@@ -266,6 +266,8 @@
 - Selepas laporan 3 diterima, semak: (1) 19/19 pengguna + profil + identity,
   (2) tiada pengguna sedia ada di-reset, (3) role betul, (4) bucket private
   + 4 polisi.
-- Selepas laporan 3 diluluskan, langkah seterusnya ialah **Prompt #4**:
-  deploy Vercel (env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
-  + ujian end-to-end. (Prompt #4 akan disediakan selepas laporan 3 disemak.)
+- Selepas laporan 3 diluluskan, langkah seterusnya ialah **Prompt #4**
+  (`docs/PROMPT-4-DEPLOY-E2E.md`): deploy Vercel (Production Branch =
+  `arena/01a05cd4-masb-pms-v4`; env: `NEXT_PUBLIC_SUPABASE_URL` +
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY`) + ujian API & senarai semak manual.
+  **Nota:** login page kini guna Supabase Auth sebenar (komit `56bc392`).
