@@ -258,7 +258,7 @@
   drop, itu bukti risiko itu nyata), (3) `lock_reason` kini enum + NOT NULL
   DEFAULT 'manual', (4) RLS rasmi lengkap, (5) seed berjaya dengan kiraan
   betul (4/4/6/2/4/4) dan audit rasmi `created` terhasil.
-- Selepas laporan 2D diluluskan, langkah seterusnya ialah **Prompt #3**:
-  cipta Auth users (Dashboard Supabase) + `user_profiles` dengan role,
-  bucket storage, kemudian deploy Vercel + ujian end-to-end. (Prompt #3
-  akan disediakan selepas laporan 2D disemak.)
+- Selepas laporan 2D diluluskan, langkah seterusnya ialah **Prompt #2E**
+  (`docs/PROMPT-2E-AUDIT-LEGACY-FIX.md`): fix kolum legacy NOT NULL yang
+  menghalang audit rasmi (action_type dll.), ujian rollback audit, kemudian
+  seed. **Nota:** seed sebenar mengandungi 12 organizers (bukan 4).
