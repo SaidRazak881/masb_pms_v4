@@ -1,14 +1,24 @@
 import type { Metadata } from "next";
+import type { Programme } from "@/lib/types";
 
 import { ReportBuilder } from "@/components/reports/report-builder";
-import { PROGRAMMES } from "@/lib/mock-data";
+import { getProgrammes } from "@/lib/actions/programme-actions";
 
 export const metadata: Metadata = {
   title: "Laporan",
   description: "Report Builder & Export Excel — MIMOS Academy TPMS",
 };
 
-export default function ReportsPage() {
+export default async function ReportsPage() {
+  // Cuba muat data dari Supabase
+  let programmes: Programme[] = [];
+  try {
+    programmes = await getProgrammes();
+  } catch (error) {
+    console.error("Error loading programmes from Supabase:", error);
+    // Kosongkan, komponen ReportBuilder akan handle
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div>
@@ -19,7 +29,7 @@ export default function ReportsPage() {
         </p>
       </div>
 
-      <ReportBuilder programmes={PROGRAMMES} />
+      <ReportBuilder programmes={programmes} />
     </div>
   );
 }

@@ -1,14 +1,23 @@
 import type { Metadata } from "next";
 
 import { ProgrammesBrowser } from "@/components/programmes/programmes-browser";
-import { PROGRAMMES } from "@/lib/mock-data";
+import { getProgrammes } from "@/lib/actions/programme-actions";
 
 export const metadata: Metadata = {
   title: "Program Latihan",
   description: "Senarai program latihan MIMOS Academy",
 };
 
-export default function ProgrammesPage() {
+export default async function ProgrammesPage() {
+  // Cuba muat data dari Supabase
+  let programmes;
+  try {
+    programmes = await getProgrammes();
+  } catch (error) {
+    console.error("Error loading programmes from Supabase:", error);
+    programmes = undefined; // Biarkan komponen gunakan mock data
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div>
@@ -19,7 +28,7 @@ export default function ProgrammesPage() {
         </p>
       </div>
 
-      <ProgrammesBrowser programmes={PROGRAMMES} />
+      <ProgrammesBrowser programmes={programmes} />
     </div>
   );
 }
