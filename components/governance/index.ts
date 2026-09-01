@@ -11,6 +11,9 @@ export {
   type UnlockApprovalCardProps,
 } from "@/components/governance/unlock-approval-card";
 export { UnlockRequestHistory } from "@/components/governance/unlock-request-history";
+export { ChangeRequestDialog } from "@/components/governance/change-request-dialog";
+export { ChangeRequestInbox } from "@/components/governance/change-request-inbox";
+export { ChangeRequestHistory } from "@/components/governance/change-request-history";
 export {
   GovernancePanel,
   type GovernancePanelProps,

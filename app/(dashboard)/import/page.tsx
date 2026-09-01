@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
+import { ImportHistory } from "@/components/import/import-history";
 import { SmartExcelImport } from "@/components/import/smart-excel-import";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const metadata: Metadata = {
   title: "Import Data (Excel)",
@@ -23,11 +25,23 @@ export default function ImportPage() {
           <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">
             import_staging
           </code>{" "}
-          untuk semakan akhir.
+          untuk semakan akhir. Semua keputusan sync direkodkan dalam audit
+          log dan boleh disemak semula di bawah tab Sejarah Import.
         </p>
       </div>
 
-      <SmartExcelImport />
+      <Tabs defaultValue="upload" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="upload">Muat Naik &amp; Semakan</TabsTrigger>
+          <TabsTrigger value="history">Sejarah Import</TabsTrigger>
+        </TabsList>
+        <TabsContent value="upload" className="space-y-4">
+          <SmartExcelImport />
+        </TabsContent>
+        <TabsContent value="history" className="space-y-4">
+          <ImportHistory />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

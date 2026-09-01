@@ -17,7 +17,6 @@ const NAV_ITEMS = [
     title: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
-    disabled: true,
   },
   {
     title: "Program Latihan",
@@ -33,7 +32,6 @@ const NAV_ITEMS = [
     title: "Peserta",
     href: "/participants",
     icon: Users,
-    disabled: true,
   },
   {
     title: "Laporan",
@@ -49,22 +47,8 @@ export function SidebarNav() {
     <nav className="flex flex-col gap-1 px-3 py-4">
       {NAV_ITEMS.map((item) => {
         const active =
-          !item.disabled &&
-          (pathname === item.href || pathname.startsWith(`${item.href}/`));
+          pathname === item.href || pathname.startsWith(`${item.href}/`);
         const Icon = item.icon;
-
-        if (item.disabled) {
-          return (
-            <span
-              key={item.href}
-              className="flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground/50"
-              title="Modul ini akan dibangunkan pada fasa seterusnya"
-            >
-              <Icon className="h-4 w-4" />
-              {item.title}
-            </span>
-          );
-        }
 
         return (
           <Link

@@ -28,7 +28,11 @@ export type ReportType =
   | "programme_summary"
   | "financial"
   | "participants"
-  | "costs";
+  | "costs"
+  | "monthly_summary"
+  | "governance_locked"
+  | "certificate_eligibility"
+  | "demographic";
 
 export interface ReportFilter {
   /** Tahun program; `null` bermaksud semua tahun. */
@@ -151,6 +155,22 @@ export const REPORT_TYPES: Record<ReportType, ReportTypeMeta> = {
     label: "Laporan Kos",
     description: "Pecahan kos mengikut kategori: bajet vs sebenar & varians.",
   },
+  monthly_summary: {
+    label: "Ringkasan Bulanan",
+    description: "Bilangan program, peserta, kategori dan completion mengikut bulan.",
+  },
+  governance_locked: {
+    label: "Program Terkunci (Governance)",
+    description: "Program yang dikunci, status, pemilik dan tempoh — untuk semakan tadbir urus.",
+  },
+  certificate_eligibility: {
+    label: "Kelayakan Sijil",
+    description: "Peserta layak sijil berdasarkan kehadiran (≥80%) dan completion.",
+  },
+  demographic: {
+    label: "Demografi Peserta",
+    description: "Peserta mengikut organisasi, jawatan dan status Bumiputera. Akses dikawal — hanya bagi tujuan dibenarkan polisi organisasi.",
+  },
 };
 
 export const REPORT_TYPE_ORDER: ReportType[] = [
@@ -158,6 +178,10 @@ export const REPORT_TYPE_ORDER: ReportType[] = [
   "financial",
   "participants",
   "costs",
+  "monthly_summary",
+  "governance_locked",
+  "certificate_eligibility",
+  "demographic",
 ];
 
 /* ====================== Penapisan program ====================== */
@@ -259,6 +283,122 @@ function buildCostRows(programmes: Programme[]): ReportRow[] {
   return rows;
 }
 
+/** Bulan dalam BM, cth. "2026-01" → "Januari 2026". */
+function monthLabel(yearMonth: string): string {
+  const [y, m] = yearMonth.split("-").map(Number);
+  const names = [
+    "Januari", "Februari", "Mac", "April", "Mei", "Jun",
+    "Julai", "Ogos", "September", "Oktober", "November", "Disember",
+  ];
+  return `${names[(m ?? 1) - 1]} ${y}`;
+}
+
+/** Ringkasan bulanan: kumpul program mengikut bulan tarikh mula. */
+function buildMonthlySummaryRows(programmes: Programme[]): ReportRow[] {
+  const groups = new Map<string, {
+    count: number;
+    participants: number;
+    contracted: number;
+    completed: number;
+    margin: number;
+  }>();
+
+  for (const p of programmes) {
+    const start = p.startDate ? p.startDate.slice(0, 7) : null;
+    const key = start ?? `${p.year}-00`;
+    const g = groups.get(key) ?? {
+      count: 0,
+      participants: 0,
+      contracted: 0,
+      completed: 0,
+      margin: 0,
+    };
+    g.count += 1;
+    g.participants += p.participants.length;
+    g.contracted += p.contractedAmount;
+    g.margin += p.contractedAmount - p.actualCost;
+    if (p.status === "completed") g.completed += 1;
+    groups.set(key, g);
+  }
+
+  return [...groups.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+    .map(([key, g]) => ({
+      month: key === `${new Date().getFullYear()}-00` ? "Tiada tarikh" : monthLabel(key),
+      count: g.count,
+      participants: g.participants,
+      contracted: g.contracted,
+      completed: g.completed,
+      completionRate: g.count > 0 ? Math.round((g.completed / g.count) * 1000) / 10 : 0,
+      margin: g.margin,
+    }));
+}
+
+/** Laporan program terkunci untuk semakan tadbir urus. */
+function buildGovernanceLockedRows(programmes: Programme[]): ReportRow[] {
+  return programmes
+    .filter((p) => p.locked)
+    .map((p) => ({
+      code: p.code,
+      title: p.title,
+      client: p.client,
+      category: p.category,
+      status: STATUS_LABEL[p.status],
+      manager: p.programmeManager,
+      trainer: p.trainer,
+      contracted: p.contractedAmount,
+      startDate: p.startDate,
+      endDate: p.endDate,
+      locked: booleanLabel(p.locked),
+    }));
+}
+
+/** Kelayakan sijil: hadir ≥80% DAN status completed. */
+function buildCertificateEligibilityRows(programmes: Programme[]): ReportRow[] {
+  const rows: ReportRow[] = [];
+  for (const p of programmes) {
+    for (const part of p.participants) {
+      const eligible = part.attendance >= 80 && part.status === "completed";
+      const issued = part.certificateIssued;
+      rows.push({
+        code: p.code,
+        title: p.title,
+        name: part.name,
+        email: part.email,
+        organisation: part.organisation,
+        attendance: part.attendance,
+        status: PARTICIPANT_STATUS_LABEL[part.status],
+        eligible: eligible && !issued ? "Layak" : eligible ? "Sijil dikeluarkan" : "Tidak layak",
+        certificate: booleanLabel(issued),
+      });
+    }
+  }
+  return rows;
+}
+
+/**
+ * Demografi peserta — data sensitif, guna ONLY bagi tujuan dibenarkan.
+ * Kawalan akses dikuatkuasakan oleh RLS / role (lihat skema master).
+ */
+function buildDemographicRows(programmes: Programme[]): ReportRow[] {
+  const rows: ReportRow[] = [];
+  for (const p of programmes) {
+    for (const part of p.participants) {
+      rows.push({
+        code: p.code,
+        title: p.title,
+        name: part.name,
+        organisation: part.organisation,
+        designation: part.designation,
+        bumi: BUMI_LABEL[part.bumiStatus],
+        status: PARTICIPANT_STATUS_LABEL[part.status],
+        attendance: part.attendance,
+      });
+    }
+  }
+  return rows;
+}
+
 /* ====================== Definisi kolom mengikut jenis ====================== */
 
 const COLUMNS: Record<ReportType, ReportColumn[]> = {
@@ -311,6 +451,49 @@ const COLUMNS: Record<ReportType, ReportColumn[]> = {
     { key: "actual", label: "Sebenar (RM)", align: "right" },
     { key: "variance", label: "Varians (RM)", align: "right" },
   ],
+  monthly_summary: [
+    { key: "month", label: "Bulan" },
+    { key: "count", label: "Bilangan Program", align: "right" },
+    { key: "participants", label: "Peserta", align: "right" },
+    { key: "contracted", label: "Nilai Kontrak (RM)", align: "right" },
+    { key: "completed", label: "Selesai", align: "right" },
+    { key: "completionRate", label: "Kadar Siap (%)", align: "right" },
+    { key: "margin", label: "Margin (RM)", align: "right" },
+  ],
+  governance_locked: [
+    { key: "code", label: "Kod" },
+    { key: "title", label: "Tajuk Program" },
+    { key: "client", label: "Pelanggan" },
+    { key: "category", label: "Kategori" },
+    { key: "status", label: "Status" },
+    { key: "manager", label: "Pengurus Program" },
+    { key: "trainer", label: "Jurulatih" },
+    { key: "contracted", label: "Nilai Kontrak (RM)", align: "right" },
+    { key: "startDate", label: "Tarikh Mula" },
+    { key: "endDate", label: "Tarikh Tamat" },
+    { key: "locked", label: "Berkunci", align: "center" },
+  ],
+  certificate_eligibility: [
+    { key: "code", label: "Kod" },
+    { key: "title", label: "Tajuk Program" },
+    { key: "name", label: "Nama" },
+    { key: "email", label: "E-mel" },
+    { key: "organisation", label: "Organisasi" },
+    { key: "attendance", label: "Kehadiran (%)", align: "right" },
+    { key: "status", label: "Status" },
+    { key: "eligible", label: "Kelayakan Sijil" },
+    { key: "certificate", label: "Sijil Dikeluarkan", align: "center" },
+  ],
+  demographic: [
+    { key: "code", label: "Kod" },
+    { key: "title", label: "Tajuk Program" },
+    { key: "name", label: "Nama" },
+    { key: "organisation", label: "Organisasi" },
+    { key: "designation", label: "Jawatan" },
+    { key: "bumi", label: "Status Bumiputera" },
+    { key: "status", label: "Status" },
+    { key: "attendance", label: "Kehadiran (%)", align: "right" },
+  ],
 };
 
 const ROW_BUILDERS: Record<ReportType, (programmes: Programme[]) => ReportRow[]> = {
@@ -318,6 +501,10 @@ const ROW_BUILDERS: Record<ReportType, (programmes: Programme[]) => ReportRow[]>
   financial: buildFinancialRows,
   participants: buildParticipantsRows,
   costs: buildCostRows,
+  monthly_summary: buildMonthlySummaryRows,
+  governance_locked: buildGovernanceLockedRows,
+  certificate_eligibility: buildCertificateEligibilityRows,
+  demographic: buildDemographicRows,
 };
 
 /* ====================== API utama ====================== */

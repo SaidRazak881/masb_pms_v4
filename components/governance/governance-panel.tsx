@@ -20,6 +20,8 @@ import { LockBanner } from "@/components/governance/lock-banner";
 import { RequestUnlockDialog } from "@/components/governance/request-unlock-dialog";
 import { UnlockApprovalCard } from "@/components/governance/unlock-approval-card";
 import { UnlockRequestHistory } from "@/components/governance/unlock-request-history";
+import { ChangeRequestDialog } from "@/components/governance/change-request-dialog";
+import { ChangeRequestInbox } from "@/components/governance/change-request-inbox";
 import {
   canApproveUnlock,
   effectiveStatus,
@@ -28,6 +30,7 @@ import {
   type UnlockRequest,
 } from "@/lib/governance";
 import { cancelUnlockAction } from "@/lib/governance-actions";
+import type { ChangeRequest } from "@/lib/change-requests";
 
 export interface GovernancePanelProps {
   lock: ProgrammeLockState;
@@ -35,6 +38,8 @@ export interface GovernancePanelProps {
   role: GovernanceRole;
   currentUserId: string;
   requests?: UnlockRequest[];
+  /** Permohonan ubah data (Change Requests) bagi program ini. */
+  changeRequests?: ChangeRequest[];
   /** Tunjukkan sejarah permohonan (lalai: ya). */
   showHistory?: boolean;
 }
@@ -45,6 +50,7 @@ export function GovernancePanel({
   role,
   currentUserId,
   requests = [],
+  changeRequests = [],
   showHistory = true,
 }: GovernancePanelProps) {
   const [dialogOpen, setDialogOpen] = React.useState(false);
@@ -53,6 +59,8 @@ export function GovernancePanel({
 
   const pending = requests.find((r) => effectiveStatus(r) === "pending");
   const showApproval = Boolean(pending) && canApproveUnlock(role);
+  const canReviewChanges = canApproveUnlock(role);
+  const isLocked = lock.locked;
 
   function handleCancel(requestId: string) {
     const formData = new FormData();
@@ -92,6 +100,31 @@ export function GovernancePanel({
 
       {showHistory && requests.length > 0 && (
         <UnlockRequestHistory requests={requests} />
+      )}
+
+      {/* Change Requests — hanya relevan apabila program dikunci */}
+      {isLocked && (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
+            <div>
+              <p className="text-sm font-semibold">Permohonan Ubah Data</p>
+              <p className="text-xs text-muted-foreground">
+                Program terkunci — sebarang perubahan perlu melalui kelulusan
+                Head Governance. {changeRequests.length} permohonan direkod.
+              </p>
+            </div>
+            <ChangeRequestDialog
+              programmeId={lock.programmeId}
+              programmeCode={programmeCode}
+            />
+          </div>
+
+          <ChangeRequestInbox
+            requests={changeRequests}
+            currentUserId={currentUserId}
+            canReview={canReviewChanges}
+          />
+        </>
       )}
 
       <RequestUnlockDialog

@@ -24,6 +24,7 @@ import {
   getCurrentGovernanceRole,
   listUnlockRequests,
 } from "@/lib/governance-actions";
+import { listChangeRequests } from "@/lib/change-request-actions";
 import { canEditProgramme, type ProgrammeLockState } from "@/lib/governance";
 import { getProgrammeById as getProgrammeFromDb } from "@/lib/actions/programme-actions";
 import { getProgrammeById as getProgrammeFromMock } from "@/lib/mock-data";
@@ -61,9 +62,10 @@ export default async function ProgrammeDetailPage({ params }: DetailPageProps) {
   }
 
   /* ---- Langkah 5: keadaan tadbir urus (lock / unlock) ---- */
-  const [role, unlockRequests] = await Promise.all([
+  const [role, unlockRequests, changeRequests] = await Promise.all([
     getCurrentGovernanceRole(),
     listUnlockRequests(programme.id),
+    listChangeRequests(programme.id),
   ]);
 
   const lockState: ProgrammeLockState = {
@@ -174,16 +176,17 @@ export default async function ProgrammeDetailPage({ params }: DetailPageProps) {
         </CardContent>
       </Card>
 
-      {/* Langkah 5 — Modul Governance Lock & Request Unlock */}
+      {/* Langkah 5 — Modul Governance Lock, Request Unlock & Change Requests */}
       <GovernancePanel
         lock={lockState}
         programmeCode={programme.code}
         role={role}
         currentUserId="current-user"
         requests={unlockRequests}
+        changeRequests={changeRequests}
       />
 
-      <ProgrammeDetailTabs programme={programme} />
+      <ProgrammeDetailTabs programme={programme} changeRequests={changeRequests} />
     </div>
   );
 }
