@@ -21,7 +21,12 @@
 
 /* ====================== Peranan & keizinan ====================== */
 
-export type GovernanceRole = "viewer" | "executive" | "manager" | "admin";
+export type GovernanceRole =
+  | "viewer"
+  | "executive"
+  | "manager"
+  | "admin"
+  | "head_governance";
 
 /** Susunan hierarki peranan — indeks lebih tinggi = lebih berkuasa. */
 const ROLE_RANK: Record<GovernanceRole, number> = {
@@ -29,13 +34,22 @@ const ROLE_RANK: Record<GovernanceRole, number> = {
   executive: 1,
   manager: 2,
   admin: 3,
+  head_governance: 3,
 };
 
 /** Peranan yang dibenarkan MELULUS/MENOLAK permohonan buka kunci. */
-export const APPROVER_ROLES: GovernanceRole[] = ["manager", "admin"];
+export const APPROVER_ROLES: GovernanceRole[] = [
+  "manager",
+  "admin",
+  "head_governance",
+];
 
 /** Peranan yang dibenarkan MENGUNCI program secara manual. */
-export const LOCKER_ROLES: GovernanceRole[] = ["manager", "admin"];
+export const LOCKER_ROLES: GovernanceRole[] = [
+  "manager",
+  "admin",
+  "head_governance",
+];
 
 /** Label paparan Bahasa Melayu bagi setiap peranan. */
 export const ROLE_LABEL: Record<GovernanceRole, string> = {
@@ -43,6 +57,7 @@ export const ROLE_LABEL: Record<GovernanceRole, string> = {
   executive: "Eksekutif",
   manager: "Pengurus",
   admin: "Pentadbir",
+  head_governance: "Head Governance",
 };
 
 export function hasRoleAtLeast(

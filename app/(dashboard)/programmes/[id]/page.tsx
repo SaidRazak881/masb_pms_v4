@@ -6,18 +6,18 @@ import {
   CalendarRange,
   Lock,
   LockOpen,
-  Pencil,
   User,
 } from "lucide-react";
 
 import { GovernancePanel } from "@/components/governance/governance-panel";
+import { LockProgrammeButton } from "@/components/governance/lock-programme-button";
+import { EditProgrammeDialog } from "@/components/programmes/edit-programme-dialog";
 import { ProgrammeDetailTabs } from "@/components/programmes/programme-detail-tabs";
 import {
   ModeBadge,
   ProgrammeStatusBadge,
 } from "@/components/programmes/status-badges";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDate } from "@/lib/format";
 import {
@@ -25,7 +25,7 @@ import {
   listUnlockRequests,
 } from "@/lib/governance-actions";
 import { listChangeRequests } from "@/lib/change-request-actions";
-import { canEditProgramme, type ProgrammeLockState } from "@/lib/governance";
+import { canEditProgramme, canLockProgramme, type ProgrammeLockState } from "@/lib/governance";
 import { getProgrammeById as getProgrammeFromDb } from "@/lib/actions/programme-actions";
 import { getProgrammeById as getProgrammeFromMock } from "@/lib/mock-data";
 
@@ -110,11 +110,14 @@ export default async function ProgrammeDetailPage({ params }: DetailPageProps) {
           </Link>
         </div>
         <div className="flex items-center gap-2">
+          {canLockProgramme(role) && !lockState.locked && (
+            <LockProgrammeButton
+              programmeId={programme.id}
+              programmeCode={programme.code}
+            />
+          )}
           {editable ? (
-            <Button variant="outline">
-              <Pencil className="h-4 w-4" />
-              Sunting Program
-            </Button>
+            <EditProgrammeDialog programme={programme} />
           ) : (
             <Badge variant="secondary" className="gap-1.5 px-3 py-1.5">
               <Lock className="h-3.5 w-3.5" />

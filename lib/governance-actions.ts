@@ -329,7 +329,12 @@ export async function getCurrentGovernanceRole(): Promise<GovernanceRole> {
     .maybeSingle();
 
   const role = (data as { role?: string } | null)?.role;
-  if (role === "admin" || role === "manager" || role === "executive") {
+  if (
+    role === "admin" ||
+    role === "manager" ||
+    role === "executive" ||
+    role === "head_governance"
+  ) {
     return role;
   }
   return "viewer";
