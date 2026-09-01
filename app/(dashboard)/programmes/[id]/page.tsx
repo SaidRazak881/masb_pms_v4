@@ -25,24 +25,39 @@ import {
   listUnlockRequests,
 } from "@/lib/governance-actions";
 import { canEditProgramme, type ProgrammeLockState } from "@/lib/governance";
-import { getProgrammeById } from "@/lib/mock-data";
+import { getProgrammeById as getProgrammeFromDb } from "@/lib/actions/programme-actions";
+import { getProgrammeById as getProgrammeFromMock } from "@/lib/mock-data";
 
 type DetailPageProps = {
   params: { id: string };
 };
 
-export function generateMetadata({ params }: DetailPageProps): Metadata {
-  const programme = getProgrammeById(params.id);
+export async function generateMetadata({ params }: DetailPageProps): Promise<Metadata> {
+  // Cuba muat dari Supabase terlebih dahulu
+  let programme = await getProgrammeFromDb(params.id);
+  
+  // Jika gagal, gunakan mock data
+  if (!programme) {
+    const mockProgramme = getProgrammeFromMock(params.id);
+    programme = mockProgramme || null;
+  }
+  
   return {
     title: programme ? programme.code : "Perincian Program",
   };
 }
 
 export default async function ProgrammeDetailPage({ params }: DetailPageProps) {
-  const programme = getProgrammeById(params.id);
-
+  // Cuba muat dari Supabase terlebih dahulu
+  let programme = await getProgrammeFromDb(params.id);
+  
+  // Jika gagal, gunakan mock data
   if (!programme) {
-    notFound();
+    const mockProgramme = getProgrammeFromMock(params.id);
+    if (!mockProgramme) {
+      notFound();
+    }
+    programme = mockProgramme;
   }
 
   /* ---- Langkah 5: keadaan tadbir urus (lock / unlock) ---- */
