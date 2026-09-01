@@ -39,7 +39,6 @@ const NAV_ITEMS = [
     title: "Laporan",
     href: "/reports",
     icon: BarChart3,
-    disabled: true,
   },
 ];
 

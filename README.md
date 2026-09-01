@@ -20,7 +20,8 @@ komponen **shadcn/ui** (Radix UI).
 │       ├── programmes/
 │       │   ├── page.tsx              # Senarai program (My / All, filter)
 │       │   └── [id]/page.tsx         # Perincian program + 6 tab
-│       └── import/page.tsx           # Staging Area pintar muat naik Excel
+│       ├── import/page.tsx           # Staging Area pintar muat naik Excel
+│       └── reports/page.tsx          # Report Builder & Export Excel
 ├── components/
 │   ├── ui/                           # Komponen shadcn/ui
 │   │   ├── button.tsx  card.tsx  badge.tsx  input.tsx  label.tsx
@@ -37,6 +38,16 @@ komponen **shadcn/ui** (Radix UI).
 │   │       ├── costs-tab.tsx         # Bajet vs sebenar + varians
 │   │       ├── documents-tab.tsx     # Senarai dokumen
 │   │       └── audit-trail-tab.tsx   # Garis masa audit
+│   ├── governance/                   # Modul Governance Lock & Request Unlock
+│   │   ├── lock-banner.tsx           # Banner kunci program
+│   │   ├── request-unlock-dialog.tsx # Dialog permohonan buka kunci
+│   │   ├── unlock-approval-card.tsx  # Kad lulus/tolak permohonan
+│   │   ├── unlock-request-history.tsx# Sejarah permohonan
+│   │   ├── governance-panel.tsx      # Panel tadbir urus gabungan
+│   │   └── index.ts                  # Barrel eksport
+│   ├── reports/                      # Modul Report Builder & Export Excel
+│   │   ├── report-builder.tsx        # Wizard laporan: jenis → filter → preview
+│   │   └── index.ts                  # Barrel eksport
 │   └── import/                       # Modul Import Excel Pintar
 │       ├── smart-excel-import.tsx    # Wizard: muat naik → review → sync
 │       ├── review-panel.tsx          # Jadual preview + penapis + tindakan
@@ -46,6 +57,10 @@ komponen **shadcn/ui** (Radix UI).
 │   ├── excel-parser.ts               # Parser SheetJS + pemetaan import_staging
 │   ├── import-api.ts                 # Sambungan UI → POST /api/import/sync
 │   ├── master-records.ts             # Data induk (Supabase / mock) untuk pendua
+│   ├── governance.ts                 # Logik tulen Governance Lock (Langkah 5)
+│   ├── governance-actions.ts         # Server Actions Governance (Langkah 5)
+│   ├── reporting.ts                  # Logik tulen Report Builder (Langkah 6)
+│   └── report-excel.ts               # Pengeksport SheetJS → .xlsx (Langkah 6)
 │   ├── supabase/
 │   │   ├── client.ts                 # Browser client (@supabase/ssr)
 │   │   ├── server.ts                 # Server client (cookies)
@@ -144,6 +159,38 @@ Gagal tanpa fail sebenar: dua fail contoh disediakan di `public/samples/`
 (klik "Cuba" pada halaman import). Jana semula dengan
 `node scripts/generate-sample-excel.mjs`; uji parser dengan
 `node --experimental-strip-types scripts/test-parser.mjs`.
+
+## Modul Governance Lock & Request Unlock (Langkah 5)
+
+Program yang telah dikunci (`locked = true`) adalah rekod audit yang tidak boleh
+disunting terus. Untuk menyunting, pengguna menghantar *Permohonan Buka Kunci*
+dengan justifikasi, diluluskan oleh peranan berautoriti (Manager/Admin, tanpa
+self-approval), lalu membuka tetingkap suntingan bertempoh (default 24 jam).
+
+- **`lib/governance.ts`** — logik tulen: hierarki peranan, pengesahan permohonan,
+  peralihan keadaan, pengiraan tamat tempoh, dan peraturan *no self-approval*.
+- **`lib/governance-actions.ts`** — Server Actions (`mohon`, `lulus/tolak`,
+  `kunci semula`, `batal`) yang memanggil RPC atomik dalam
+  `lib/supabase/governance-lock.sql`; mod demo tanpa Supabase.
+- **`components/governance/*`** — `LockBanner`, `RequestUnlockDialog`,
+  `UnlockApprovalCard`, `UnlockRequestHistory` dan `GovernancePanel`.
+- **`app/(dashboard)/programmes/[id]/page.tsx`** — integrasi panel tadbir urus
+  dan keadaan *boleh sunting* program.
+
+## Modul Report Builder & Export Excel (Langkah 6)
+
+Halaman **/reports** membina laporan program latihan dan mengeksportnya ke fail
+Excel (.xlsx) menggunakan SheetJS (`xlsx`) — konsisten dengan parser import.
+
+- **`lib/reporting.ts`** — logik tulen: empat jenis laporan (`programme_summary`,
+  `financial`, `participants`, `costs`), penapis (tahun/kategori/status), metrik
+  ringkasan dan struktur `ReportResult` (kolom + baris) yang agnostik medium.
+- **`lib/report-excel.ts`** — `buildSheet()` / `buildWorkbook()` / `downloadReport()`
+  menukar `ReportResult` kepada fail `.xlsx` (satu sheet "Laporan").
+- **`components/reports/report-builder.tsx`** — wizard laporan: pilih jenis →
+  penapis → kad metrik → jadual preview → butang **Eksport Excel**.
+- **`app/(dashboard)/reports/page.tsx`** — halaman laporan; item "Laporan" dalam
+  sidebar kini aktif (dahulunya `disabled`).
 
 ## Bermula
 
