@@ -18,6 +18,7 @@
 - Env Vercel: `NEXT_PUBLIC_SUPABASE_URL=https://lmenmfsbjgxfhnykkgow.supabase.co` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` (anon key).
 - Supabase: projek `lmenmfsbjgxfhnykkgow` — 14 jadual, RLS aktif, seed: 12 organizer, 4 program, 6 financial docs, 2 programme costs, 4 peserta, 4 cost items; audit_logs 14 rekod `created`; 19 auth users + 19 `user_profiles`.
 - Password lalai rasmi semua akaun (dari `V4 RAW/User Profiles Mapping.xlsx`): **`masb.12345`**.
+- ✅ **PENGESAHAN PENGUNA: password `masb.12345` MASIH SAH** untuk akaun ujian (disahkan semasa menyediakan prompt ini) — jalankan Laluan A terus; laluan 3.2-B (reset) hanya relevan jika login tiba-tiba gagal.
 
 ## 2. Tugasan
 
