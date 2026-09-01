@@ -11,11 +11,22 @@
 --   discarded      → dibuang (kekal untuk jejak audit jika perlu)
 -- =====================================================================
 
-create type import_entity_kind as enum ('quotation', 'invoice', 'cost', 'unknown');
-create type import_record_action as enum (
-  'pending', 'sync_confirmed', 'merged', 'created_new', 'discarded'
-);
-create type import_duplicate_confidence as enum ('high', 'medium', 'none');
+-- Jenis enum — guna DO $$ ... $$ supaya boleh dijalankan semula dengan selamat
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'import_entity_kind') THEN
+    CREATE TYPE import_entity_kind AS ENUM ('quotation', 'invoice', 'cost', 'unknown');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'import_record_action') THEN
+    CREATE TYPE import_record_action AS ENUM (
+      'pending', 'sync_confirmed', 'merged', 'created_new', 'discarded'
+    );
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'import_duplicate_confidence') THEN
+    CREATE TYPE import_duplicate_confidence AS ENUM ('high', 'medium', 'none');
+  END IF;
+END
+$$;
 
 create table if not exists import_staging (
   id                  uuid primary key default gen_random_uuid(),
@@ -76,9 +87,20 @@ create table if not exists import_batches (
                   -- staged | reviewed | synced | discarded
 );
 
-alter table import_staging
-  add constraint import_staging_batch_fk
-  foreign key (batch_id) references import_batches (id) on delete cascade;
+-- Kekangan FK — tambah hanya jika belum wujud
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'import_staging_batch_fk'
+      AND conrelid = 'import_staging'::regclass
+  ) THEN
+    ALTER TABLE import_staging
+      ADD CONSTRAINT import_staging_batch_fk
+      FOREIGN KEY (batch_id) REFERENCES import_batches (id) ON DELETE CASCADE;
+  END IF;
+END
+$$;
 
 create index if not exists idx_import_staging_batch
   on import_staging (batch_id);
@@ -90,6 +112,24 @@ create index if not exists idx_import_staging_dup
   on import_staging (duplicate_confidence);
 
 -- Dasar baris (RLS) — boleh diperketat ikut peranan pasukan.
+-- Sediakan semula polisi supaya fail boleh dijalankan semula.
+DO $$
+DECLARE
+  v_table text;
+  v_policy text;
+BEGIN
+  FOR v_table IN SELECT unnest(ARRAY['import_staging', 'import_batches'])
+  LOOP
+    FOR v_policy IN
+      SELECT policyname FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = v_table
+    LOOP
+      EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', v_policy, v_table);
+    END LOOP;
+  END LOOP;
+END
+$$;
+
 alter table import_staging enable row level security;
 alter table import_batches enable row level security;
 
@@ -101,13 +141,13 @@ create policy "Pengguna terauth boleh melihat staging"
 create policy "Pengguna terauth boleh menambah staging"
   on import_staging for insert
   to authenticated
-  with_check (true);
+  with check (true);
 
 create policy "Pengguna terauth boleh mengemaskini keputusan"
   on import_staging for update
   to authenticated
   using (true)
-  with_check (true);
+  with check (true);
 
 create policy "Pengguna terauth boleh melihat batch"
   on import_batches for select
@@ -117,4 +157,4 @@ create policy "Pengguna terauth boleh melihat batch"
 create policy "Pengguna terauth boleh mencipta batch"
   on import_batches for insert
   to authenticated
-  with_check (true);
+  with check (true);

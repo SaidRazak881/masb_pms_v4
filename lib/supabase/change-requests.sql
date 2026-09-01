@@ -134,6 +134,12 @@ $$;
 -- 4. RPC: hantar permohonan ubah data
 -- ---------------------------------------------------------------------
 
+-- Buang versi lama (jika wujud) supaya kontrak baharu digunakan dengan
+-- pasti; fungsi dicipta semula di bawah dalam transaksi yang sama.
+DROP FUNCTION IF EXISTS public.submit_change_request(uuid, text, text, text, text, text);
+DROP FUNCTION IF EXISTS public.review_change_request(uuid, boolean, text);
+DROP FUNCTION IF EXISTS public.cancel_change_request(uuid);
+
 CREATE OR REPLACE FUNCTION public.submit_change_request(
   p_programme_id   uuid,
   p_field_name     text,
@@ -376,6 +382,20 @@ $$;
 -- ---------------------------------------------------------------------
 -- 7. RLS — baca dibenarkan, tulis hanya melalui RPC
 -- ---------------------------------------------------------------------
+
+-- Sediakan semula polisi supaya fail boleh dijalankan semula.
+DO $$
+DECLARE
+  v_policy text;
+BEGIN
+  FOR v_policy IN
+    SELECT policyname FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'change_requests'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.change_requests', v_policy);
+  END LOOP;
+END
+$$;
 
 ALTER TABLE public.change_requests ENABLE ROW LEVEL SECURITY;
 

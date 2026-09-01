@@ -107,7 +107,7 @@ STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
-  SELECT public.current_role_name() IN ('manager', 'admin');
+  SELECT public.current_role_name() IN ('manager', 'admin', 'head_governance');
 $$;
 
 -- Adakah program boleh disunting sekarang?
@@ -132,6 +132,14 @@ $$;
 -- ---------------------------------------------------------------------
 -- 4. RPC: hantar permohonan buka kunci
 -- ---------------------------------------------------------------------
+
+-- Buang versi lama (jika wujud) supaya kontrak baharu digunakan dengan
+-- pasti — fungsi yang sama dicipta semula di bawah dalam transaksi yang
+-- sama, jadi operasi ini selamat untuk dijalankan semula.
+DROP FUNCTION IF EXISTS public.request_programme_unlock(uuid, text, text[], integer);
+DROP FUNCTION IF EXISTS public.review_programme_unlock(uuid, boolean, text, integer);
+DROP FUNCTION IF EXISTS public.lock_programme(uuid, text);
+DROP FUNCTION IF EXISTS public.cancel_programme_unlock(uuid);
 
 CREATE OR REPLACE FUNCTION public.request_programme_unlock(
   p_programme_id    uuid,
@@ -161,7 +169,7 @@ BEGIN
   END IF;
 
   -- Kunci baris program supaya semakan keadaan bersifat atomik.
-  SELECT p.code, p.is_locked, p.unlock_expires_at
+  SELECT p.programme_code, p.is_locked, p.unlock_expires_at
     INTO v_code, v_locked, v_expires
   FROM public.programmes p
   WHERE p.id = p_programme_id
@@ -202,11 +210,12 @@ BEGIN
   )
   RETURNING id INTO v_id;
 
-  INSERT INTO public.audit_logs (
-    user_id, action, table_name, record_id, old_data, new_data, metadata
-  )
-  VALUES (
-    v_user, 'unlock_requested', 'programme_unlock_requests', v_id, NULL, NULL,
+  PERFORM public.log_audit(
+    'programme_unlock_requests',
+    v_id,
+    'unlock_requested',
+    NULL,
+    NULL,
     jsonb_build_object(
       'programme_id', p_programme_id,
       'programme_code', v_code,
@@ -300,13 +309,13 @@ BEGIN
     v_expires := NULL;
   END IF;
 
-  INSERT INTO public.audit_logs (
-    user_id, action, table_name, record_id, old_data, new_data, metadata
-  )
-  VALUES (
-    v_user,
-    CASE WHEN p_approve THEN 'unlock_approved' ELSE 'unlock_rejected' END,
-    'programme_unlock_requests', p_request_id, NULL, NULL,
+  PERFORM public.log_audit(
+    'programme_unlock_requests',
+    p_request_id,
+    CASE WHEN p_approve THEN 'unlock_approved'::public.audit_action
+         ELSE 'unlock_rejected'::public.audit_action END,
+    NULL,
+    NULL,
     jsonb_build_object(
       'programme_id', v_req.programme_id,
       'requested_by', v_req.requested_by,
@@ -356,11 +365,12 @@ BEGIN
      SET status = 'expired'
    WHERE programme_id = p_programme_id AND status = 'approved';
 
-  INSERT INTO public.audit_logs (
-    user_id, action, table_name, record_id, old_data, new_data, metadata
-  )
-  VALUES (
-    v_user, 'locked', 'programmes', p_programme_id, NULL, NULL,
+  PERFORM public.log_audit(
+    'programmes',
+    p_programme_id,
+    'locked',
+    NULL,
+    NULL,
     jsonb_build_object('lock_reason', p_lock_reason)
   );
 END;
@@ -401,12 +411,13 @@ BEGIN
      SET status = 'cancelled', reviewed_at = now()
    WHERE id = p_request_id;
 
-  INSERT INTO public.audit_logs (
-    user_id, action, table_name, record_id, old_data, new_data, metadata
-  )
-  VALUES (
-    v_user, 'unlock_cancelled', 'programme_unlock_requests', p_request_id,
-    NULL, NULL, jsonb_build_object('programme_id', v_req.programme_id)
+  PERFORM public.log_audit(
+    'programme_unlock_requests',
+    p_request_id,
+    'unlock_cancelled',
+    NULL,
+    NULL,
+    jsonb_build_object('programme_id', v_req.programme_id)
   );
 END;
 $$;
@@ -492,6 +503,47 @@ CREATE POLICY unlock_no_direct_write
   TO authenticated
   USING (false)
   WITH CHECK (false);
+
+-- ---------------------------------------------------------------------
+-- 11. Audit — peralihan keadaan ditulis melalui log_audit (konsisten
+--     dengan skema master). Nilai audit_action unlock_* ditambah oleh
+--     schema-master.sql.
+-- ---------------------------------------------------------------------
+
+-- Pastikan nilai audit_action wujud (untuk pangkalan data sedia ada yang
+-- mungkin dipasang sebelum schema-master dikemas kini).
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_enum e
+    JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = 'audit_action' AND e.enumlabel = 'unlock_requested'
+  ) THEN
+    ALTER TYPE public.audit_action ADD VALUE 'unlock_requested';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_enum e
+    JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = 'audit_action' AND e.enumlabel = 'unlock_approved'
+  ) THEN
+    ALTER TYPE public.audit_action ADD VALUE 'unlock_approved';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_enum e
+    JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = 'audit_action' AND e.enumlabel = 'unlock_rejected'
+  ) THEN
+    ALTER TYPE public.audit_action ADD VALUE 'unlock_rejected';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_enum e
+    JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = 'audit_action' AND e.enumlabel = 'unlock_cancelled'
+  ) THEN
+    ALTER TYPE public.audit_action ADD VALUE 'unlock_cancelled';
+  END IF;
+END
+$$;
 
 GRANT EXECUTE ON FUNCTION public.request_programme_unlock(uuid, text, text[], integer) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.review_programme_unlock(uuid, boolean, text, integer) TO authenticated;

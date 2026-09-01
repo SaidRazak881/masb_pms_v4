@@ -14,55 +14,128 @@
 
 BEGIN;
 
+-- ---------------------------------------------------------------------
+-- 0. Sediakan semula polisi RLS (supaya fail boleh dijalankan semula)
+--    Hanya polisi pada jadual yang diurus oleh sistem TPMS dibuang.
+-- ---------------------------------------------------------------------
+
+DO $$
+DECLARE
+  v_table text;
+  v_policy text;
+BEGIN
+  FOR v_table IN SELECT unnest(ARRAY[
+    'user_profiles', 'organizers', 'programmes', 'participants',
+    'financial_docs', 'programme_costs', 'cost_items', 'programme_documents',
+    'audit_logs', 'invoices'
+  ])
+  LOOP
+    FOR v_policy IN
+      SELECT policyname FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = v_table
+    LOOP
+      EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', v_policy, v_table);
+    END LOOP;
+  END LOOP;
+END
+$$;
+
 -- =====================================================================
 -- BAHAGIAN 1: ENUM DAN TYPE
 -- =====================================================================
 
 -- Enum untuk status program
-CREATE TYPE IF NOT EXISTS public.programme_status AS ENUM (
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'programme_status' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.programme_status AS ENUM (
   'draft', 'active', 'completed', 'cancelled', 'on_hold'
 );
+  END IF;
+END
+$$;
 
 -- Enum untuk kategori program
-CREATE TYPE IF NOT EXISTS public.programme_category AS ENUM (
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'programme_category' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.programme_category AS ENUM (
   'AI & Data Science',
   'Cybersecurity',
   'Cloud & Infrastructure',
   'Digital Transformation',
   'Leadership & Management',
   'IoT & Embedded Systems',
+  'Engineering',
+  'Semiconductor',
   'Non-Training',
   'Room Rental',
   'Certification'
 );
+  END IF;
+END
+$$;
 
 -- Enum untuk mod latihan
-CREATE TYPE IF NOT EXISTS public.delivery_mode AS ENUM (
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'delivery_mode' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.delivery_mode AS ENUM (
   'in_person', 'online', 'hybrid', 'physical'
 );
+  END IF;
+END
+$$;
 
 -- Enum untuk status bayaran
-CREATE TYPE IF NOT EXISTS public.payment_status AS ENUM (
-  'draft', 'sent', 'accepted', 'invoiced', 'paid', 'overdue', 'cancelled', 'partial'
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payment_status' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.payment_status AS ENUM (
+  'draft', 'pending', 'sent', 'accepted', 'invoiced', 'paid', 'overdue', 'cancelled', 'partial'
 );
+  END IF;
+END
+$$;
 
 -- Enum untuk jenis dokumen kewangan
-CREATE TYPE IF NOT EXISTS public.financial_doc_type AS ENUM (
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'financial_doc_type' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.financial_doc_type AS ENUM (
   'quotation', 'po', 'invoice'
 );
+  END IF;
+END
+$$;
 
 -- Enum untuk status Bumiputera
-CREATE TYPE IF NOT EXISTS public.bumi_status AS ENUM (
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'bumi_status' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.bumi_status AS ENUM (
   'bumiputera', 'non_bumiputera', 'pending'
 );
+  END IF;
+END
+$$;
 
 -- Enum untuk status peserta
-CREATE TYPE IF NOT EXISTS public.participant_status AS ENUM (
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'participant_status' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.participant_status AS ENUM (
   'registered', 'confirmed', 'attended', 'completed', 'cancelled'
 );
+  END IF;
+END
+$$;
 
 -- Enum untuk kategori kos
-CREATE TYPE IF NOT EXISTS public.cost_category AS ENUM (
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'cost_category' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.cost_category AS ENUM (
   'Trainer Fees',
   'Venue',
   'Catering',
@@ -71,9 +144,15 @@ CREATE TYPE IF NOT EXISTS public.cost_category AS ENUM (
   'Logistics',
   'Administration'
 );
+  END IF;
+END
+$$;
 
 -- Enum untuk jenis dokumen
-CREATE TYPE IF NOT EXISTS public.document_type AS ENUM (
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'document_type' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.document_type AS ENUM (
   'Borang Permohonan',
   'Quotation',
   'Purchase Order',
@@ -83,9 +162,15 @@ CREATE TYPE IF NOT EXISTS public.document_type AS ENUM (
   'Senarai Kehadiran',
   'Laporan Penilaian'
 );
+  END IF;
+END
+$$;
 
 -- Enum untuk tindakan audit
-CREATE TYPE IF NOT EXISTS public.audit_action AS ENUM (
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'audit_action' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.audit_action AS ENUM (
   'created',
   'updated',
   'status_changed',
@@ -95,13 +180,30 @@ CREATE TYPE IF NOT EXISTS public.audit_action AS ENUM (
   'locked',
   'unlocked',
   'imported',
+  'import_sync',
+  'import_discard',
+  'unlock_requested',
+  'unlock_approved',
+  'unlock_rejected',
+  'unlock_cancelled',
+  'change_requested',
+  'change_reviewed',
   'deleted'
 );
+  END IF;
+END
+$$;
 
 -- Enum untuk peranan pengguna
-CREATE TYPE IF NOT EXISTS public.app_role AS ENUM (
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'app_role' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.app_role AS ENUM (
   'viewer', 'executive', 'manager', 'admin', 'staff', 'finance', 'head_governance'
 );
+  END IF;
+END
+$$;
 
 -- =====================================================================
 -- BAHAGIAN 2: JADUAL USER PROFILES
@@ -509,7 +611,94 @@ CREATE POLICY "Pengguna boleh kemaskini financial_docs jika program tidak dikunc
   WITH CHECK (true);
 
 -- =====================================================================
--- BAHAGIAN 7: JADUAL PROGRAMME_COSTS (KOS PROGRAM)
+-- BAHAGIAN 7: JADUAL INVOICES (KUMPULAN INVOIS PER PROGRAM)
+-- =====================================================================
+-- Jadual ini dicipta oleh skema master supaya RPC sync_import_transaction
+-- (dan laporan kewangan) mempunyai jadual invoices yang konsisten.
+-- Ia memegang maklumat invois + quotation + PO yang diimport daripada
+-- fail Excel MIMOS Academy (R1 Income Statement, invoice_2026, dll.).
+--
+-- NOTA: jadual `financial_docs` kekal untuk dokumen kewangan generik
+-- (quotation/PO/invoice berbilang per program) yang diurus secara manual.
+-- `invoices` direka khusus untuk aliran import pukal Excel.
+
+CREATE TABLE IF NOT EXISTS public.invoices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by UUID REFERENCES auth.users (id),
+
+  programme_id UUID NOT NULL REFERENCES public.programmes (id) ON DELETE CASCADE,
+
+  -- Rujukan dokumen (salah satu akan diisi bergantung jenis import)
+  invoice_no TEXT,
+  quotation_no TEXT,
+  po_no TEXT,
+
+  -- Nilai
+  invoice_value_excl_tax NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  po_value_excl_tax NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  sst NUMERIC(10, 2) NOT NULL DEFAULT 0,
+  total_value NUMERIC(14, 2) NOT NULL DEFAULT 0,
+
+  -- Tarikh
+  invoice_date DATE,
+  due_date DATE,
+  payment_date DATE,
+
+  -- Status
+  payment_status public.payment_status NOT NULL DEFAULT 'pending',
+  account TEXT,
+  account_manager TEXT,
+  pic_name TEXT,
+
+  -- Metadata
+  file_path TEXT,
+  notes TEXT
+);
+
+-- Index untuk invoices
+CREATE INDEX IF NOT EXISTS idx_invoices_programme ON public.invoices (programme_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_invoice_no ON public.invoices (invoice_no);
+CREATE INDEX IF NOT EXISTS idx_invoices_quotation_no ON public.invoices (quotation_no);
+CREATE INDEX IF NOT EXISTS idx_invoices_payment_status ON public.invoices (payment_status);
+
+-- Unique constraint
+CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_invoice_no_unique
+  ON public.invoices (invoice_no) WHERE invoice_no IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_quotation_no_unique
+  ON public.invoices (quotation_no) WHERE quotation_no IS NOT NULL;
+
+-- RLS untuk invoices
+ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Pengguna terauth boleh lihat invoices"
+  ON public.invoices FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Pengguna terauth boleh tambah invoices"
+  ON public.invoices FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "Pengguna boleh kemaskini invoices jika program tidak dikunci"
+  ON public.invoices FOR UPDATE
+  TO authenticated
+  USING (
+    (EXISTS (
+      SELECT 1 FROM public.programmes p
+      WHERE p.id = programme_id AND (p.is_locked = false OR p.unlock_expires_at > now())
+    )) OR
+    (EXISTS (
+      SELECT 1 FROM public.user_profiles up
+      WHERE up.id = auth.uid() AND up.role IN ('head_governance', 'admin', 'finance')
+    ))
+  )
+  WITH CHECK (true);
+
+-- =====================================================================
+-- BAHAGIAN 8: JADUAL PROGRAMME_COSTS (KOS PROGRAM)
 -- =====================================================================
 
 CREATE TABLE IF NOT EXISTS public.programme_costs (
@@ -813,12 +1002,17 @@ BEGIN
     PERFORM public.log_audit('programmes', NEW.id, 'created', NULL, to_jsonb(NEW));
   ELSIF TG_OP = 'UPDATE' THEN
     PERFORM public.log_audit(
-      'programmes', 
-      NEW.id, 
-      'updated', 
-      to_jsonb(OLD), 
+      'programmes',
+      NEW.id,
+      'updated',
+      to_jsonb(OLD),
       to_jsonb(NEW),
-      jsonb_build_object('changed_fields', jsonb_object_agg(OLD, NEW))
+      jsonb_build_object('changed_fields', COALESCE(
+        (SELECT jsonb_object_agg(k, v)
+           FROM jsonb_each(to_jsonb(NEW)) AS e(k, v)
+          WHERE to_jsonb(OLD) -> k IS DISTINCT FROM v),
+        '{}'::jsonb
+      ))
     );
   ELSIF TG_OP = 'DELETE' THEN
     PERFORM public.log_audit('programmes', OLD.id, 'deleted', to_jsonb(OLD), NULL);

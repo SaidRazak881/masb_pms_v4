@@ -22,41 +22,101 @@ BEGIN;
 -- =====================================================================
 
 -- Enum untuk status dan kategori
-CREATE TYPE IF NOT EXISTS public.programme_status AS ENUM (
-  'draft', 'active', 'completed', 'cancelled', 'on_hold'
-);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'programme_status' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.programme_status AS ENUM (
 
-CREATE TYPE IF NOT EXISTS public.programme_category AS ENUM (
+  'draft', 'active', 'completed', 'cancelled', 'on_hold'
+
+);
+  END IF;
+END
+$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'programme_category' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.programme_category AS ENUM (
   'AI & Data Science',
   'Cybersecurity',
   'Cloud & Infrastructure',
   'Digital Transformation',
   'Leadership & Management',
   'IoT & Embedded Systems',
-  'Non-Training'
+  'Engineering',
+  'Semiconductor',
+  'Non-Training',
+  'Room Rental',
+  'Certification'
 );
+  END IF;
+END
+$$;
 
-CREATE TYPE IF NOT EXISTS public.delivery_mode AS ENUM (
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'delivery_mode' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.delivery_mode AS ENUM (
+
   'in_person', 'online', 'hybrid', 'physical'
-);
 
-CREATE TYPE IF NOT EXISTS public.payment_status AS ENUM (
-  'draft', 'sent', 'accepted', 'invoiced', 'paid', 'overdue', 'cancelled', 'partial'
 );
+  END IF;
+END
+$$;
 
-CREATE TYPE IF NOT EXISTS public.financial_doc_type AS ENUM (
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payment_status' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.payment_status AS ENUM (
+  'draft', 'pending', 'sent', 'accepted', 'invoiced', 'paid', 'overdue', 'cancelled', 'partial'
+);
+  END IF;
+END
+$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'financial_doc_type' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.financial_doc_type AS ENUM (
+
   'quotation', 'po', 'invoice'
-);
 
-CREATE TYPE IF NOT EXISTS public.bumi_status AS ENUM (
+);
+  END IF;
+END
+$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'bumi_status' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.bumi_status AS ENUM (
+
   'bumiputera', 'non_bumiputera', 'pending'
-);
 
-CREATE TYPE IF NOT EXISTS public.participant_status AS ENUM (
+);
+  END IF;
+END
+$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'participant_status' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.participant_status AS ENUM (
+
   'registered', 'confirmed', 'attended', 'completed', 'cancelled'
-);
 
-CREATE TYPE IF NOT EXISTS public.cost_category AS ENUM (
+);
+  END IF;
+END
+$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'cost_category' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.cost_category AS ENUM (
+
   'Trainer Fees',
   'Venue',
   'Catering',
@@ -64,9 +124,17 @@ CREATE TYPE IF NOT EXISTS public.cost_category AS ENUM (
   'Platform / Software',
   'Logistics',
   'Administration'
-);
 
-CREATE TYPE IF NOT EXISTS public.document_type AS ENUM (
+);
+  END IF;
+END
+$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'document_type' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.document_type AS ENUM (
+
   'Borang Permohonan',
   'Quotation',
   'Purchase Order',
@@ -75,19 +143,21 @@ CREATE TYPE IF NOT EXISTS public.document_type AS ENUM (
   'Sijil Kehadiran',
   'Senarai Kehadiran',
   'Laporan Penilaian'
-);
 
-CREATE TYPE IF NOT EXISTS public.audit_action AS ENUM (
-  'created',
-  'updated',
-  'status_changed',
-  'financial_added',
-  'participant_updated',
-  'document_uploaded',
-  'locked',
-  'unlocked',
-  'imported'
 );
+  END IF;
+END
+$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'audit_action' AND typnamespace = 'public'::regnamespace) THEN
+    CREATE TYPE public.audit_action AS ENUM (
+  'created', 'updated', 'status_changed', 'financial_added', 'participant_updated', 'document_uploaded', 'locked', 'unlocked', 'imported', 'import_sync', 'import_discard', 'unlock_requested', 'unlock_approved', 'unlock_rejected', 'unlock_cancelled', 'change_requested', 'change_reviewed', 'deleted'
+);
+  END IF;
+END
+$$;
 
 -- Jadual organisasi/pelanggan
 CREATE TABLE IF NOT EXISTS public.organizers (
@@ -295,6 +365,27 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON public.audit_logs (user_id);
 -- BAHAGIAN 3: ROW LEVEL SECURITY (RLS)
 -- =====================================================================
 
+-- Buang polisi sedia ada dahulu (PostgreSQL tidak menyokong
+-- CREATE POLICY IF NOT EXISTS; membolehkan fail ini dijalankan semula
+-- selepas schema-master).
+DO $$
+DECLARE
+  v_policy record;
+BEGIN
+  FOR v_policy IN
+    SELECT policyname, tablename
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename IN ('programmes', 'organizers', 'participants',
+                        'financial_docs', 'programme_costs', 'cost_items',
+                        'programme_documents', 'audit_logs')
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I',
+                   v_policy.policyname, v_policy.tablename);
+  END LOOP;
+END
+$$;
+
 -- RLS untuk programmes
 ALTER TABLE public.programmes ENABLE ROW LEVEL SECURITY;
 
@@ -451,14 +542,14 @@ $$;
 
 -- Fungsi untuk mendapatkan peranan pengguna semasa
 CREATE OR REPLACE FUNCTION public.current_user_role()
-RETURNS TEXT
+RETURNS public.app_role
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
 AS $$
   SELECT COALESCE(
     (SELECT up.role FROM public.user_profiles up WHERE up.id = auth.uid()),
-    'viewer'
+    'viewer'::public.app_role
   );
 $$;
 
@@ -477,7 +568,7 @@ SECURITY DEFINER
 AS $$
 BEGIN
   INSERT INTO public.audit_logs (
-    user_id, action, table_name, record_id, old_data, new_data, metadata
+    user_id, action, table_name, record_id, old_data, new_data, changed_fields, metadata
   ) VALUES (
     public.current_user_id(),
     p_action,
@@ -485,7 +576,8 @@ BEGIN
     p_record_id,
     p_old_data,
     p_new_data,
-    p_metadata
+    p_metadata -> 'changed_fields',
+    COALESCE(p_metadata, '{}'::jsonb)
   );
 END;
 $$;
@@ -504,7 +596,19 @@ BEGIN
   IF TG_OP = 'INSERT' THEN
     PERFORM public.log_audit('programmes', NEW.id, 'created', NULL, to_jsonb(NEW));
   ELSIF TG_OP = 'UPDATE' THEN
-    PERFORM public.log_audit('programmes', NEW.id, 'updated', to_jsonb(OLD), to_jsonb(NEW));
+    PERFORM public.log_audit(
+      'programmes',
+      NEW.id,
+      'updated',
+      to_jsonb(OLD),
+      to_jsonb(NEW),
+      jsonb_build_object('changed_fields', COALESCE(
+        (SELECT jsonb_object_agg(k, v)
+           FROM jsonb_each(to_jsonb(NEW)) AS e(k, v)
+          WHERE to_jsonb(OLD) -> k IS DISTINCT FROM v),
+        '{}'::jsonb
+      ))
+    );
   ELSIF TG_OP = 'DELETE' THEN
     PERFORM public.log_audit('programmes', OLD.id, 'deleted', to_jsonb(OLD), NULL);
   END IF;
@@ -529,18 +633,18 @@ CREATE TRIGGER programmes_audit_trigger
 -- Organizers (Pelanggan/Client) dari fail Excel
 -- Contoh: MIMOS Berhad, FGV R&D Sdn Bhd, Kementerian Sumber Manusia, dll.
 INSERT INTO public.organizers (id, name, sector, is_active) VALUES
-('org-001', 'MIMOS Berhad', 'Government', true),
-('org-002', 'FGV R&D Sdn Bhd', 'Private', true),
-('org-003', 'Kementerian Sumber Manusia', 'Government', true),
-('org-004', 'Ketengah', 'Government', true),
-('org-005', 'CyberSecurity Malaysia', 'Government', true),
-('org-006', 'SGS', 'Private', true),
-('org-007', 'KENANGA INVESTOR BERHAD', 'Private', true),
-('org-008', 'Lembaga Pelabuhan Klang', 'Government', true),
-('org-009', 'PETRONAS', 'Private', true),
-('org-010', 'MAMPU', 'Government', true),
-('org-011', 'Bank Negara Malaysia', 'Government', true),
-('org-012', 'Jabatan Kastam Diraja Malaysia', 'Government', true);
+('00000000-0000-4000-8000-000000000001', 'MIMOS Berhad', 'Government', true),
+('00000000-0000-4000-8000-000000000002', 'FGV R&D Sdn Bhd', 'Private', true),
+('00000000-0000-4000-8000-000000000003', 'Kementerian Sumber Manusia', 'Government', true),
+('00000000-0000-4000-8000-000000000004', 'Ketengah', 'Government', true),
+('00000000-0000-4000-8000-000000000005', 'CyberSecurity Malaysia', 'Government', true),
+('00000000-0000-4000-8000-000000000006', 'SGS', 'Private', true),
+('00000000-0000-4000-8000-000000000007', 'KENANGA INVESTOR BERHAD', 'Private', true),
+('00000000-0000-4000-8000-000000000008', 'Lembaga Pelabuhan Klang', 'Government', true),
+('00000000-0000-4000-8000-000000000009', 'PETRONAS', 'Private', true),
+('00000000-0000-4000-8000-000000000010', 'MAMPU', 'Government', true),
+('00000000-0000-4000-8000-000000000011', 'Bank Negara Malaysia', 'Government', true),
+('00000000-0000-4000-8000-000000000012', 'Jabatan Kastam Diraja Malaysia', 'Government', true);
 
 -- Programmes (Program Latihan) dari Quotation Tracker dan Invoice
 -- Catatan: Data ini hendaklah dimuatkan selepas organizers
@@ -550,26 +654,26 @@ INSERT INTO public.programmes (
   programme_manager, contracted_amount, budget, actual_cost, status
 ) VALUES
 -- Dari Quotation Tracker
-('prog-001', 'MSSB/QT/TRA/2026/0001', 'Train The Trainer (TTT)', 'Program latihan untuk jurulatih', 
- 'org-007', 'KENANGA INVESTOR BERHAD', 'Leadership & Management', 'in_person', 
+('00000000-0000-4000-8000-100000000001', 'MSSB/QT/TRA/2026/0001', 'Train The Trainer (TTT)', 'Program latihan untuk jurulatih', 
+ '00000000-0000-4000-8000-000000000007', 'KENANGA INVESTOR BERHAD', 'Leadership & Management', 'in_person', 
  '2026-01-15', '2026-01-17', 'MIMOS Training Centre', 'Ms Liyana Ayunni', 
  'Nur Izzati Zailani', 21000.00, 19000.00, 18500.00, 'completed'),
 
-('prog-002', 'MSSB/QT/TRA/2026/0002', 'In-House AI Training for 20 pax', 'Latihan AI dalaman untuk 20 orang', 
- 'org-006', 'SGS', 'AI & Data Science', 'in_person', 
+('00000000-0000-4000-8000-100000000002', 'MSSB/QT/TRA/2026/0002', 'In-House AI Training for 20 pax', 'Latihan AI dalaman untuk 20 orang', 
+ '00000000-0000-4000-8000-000000000006', 'SGS', 'AI & Data Science', 'in_person', 
  '2026-02-20', '2026-02-22', 'SGS Office', 'Mr Mohd Najib', 
  'Nur Izzati Zailani', 21000.00, 18000.00, 17500.00, 'completed'),
 
 -- Dari Invoice
-('prog-003', 'MA/QT/2026(0001)', 'Training - AI Prompt Skills: Best Practices for Organization Productivity (In-House)', 
+('00000000-0000-4000-8000-100000000003', 'MA/QT/2026(0001)', 'Training - AI Prompt Skills: Best Practices for Organization Productivity (In-House)', 
  'Program latihan kemahiran AI untuk produktiviti organisasi', 
- 'org-001', 'MIMOS Berhad', 'AI & Data Science', 'in_person', 
+ '00000000-0000-4000-8000-000000000001', 'MIMOS Berhad', 'AI & Data Science', 'in_person', 
  '2026-01-01', '2026-01-03', 'MIMOS Auditorium', 'Adilah', 
  'Adilah', 8500.00, 8000.00, 8200.00, 'completed'),
 
-('prog-004', 'MASB/QT/TRA/2026/0038', 'Training - AI System Thinking (Public)', 
+('00000000-0000-4000-8000-100000000004', 'MASB/QT/TRA/2026/0038', 'Training - AI System Thinking (Public)', 
  'Latihan berfikir sistem AI untuk awam', 
- 'org-002', 'FGV R&D Sdn Bhd', 'AI & Data Science', 'in_person', 
+ '00000000-0000-4000-8000-000000000002', 'FGV R&D Sdn Bhd', 'AI & Data Science', 'in_person', 
  '2026-02-15', '2026-02-17', 'FGV Training Room', 'Farrah', 
  'Farrah', 1842.59, 1700.00, 1680.00, 'completed');
 
@@ -579,50 +683,50 @@ INSERT INTO public.financial_docs (
   account_manager, pic_name, notes
 ) VALUES
 -- Quotation dari Quotation Tracker
-('fin-001', 'prog-001', 'quotation', 'MSSB/QT/TRA/2026/0001', 21000.00, '2026-01-10', 'accepted', 
+('00000000-0000-4000-8000-200000000001', '00000000-0000-4000-8000-100000000001', 'quotation', 'MSSB/QT/TRA/2026/0001', 21000.00, '2026-01-10', 'accepted', 
  'Nur Izzati Zailani', 'Ms Liyana Ayunni', 'Sebutharga rasmi untuk program TTT'),
 
-('fin-002', 'prog-002', 'quotation', 'MSSB/QT/TRA/2026/0002', 21000.00, '2026-02-10', 'accepted', 
+('00000000-0000-4000-8000-200000000002', '00000000-0000-4000-8000-100000000002', 'quotation', 'MSSB/QT/TRA/2026/0002', 21000.00, '2026-02-10', 'accepted', 
  'Nur Izzati Zailani', 'Mr Mohd Najib', 'Sebutharga untuk latihan AI dalaman'),
 
 -- Invoice dari Income Statement
-('fin-003', 'prog-003', 'invoice', '95000016/2026', 8500.00, '2026-01-20', 'paid', 
+('00000000-0000-4000-8000-200000000003', '00000000-0000-4000-8000-100000000003', 'invoice', '95000016/2026', 8500.00, '2026-01-20', 'paid', 
  'Adilah', 'Adilah', 'Invois untuk program AI Prompt Skills'),
 
-('fin-004', 'prog-004', 'invoice', '95000015/2026', 1842.59, '2026-02-20', 'paid', 
+('00000000-0000-4000-8000-200000000004', '00000000-0000-4000-8000-100000000004', 'invoice', '95000015/2026', 1842.59, '2026-02-20', 'paid', 
  'Farrah', 'Adilah', 'Invois untuk program AI System Thinking'),
 
 -- PO dari Income Statement
-('fin-005', 'prog-003', 'po', 'MA/QT/2026(0001)', 8500.00, '2026-01-15', 'accepted', 
+('00000000-0000-4000-8000-200000000005', '00000000-0000-4000-8000-100000000003', 'po', 'MA/QT/2026(0001)', 8500.00, '2026-01-15', 'accepted', 
  'Adilah', 'Adilah', 'PO untuk program AI Prompt Skills'),
 
-('fin-006', 'prog-004', 'po', 'MASB/QT/TRA/2026/0038', 1842.59, '2026-02-15', 'accepted', 
+('00000000-0000-4000-8000-200000000006', '00000000-0000-4000-8000-100000000004', 'po', 'MASB/QT/TRA/2026/0038', 1842.59, '2026-02-15', 'accepted', 
  'Farrah', 'Adilah', 'PO untuk program AI System Thinking');
 
 -- Programme Costs (Cost of Sales) dari Cost of Sale sheet
 INSERT INTO public.programme_costs (
   id, programme_id, cost_of_sales, mimos_academy_cost, net_profit, profit_percentage
 ) VALUES
-('cost-001', 'prog-003', 4433.00, 4000.00, 4167.00, 49.00),
-('cost-002', 'prog-004', 0.00, 0.00, 1842.59, 100.00);
+('00000000-0000-4000-8000-400000000001', '00000000-0000-4000-8000-100000000003', 4433.00, 4000.00, 4167.00, 49.00),
+('00000000-0000-4000-8000-400000000002', '00000000-0000-4000-8000-100000000004', 0.00, 0.00, 1842.59, 100.00);
 
 -- Participants (Peserta) - Data contoh
 INSERT INTO public.participants (
   id, programme_id, name, email, organisation, designation, bumi_status, attendance, status, certificate_issued
 ) VALUES
-('part-001', 'prog-001', 'Ahmad Faizal bin Rahman', 'ahmad.faizal@mot.gov.my', 'Kementerian Pengangkutan', 'Penolong Pengarah IT', 'bumiputera', 95, 'completed', true),
-('part-002', 'prog-001', 'Nurul Aina binti Mohd Yusof', 'nurul.aina@mampu.gov.my', 'MAMPU', 'Pegawai Teknologi Maklumat', 'bumiputera', 90, 'completed', true),
-('part-003', 'prog-002', 'Siti Khadijah binti Ismail', 'siti.khadijah@johor.gov.my', 'Kerajaan Negeri Johor', 'Eksekutif Digital', 'bumiputera', 85, 'attended', false),
-('part-004', 'prog-003', 'Mohd Hafiz bin Abdul Aziz', 'hafiz.aziz@tm.com.my', 'Telekom Malaysia', 'Network Engineer', 'bumiputera', 88, 'completed', true);
+('00000000-0000-4000-8000-300000000001', '00000000-0000-4000-8000-100000000001', 'Ahmad Faizal bin Rahman', 'ahmad.faizal@mot.gov.my', 'Kementerian Pengangkutan', 'Penolong Pengarah IT', 'bumiputera', 95, 'completed', true),
+('00000000-0000-4000-8000-300000000002', '00000000-0000-4000-8000-100000000001', 'Nurul Aina binti Mohd Yusof', 'nurul.aina@mampu.gov.my', 'MAMPU', 'Pegawai Teknologi Maklumat', 'bumiputera', 90, 'completed', true),
+('00000000-0000-4000-8000-300000000003', '00000000-0000-4000-8000-100000000002', 'Siti Khadijah binti Ismail', 'siti.khadijah@johor.gov.my', 'Kerajaan Negeri Johor', 'Eksekutif Digital', 'bumiputera', 85, 'attended', false),
+('00000000-0000-4000-8000-300000000004', '00000000-0000-4000-8000-100000000003', 'Mohd Hafiz bin Abdul Aziz', 'hafiz.aziz@tm.com.my', 'Telekom Malaysia', 'Network Engineer', 'bumiputera', 88, 'completed', true);
 
 -- Cost Items (Pecahan Kos) - Data contoh
 INSERT INTO public.cost_items (
   id, programme_id, category, description, budgeted, actual
 ) VALUES
-('cost-item-001', 'prog-001', 'Trainer Fees', 'Yuran tenaga pengajar pakar industri', 8000.00, 7800.00),
-('cost-item-002', 'prog-001', 'Venue', 'Sewa dewan latihan', 2000.00, 1900.00),
-('cost-item-003', 'prog-001', 'Catering', 'Katering makan tengah hari', 1500.00, 1450.00),
-('cost-item-004', 'prog-001', 'Materials & Kit', 'Bahan latihan dan modul', 1000.00, 950.00);
+('00000000-0000-4000-8000-500000000001', '00000000-0000-4000-8000-100000000001', 'Trainer Fees', 'Yuran tenaga pengajar pakar industri', 8000.00, 7800.00),
+('00000000-0000-4000-8000-500000000002', '00000000-0000-4000-8000-100000000001', 'Venue', 'Sewa dewan latihan', 2000.00, 1900.00),
+('00000000-0000-4000-8000-500000000003', '00000000-0000-4000-8000-100000000001', 'Catering', 'Katering makan tengah hari', 1500.00, 1450.00),
+('00000000-0000-4000-8000-500000000004', '00000000-0000-4000-8000-100000000001', 'Materials & Kit', 'Bahan latihan dan modul', 1000.00, 950.00);
 
 -- =====================================================================
 -- BAHAGIAN 7: COMMIT

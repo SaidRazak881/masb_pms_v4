@@ -6,7 +6,7 @@ BEGIN;
 
 CREATE OR REPLACE FUNCTION private.append_import_audit(
   p_user_id uuid,
-  p_action text,
+  p_action public.audit_action,
   p_record_id uuid,
   p_payload jsonb,
   p_metadata jsonb DEFAULT '{}'::jsonb
@@ -40,8 +40,8 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION private.append_import_audit(uuid, text, uuid, jsonb, jsonb) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION private.append_import_audit(uuid, text, uuid, jsonb, jsonb) TO authenticated;
+REVOKE ALL ON FUNCTION private.append_import_audit(uuid, public.audit_action, uuid, jsonb, jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private.append_import_audit(uuid, public.audit_action, uuid, jsonb, jsonb) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.sync_import_transaction(
   p_batch_id uuid,
@@ -49,7 +49,7 @@ CREATE OR REPLACE FUNCTION public.sync_import_transaction(
 )
 RETURNS jsonb
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
@@ -72,6 +72,7 @@ DECLARE
   v_status text;
   v_invoice_id uuid;
   v_cost_id uuid;
+  v_new_status text;
   v_processed integer := 0;
   v_created integer := 0;
   v_merged integer := 0;
@@ -91,10 +92,10 @@ BEGIN
   END IF;
 
   IF NOT (
-    private.has_role('admin'::public.app_role)
-    OR private.has_role('staff'::public.app_role)
-    OR private.has_role('finance'::public.app_role)
-    OR private.has_role('head_governance'::public.app_role)
+    public.has_role('admin'::public.app_role)
+    OR public.has_role('staff'::public.app_role)
+    OR public.has_role('finance'::public.app_role)
+    OR public.has_role('head_governance'::public.app_role)
   ) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'Anda tidak mempunyai role untuk menyegerakkan data import.';
   END IF;
@@ -103,6 +104,114 @@ BEGIN
   PERFORM 1 FROM public.import_batches WHERE id = p_batch_id FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = '23503', MESSAGE = format('Import batch %s tidak ditemui.', p_batch_id);
+  END IF;
+
+  -- Penyesuaian schema: pastikan kolum invoices yang diperlukan wujud.
+  -- (Menyokong pangkalan data sedia ada yang menggunakan kontrak lama
+  --  dengan kolum `status` dan bukannya `payment_status`.)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'invoices'
+      AND column_name = 'payment_status'
+  ) THEN
+    ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS payment_status text;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'invoices'
+      AND column_name = 'invoice_no'
+  ) THEN
+    ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS invoice_no text;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'invoices'
+      AND column_name = 'quotation_no'
+  ) THEN
+    ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS quotation_no text;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'invoices'
+      AND column_name = 'invoice_value_excl_tax'
+  ) THEN
+    ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS invoice_value_excl_tax numeric(14,2) NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'invoices'
+      AND column_name = 'po_value_excl_tax'
+  ) THEN
+    ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS po_value_excl_tax numeric(14,2) NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'invoices'
+      AND column_name = 'invoice_date'
+  ) THEN
+    ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS invoice_date date;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'invoices'
+      AND column_name = 'account_manager'
+  ) THEN
+    ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS account_manager text;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'invoices'
+      AND column_name = 'pic_name'
+  ) THEN
+    ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS pic_name text;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'invoices'
+      AND column_name = 'programme_id'
+  ) THEN
+    ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS programme_id uuid;
+  END IF;
+
+  -- Penyesuaian untuk programme_costs: pastikan kolum cost_of_sales wujud
+  -- (pangkalan data sedia ada mungkin hanya mempunyai amount/budgeted_amount).
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'programme_costs'
+      AND column_name = 'cost_of_sales'
+  ) THEN
+    ALTER TABLE public.programme_costs ADD COLUMN IF NOT EXISTS cost_of_sales numeric(14,2) NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'programme_costs'
+      AND column_name = 'updated_at'
+  ) THEN
+    ALTER TABLE public.programme_costs ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+
+  -- Penyesuaian audit_logs: skema rasmi menggunakan kolum
+  -- action / changed_fields / metadata (bukan action_type / payload).
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'audit_logs'
+      AND column_name = 'action'
+  ) THEN
+    ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS action public.audit_action;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'audit_logs'
+      AND column_name = 'changed_fields'
+  ) THEN
+    ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS changed_fields jsonb;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'audit_logs'
+      AND column_name = 'metadata'
+  ) THEN
+    ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
   END IF;
 
   FOR v_row IN SELECT value FROM jsonb_array_elements(p_rows)
@@ -124,7 +233,7 @@ BEGIN
         IF NOT FOUND THEN
           RAISE EXCEPTION USING ERRCODE = '23503', MESSAGE = format('Staging row %s tidak ditemui dalam batch %s.', v_staging_id, p_batch_id);
         END IF;
-        PERFORM private.append_import_audit(v_user_id, 'IMPORT_DISCARD', v_staging_id, v_row, jsonb_build_object('batch_id', p_batch_id));
+        PERFORM private.append_import_audit(v_user_id, 'import_discard', v_staging_id, v_row, jsonb_build_object('batch_id', p_batch_id));
       END IF;
       CONTINUE;
     END IF;
@@ -187,7 +296,7 @@ BEGIN
       END IF;
 
       IF v_programme.governance_lock_status = 'locked'
-         AND NOT private.has_role('head_governance'::public.app_role) THEN
+         AND NOT public.has_role('head_governance'::public.app_role) THEN
         RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = format('Programme "%s" telah dikunci oleh Governance. Import tidak boleh mengubah rekod ini.', v_programme.title);
       END IF;
     ELSE
@@ -197,7 +306,8 @@ BEGIN
       );
 
       v_category := CASE lower(trim(COALESCE(v_row->>'category', '')))
-        WHEN 'ai' THEN 'AI'::public.programme_category
+        WHEN 'ai' THEN 'AI & Data Science'::public.programme_category
+        WHEN 'ai & data science' THEN 'AI & Data Science'::public.programme_category
         WHEN 'engineering' THEN 'Engineering'::public.programme_category
         WHEN 'semiconductor' THEN 'Semiconductor'::public.programme_category
         WHEN 'room rental' THEN 'Room Rental'::public.programme_category
@@ -292,6 +402,15 @@ BEGIN
         RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'invoice memerlukan reference_no (invoice number).';
       END IF;
 
+      -- Normalisasi status bayaran (untuk kedua-dua kontrak payment_status/status)
+      v_new_status := CASE
+        WHEN v_status IN ('paid', 'settled', 'bayar', 'dibayar') THEN 'paid'
+        WHEN v_status IN ('overdue', 'tertunggak') THEN 'overdue'
+        WHEN v_status IN ('cancelled', 'canceled', 'dibatalkan') THEN 'cancelled'
+        WHEN v_status IN ('partial', 'partially paid', 'sebahagian') THEN 'partial'
+        ELSE 'pending'
+      END;
+
       SELECT id INTO v_invoice_id
       FROM public.invoices
       WHERE programme_id = v_programme_id
@@ -314,13 +433,7 @@ BEGIN
           v_ref,
           v_amount,
           v_doc_date,
-          CASE
-            WHEN v_status IN ('paid', 'settled', 'bayar', 'dibayar') THEN 'paid'::public.payment_status
-            WHEN v_status IN ('overdue', 'tertunggak') THEN 'overdue'::public.payment_status
-            WHEN v_status IN ('cancelled', 'canceled', 'dibatalkan') THEN 'cancelled'::public.payment_status
-            WHEN v_status IN ('partial', 'partially paid', 'sebahagian') THEN 'partial'::public.payment_status
-            ELSE 'pending'::public.payment_status
-          END,
+          v_new_status::public.payment_status,
           NULLIF(trim(v_row->>'trainer'), ''),
           v_client
         )
@@ -329,17 +442,22 @@ BEGIN
         UPDATE public.invoices
         SET invoice_value_excl_tax = v_amount,
             invoice_date = COALESCE(v_doc_date, invoice_date),
-            payment_status = CASE
-              WHEN v_status IN ('paid', 'settled', 'bayar', 'dibayar') THEN 'paid'::public.payment_status
-              WHEN v_status IN ('overdue', 'tertunggak') THEN 'overdue'::public.payment_status
-              WHEN v_status IN ('cancelled', 'canceled', 'dibatalkan') THEN 'cancelled'::public.payment_status
-              WHEN v_status IN ('partial', 'partially paid', 'sebahagian') THEN 'partial'::public.payment_status
-              ELSE payment_status
-            END,
+            payment_status = v_new_status::public.payment_status,
             account_manager = COALESCE(NULLIF(trim(v_row->>'trainer'), ''), account_manager),
             pic_name = COALESCE(v_client, pic_name),
             updated_at = now()
         WHERE id = v_invoice_id;
+      END IF;
+
+      -- Kontrak lama: jadual invoices mungkin menggunakan kolum `status`
+      -- dan bukannya `payment_status` — selaraskan juga jika wujud.
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'invoices'
+          AND column_name = 'status'
+      ) THEN
+        EXECUTE 'UPDATE public.invoices SET status = $1 WHERE id = $2'
+          USING v_new_status, v_invoice_id;
       END IF;
 
     ELSIF v_kind = 'cost' THEN
@@ -389,7 +507,7 @@ BEGIN
 
     PERFORM private.append_import_audit(
       v_user_id,
-      'IMPORT_SYNC',
+      'import_sync',
       v_staging_id,
       v_row,
       jsonb_build_object(
@@ -426,6 +544,25 @@ EXCEPTION
   WHEN check_violation THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'Sync gagal: data melanggar constraint database.', DETAIL = SQLERRM;
 END;
+$$;
+
+-- Pastikan nilai audit_action untuk import wujud pada pangkalan data sedia
+-- ada (jika schema-master/seed lama dipasang sebelum nilai ini ditambah).
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = 'audit_action' AND e.enumlabel = 'import_sync'
+  ) THEN
+    ALTER TYPE public.audit_action ADD VALUE 'import_sync';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = 'audit_action' AND e.enumlabel = 'import_discard'
+  ) THEN
+    ALTER TYPE public.audit_action ADD VALUE 'import_discard';
+  END IF;
+END
 $$;
 
 REVOKE ALL ON FUNCTION public.sync_import_transaction(uuid, jsonb) FROM PUBLIC;
