@@ -10,6 +10,7 @@ import {
   User,
 } from "lucide-react";
 
+import { GovernancePanel } from "@/components/governance/governance-panel";
 import { ProgrammeDetailTabs } from "@/components/programmes/programme-detail-tabs";
 import {
   ModeBadge,
@@ -19,6 +20,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDate } from "@/lib/format";
+import {
+  getCurrentGovernanceRole,
+  listUnlockRequests,
+} from "@/lib/governance-actions";
+import { canEditProgramme, type ProgrammeLockState } from "@/lib/governance";
 import { getProgrammeById } from "@/lib/mock-data";
 
 type DetailPageProps = {
@@ -32,12 +38,28 @@ export function generateMetadata({ params }: DetailPageProps): Metadata {
   };
 }
 
-export default function ProgrammeDetailPage({ params }: DetailPageProps) {
+export default async function ProgrammeDetailPage({ params }: DetailPageProps) {
   const programme = getProgrammeById(params.id);
 
   if (!programme) {
     notFound();
   }
+
+  /* ---- Langkah 5: keadaan tadbir urus (lock / unlock) ---- */
+  const [role, unlockRequests] = await Promise.all([
+    getCurrentGovernanceRole(),
+    listUnlockRequests(programme.id),
+  ]);
+
+  const lockState: ProgrammeLockState = {
+    programmeId: programme.id,
+    locked: programme.locked,
+    lockReason: programme.status === "completed" ? "programme_completed" : "manual",
+    unlockExpiresAt:
+      unlockRequests.find((r) => r.status === "approved")?.unlockExpiresAt ?? null,
+  };
+
+  const editable = canEditProgramme(lockState);
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -53,16 +75,16 @@ export default function ProgrammeDetailPage({ params }: DetailPageProps) {
           </Link>
         </div>
         <div className="flex items-center gap-2">
-          {programme.locked ? (
-            <Badge variant="secondary" className="gap-1.5 px-3 py-1.5">
-              <Lock className="h-3.5 w-3.5" />
-              Program Berkunci — Audit
-            </Badge>
-          ) : (
+          {editable ? (
             <Button variant="outline">
               <Pencil className="h-4 w-4" />
               Sunting Program
             </Button>
+          ) : (
+            <Badge variant="secondary" className="gap-1.5 px-3 py-1.5">
+              <Lock className="h-3.5 w-3.5" />
+              Program Berkunci — Audit
+            </Badge>
           )}
         </div>
       </div>
@@ -136,6 +158,15 @@ export default function ProgrammeDetailPage({ params }: DetailPageProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Langkah 5 — Modul Governance Lock & Request Unlock */}
+      <GovernancePanel
+        lock={lockState}
+        programmeCode={programme.code}
+        role={role}
+        currentUserId="current-user"
+        requests={unlockRequests}
+      />
 
       <ProgrammeDetailTabs programme={programme} />
     </div>
