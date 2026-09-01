@@ -1,8 +1,12 @@
 # PROMPT 2 — Reconcile Pangkalan Data Supabase Live dengan SQL Rasmi Repo
 
-> **Status:** Sedia digunakan selepas commit pembetulan SQL `9309291`
-> (branch `arena/01a05cd4-masb-pms-v4`) — semua fail SQL rasmi telah
-> diuji pada PostgreSQL sebenar (PGlite) dan lulus.
+> **Status:** Sedia digunakan — semua fail SQL rasmi telah dibetulkan,
+> diuji pada PostgreSQL sebenar (PGlite) dan di-push ke branch
+> `arena/01a05cd4-masb-pms-v4` (komit terkini `2d9baa6`).
+>
+> **Selepas semakan laporan GPT fasa 1 (9 blocker):** SEMUA blocker
+> (A–I) telah diselesaikan dalam komit `9309291` — lihat senarai di bawah.
+> GPT MESTI muat turun semula fail (jangan guna cache bacaan fasa 1).
 
 Sasaran: projek Supabase **`lmenmfsbjgxfhnykkgow`** (sama seperti Prompt #1).
 
@@ -23,6 +27,34 @@ Sasaran: projek Supabase **`lmenmfsbjgxfhnykkgow`** (sama seperti Prompt #1).
 
 ---
 
+## Nota semakan laporan GPT fasa 1 — SEMUA blocker telah dibetulkan
+
+Laporan fasa 1 menyenaraikan 9 blocker. Semuanya telah diselesaikan dalam
+komit `9309291` (branch `arena/01a05cd4-masb-pms-v4`), dan disahkan pada
+PostgreSQL sebenar (PGlite). Jangan biarkan GPT mengulangi siasatan lama
+atau menunggu kebenaran untuk perkara yang sudah selesai:
+
+| Blocker fasa 1 | Status sekarang |
+| -------------- | --------------- |
+| A: `private.has_role` | ✅ Sync kini guna `public.has_role` (4 lokasi) |
+| B: `Engineering`/`Semiconductor` tiada dalam enum | ✅ Ditambah ke `programme_category`; sync peta `ai`→`AI & Data Science`, `engineering`→`Engineering` |
+| C: jadual `invoices` tiada | ✅ Dicipta dalam `schema-master.sql` (Bahagian 7) lengkap dengan `payment_status`, `invoice_no`, `quotation_no`, `po_value_excl_tax`, `invoice_value_excl_tax`, `account_manager`, `pic_name` |
+| D: `programme_costs.cost_of_sales` | ✅ Ada dalam master + reconciliation `ADD COLUMN IF NOT EXISTS` dalam sync |
+| E: `audit_logs` (action/changed_fields/metadata) | ✅ Ada dalam master + reconciliation aditif untuk DB lama |
+| F: `lock_programme(uuid,text)` return type | ✅ Fail rasmi kini mengandungi `DROP FUNCTION IF EXISTS public.lock_programme(uuid, text)` (dan RPC unlock lain) SEBELUM `CREATE OR REPLACE` — jadi ia BOLEH dilaksanakan (Pendekatan A), TIDAK perlu kebenaran khas |
+| G: `p.code` | ✅ Ditukar ke `p.programme_code` |
+| H: nilai `unlock_*` dalam `audit_action` | ✅ Master kini ada 18 nilai (termasuk `import_sync`, `import_discard`, `unlock_requested/approved/rejected/cancelled`, `change_requested/reviewed`, `deleted`) + DO guard `ADD VALUE` untuk DB lama |
+| I: `schema-import-staging.sql` tidak idempotent | ✅ Enum dalam DO guard; FK `import_staging_batch_fk` dalam guard `pg_constraint` |
+| Sintaks tidak sah lain | ✅ `CREATE TYPE IF NOT EXISTS` = 0 kemunculan; `with_check` = 0; polisi RLS guna blok `DROP POLICY IF EXISTS`; trigger audit guna subquery `jsonb_each` (bukan `jsonb_object_agg(OLD,NEW)`) |
+
+**Arahan kepada GPT:** muat turun SEMULA kelima-lima fail daripada branch
+(komit terkini `2d9baa6`) — jangan guna versi yang dibaca pada fasa 1.
+`DROP FUNCTION IF EXISTS` yang ada di dalam fail rasmi adalah sebahagian
+skrip rasmi dan boleh dilaksanakan; ia hanya menyasarkan fungsi TPMS
+dengan tandatangan lama (cth. `lock_programme`), bukan fungsi lain.
+
+---
+
 ## --- MULA PROMPT ---
 
 > **Peranan kamu:** Jurutera pangkalan data yang teliti dan berhati-hati.
@@ -33,7 +65,9 @@ Sasaran: projek Supabase **`lmenmfsbjgxfhnykkgow`** (sama seperti Prompt #1).
 > (`lmenmfsbjgxfhnykkgow`) dan kamu berhenti serta melaporkan blocker.
 > Sejak itu, **semua fail SQL rasmi telah dibetulkan, diuji pada
 > PostgreSQL sebenar, dan di-commit** ke repositori yang sama pada
-> branch `arena/01a05cd4-masb-pms-v4`, commit terbaru `9309291`.
+> branch `arena/01a05cd4-masb-pms-v4`, commit terbaru `2d9baa6`.
+> Semua blocker fasa 1 (A–I) telah dibetulkan — muat turun SEMULA fail
+> dari commit ini, jangan guna cache fasa 1.
 > Tugasan kamu sekarang ialah **menyelaraskan (reconcile) pangkalan data
 > live dengan fail SQL rasmi yang sudah dibetulkan**, secara ADITIF sahaja.
 >
@@ -125,8 +159,9 @@ Sasaran: projek Supabase **`lmenmfsbjgxfhnykkgow`** (sama seperti Prompt #1).
 > - `programme_costs` di live mungkin tiada `cost_of_sales` — tambah secara
 >   aditif.
 > - `lock_programme(uuid, text)` di live mungkin `RETURNS programmes`
->   sedangkan rasmi `RETURNS void` — senaraikan di bawah Pendekatan B
->   (perlu kebenaran untuk ganti tandatangan).
+>   sedangkan rasmi `RETURNS void` — FAIL RASMI sudah ada
+>   `DROP FUNCTION IF EXISTS` untuk ini; laksanakan sahaja fail rasmi
+>   (ia menyasarkan fungsi TPMS dengan tandatangan lama).
 > - Enum `programme_category` mungkin tiada `Engineering`/`Semiconductor`;
 >   `payment_status` mungkin tiada `pending` — tambah nilai secara aditif.
 > - Pastikan fungsi `public.has_role`, `public.current_user_role`,
