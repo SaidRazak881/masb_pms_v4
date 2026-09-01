@@ -231,7 +231,8 @@
   munasabah dan tiada kolum rasmi tersentuh, (2) ujian rollback lulus,
   (3) seed berjaya dengan kiraan betul (12/4/6/2/4/4), (4) audit rasmi
   `created` terhasil dengan `action_type` NULL.
-- Selepas laporan 2E diluluskan, langkah seterusnya ialah **Prompt #3**:
-  cipta Auth users (Supabase Dashboard) + `user_profiles` dengan role
-  rasmi, bucket storage, kemudian deploy Vercel + ujian end-to-end.
-  (Prompt #3 akan disediakan selepas laporan 2E disemak.)
+- Selepas laporan 2E diluluskan, langkah seterusnya ialah **Prompt #3**
+  (`docs/PROMPT-3-AUTH-STORAGE.md`): cipta 19 Auth users + `user_profiles`
+  (role: 2 admin, 1 head_governance, 1 executive, 2 finance, 13 staff) +
+  bucket storage `programme-documents`. Semak jadual PEMETAAN ROLE dalam
+  prompt sebelum tampal.
