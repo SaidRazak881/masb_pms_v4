@@ -16,20 +16,55 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+const HAS_SUPABASE = Boolean(
+  process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+);
+
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState("zarina.abubakar@mimosacademy.my");
-  const [password, setPassword] = useState("demo-password");
+  const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState("zalina@mimos.my");
+  const [password, setPassword] = useState("");
 
-  function handleSubmit(e: React.FormEvent) {
+  function resolveRedirect(): string {
+    if (typeof window === "undefined") return "/dashboard";
+    const r = new URLSearchParams(window.location.search).get("redirect");
+    return r && r.startsWith("/") ? r : "/dashboard";
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    // Mock: dalam pelaksanaan sebenar, panggil Supabase Auth
-    // (createClient() daripada @/lib/supabase/client -> signInWithPassword).
-    setTimeout(() => {
-      router.push("/programmes");
-    }, 700);
+    setError(null);
+
+    // Mod demo: tiada env Supabase — teruskan tanpa pengesahan sebenar.
+    if (!HAS_SUPABASE) {
+      setTimeout(() => {
+        router.push(resolveRedirect());
+      }, 500);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (signInError) throw signInError;
+      router.push(resolveRedirect());
+      router.refresh();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Log masuk gagal.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -55,11 +90,12 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="nama@mimosacademy.my"
+                placeholder="nama@mimos.my"
                 className="pl-9"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
               />
             </div>
           </div>
@@ -71,12 +107,20 @@ export default function LoginPage() {
                 id="password"
                 type="password"
                 className="pl-9"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="current-password"
               />
             </div>
           </div>
+
+          {error && (
+            <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+              {error}
+            </div>
+          )}
         </CardContent>
 
         <CardFooter className="flex flex-col gap-3">
@@ -84,10 +128,11 @@ export default function LoginPage() {
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
             Log Masuk
           </Button>
-          <p className="text-center text-xs text-muted-foreground">
-            Mod Demo Mock UI — pengesahan Supabase Auth akan diintegrasikan
-            kemudian.
-          </p>
+          {!HAS_SUPABASE && (
+            <p className="text-center text-xs text-muted-foreground">
+              Mod Demo — tanpa env Supabase, log masuk disimulasikan.
+            </p>
+          )}
         </CardFooter>
       </form>
     </Card>

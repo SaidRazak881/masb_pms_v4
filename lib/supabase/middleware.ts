@@ -1,7 +1,13 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED_PREFIXES = ["/programmes", "/import", "/dashboard"];
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/programmes",
+  "/import",
+  "/participants",
+  "/reports",
+];
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 

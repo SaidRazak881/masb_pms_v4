@@ -1,14 +1,74 @@
 import { Bell, GraduationCap, Search } from "lucide-react";
 
 import { SidebarNav } from "@/components/layout/sidebar-nav";
+import { LogoutButton } from "@/components/layout/logout-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export default function DashboardLayout({
+const ROLE_LABEL: Record<string, string> = {
+  admin: "Pentadbir Sistem",
+  head_governance: "Head Governance",
+  executive: "Eksekutif",
+  manager: "Pengurus",
+  staff: "Staf",
+  finance: "Kewangan",
+  viewer: "Pemerhati",
+};
+
+function initialsOf(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Baca pengguna semasa daripada sesi Supabase (jika env diisi).
+  // Mod demo: gunakan identiti contoh.
+  let displayName = "Zarina Abu Bakar";
+  let displayRole = "Programme Manager";
+  let initials = "ZA";
+
+  const hasSupabase =
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
+  if (hasSupabase) {
+    try {
+      const { createClient } = await import("@/lib/supabase/server");
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user?.email) {
+        const { data: profile } = await supabase
+          .from("user_profiles")
+          .select("full_name, role")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        const fullName =
+          (profile as { full_name?: string } | null)?.full_name ||
+          user.user_metadata?.full_name ||
+          user.email;
+        const role = (profile as { role?: string } | null)?.role;
+
+        displayName = fullName;
+        displayRole = role ? (ROLE_LABEL[role] ?? role) : "Pengguna";
+        initials = initialsOf(fullName);
+      }
+    } catch (error) {
+      console.error("Layout: gagal membaca sesi pengguna:", error);
+    }
+  }
+
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
@@ -58,14 +118,13 @@ export default function DashboardLayout({
 
           <div className="flex items-center gap-2.5 border-l pl-4">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-              ZA
+              {initials}
             </div>
             <div className="hidden leading-tight md:block">
-              <p className="text-sm font-medium">Zarina Abu Bakar</p>
-              <p className="text-xs text-muted-foreground">
-                Programme Manager
-              </p>
+              <p className="text-sm font-medium">{displayName}</p>
+              <p className="text-xs text-muted-foreground">{displayRole}</p>
             </div>
+            <LogoutButton />
           </div>
         </header>
 
