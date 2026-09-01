@@ -326,6 +326,9 @@
   (3) semua RPC wujud + fail idempotent (run kedua lulus), (4) trigger
   audit legacy dibuang, trigger `programmes_enforce_lock` wujud, (5) tiada
   RPC write dipanggil semasa ujian.
-- Selepas laporan 2C diluluskan, langkah seterusnya ialah **Prompt #3**:
-  jalankan `seed-v4-raw.sql`, cipta Auth users + `user_profiles`, dan
-  bucket storage. (Prompt #3 akan disediakan selepas laporan 2C disemak.)
+- Selepas laporan 2C diluluskan, langkah seterusnya ialah **Prompt #2D**
+  (`docs/PROMPT-2D-SEED-VERIFY.md`): drop trigger legacy audit
+  (programme_costs/invoices/import_staging), convert `lock_reason`,
+  RLS final diff, kemudian jalankan seed.
+- Selepas laporan 2D diluluskan, barulah **Prompt #3**: Auth users +
+  `user_profiles` + storage bucket + deploy Vercel + ujian end-to-end.
