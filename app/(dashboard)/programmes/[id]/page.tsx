@@ -61,6 +61,24 @@ export default async function ProgrammeDetailPage({ params }: DetailPageProps) {
     programme = mockProgramme;
   }
 
+  /* ---- Pengguna semasa (sesi Supabase) ---- */
+  let currentUserId = "current-user";
+  if (
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  ) {
+    try {
+      const { createClient } = await import("@/lib/supabase/server");
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user?.id) currentUserId = user.id;
+    } catch (error) {
+      console.error("DetailProgram: gagal membaca sesi pengguna:", error);
+    }
+  }
+
   /* ---- Langkah 5: keadaan tadbir urus (lock / unlock) ---- */
   const [role, unlockRequests, changeRequests] = await Promise.all([
     getCurrentGovernanceRole(),
@@ -181,7 +199,7 @@ export default async function ProgrammeDetailPage({ params }: DetailPageProps) {
         lock={lockState}
         programmeCode={programme.code}
         role={role}
-        currentUserId="current-user"
+        currentUserId={currentUserId}
         requests={unlockRequests}
         changeRequests={changeRequests}
       />

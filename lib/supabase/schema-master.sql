@@ -947,6 +947,20 @@ AS $$
   );
 $$;
 
+-- Alias nama peranan sebagai TEXT
+-- (digunakan oleh RPC change-request legacy: review_change_request, dll.)
+CREATE OR REPLACE FUNCTION public.current_role_name()
+RETURNS TEXT
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+AS $$
+  SELECT COALESCE(
+    (SELECT up.role::text FROM public.user_profiles up WHERE up.id = auth.uid()),
+    'viewer'
+  );
+$$;
+
 -- Fungsi untuk log audit
 CREATE OR REPLACE FUNCTION public.log_audit(
   p_table_name TEXT,
