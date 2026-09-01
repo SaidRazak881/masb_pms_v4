@@ -234,8 +234,10 @@ dengan tandatangan lama (cth. `lock_programme`), bukan fungsi lain.
   hanya menjalankan pendekatan A dan bertanya sebelum pendekatan B.
 - Selepas laporan diterima, semak item **8 (Menunggu Kebenaran)** dahulu —
   itu keputusan anda.
-- Selepas laporan diluluskan, langkah seterusnya ialah **Prompt #3**:
-  seed data (jalankan `seed-v4-raw.sql`), cipta Auth users + `user_profiles`
-  (guna role rasmi: viewer, executive, manager, admin, staff, finance,
-  head_governance), dan bucket storage. (Prompt #3 akan disediakan selepas
-  laporan Prompt #2 disemak.)
+- Selepas laporan 2A diluluskan, langkah seterusnya ialah **Prompt #2B**
+  (`docs/PROMPT-2B-INSTALL-RPC.md`): type conversion (B1/B2/B4/B5) +
+  pasang RPC layer penuh (sync, governance, change-requests).
+- Selepas laporan 2B diluluskan, barulah **Prompt #3**: seed data
+  (jalankan `seed-v4-raw.sql`), cipta Auth users + `user_profiles` (guna
+  role rasmi: viewer, executive, manager, admin, staff, finance,
+  head_governance), dan bucket storage.

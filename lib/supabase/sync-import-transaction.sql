@@ -4,6 +4,10 @@
 
 BEGIN;
 
+-- Schema `private` digunakan untuk fungsi bantu dalaman (append_import_audit).
+-- Pastikan ia wujud (selamat untuk database baru & sedia ada).
+CREATE SCHEMA IF NOT EXISTS private;
+
 CREATE OR REPLACE FUNCTION private.append_import_audit(
   p_user_id uuid,
   p_action public.audit_action,
