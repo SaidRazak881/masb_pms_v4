@@ -6,13 +6,16 @@
 "use client";
 
 import {
+  AlertTriangle,
   CheckCircle2,
   CopyPlus,
   FileSpreadsheet,
   GitCompare,
+  Loader2,
   RotateCcw,
   Send,
   Trash2,
+  X,
   XCircle,
 } from "lucide-react";
 
@@ -48,7 +51,9 @@ import {
   type StagingRecord,
 } from "@/lib/excel-parser";
 import { formatMYRShort } from "@/lib/format";
+import { isUuid } from "@/lib/import-api";
 import type { Summary } from "./import-types";
+import type { SyncErrorState } from "./smart-excel-import";
 import { DuplicateCompareDialog } from "./duplicate-compare-dialog";
 
 export type RowFilter = "all" | "valid" | "invalid" | "duplicate";
@@ -70,6 +75,10 @@ export function ReviewPanel({
   onCloseCompare,
   onReset,
   onSync,
+  syncing = false,
+  syncStep = null,
+  syncError = null,
+  onDismissError,
 }: {
   workbook: ParsedWorkbook;
   records: StagingRecord[];
@@ -83,10 +92,21 @@ export function ReviewPanel({
   onCloseCompare: () => void;
   onReset: () => void;
   onSync: () => void;
+  /** Penyegerakan ke /api/import/sync sedang berjalan. */
+  syncing?: boolean;
+  /** Mesej kemajuan langkah semasa (staging / penghantaran). */
+  syncStep?: string | null;
+  /** Ralat daripada API, dipaparkan tanpa menukar fasa wizard. */
+  syncError?: SyncErrorState | null;
+  onDismissError?: () => void;
 }) {
   const compareRecord = records.find((r) => r.id === compareOpenId)
     ?? workbook.records.find((r) => r.id === compareOpenId)
     ?? null;
+
+  // Bilangan keputusan sebenar yang akan dihantar ke pelayan.
+  const decidedCount =
+    summary.synced + summary.merged + summary.created + summary.discarded;
 
   return (
     <div className="space-y-4">
@@ -107,7 +127,12 @@ export function ReviewPanel({
               </p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={onReset}>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={syncing}
+            onClick={onReset}
+          >
             <RotateCcw className="h-4 w-4" />
             Muat Naik Fail Lain
           </Button>
@@ -135,9 +160,18 @@ export function ReviewPanel({
         />
       </div>
 
+      {/* Ralat penyegerakan daripada /api/import/sync */}
+      {syncError && (
+        <SyncErrorAlert error={syncError} onDismiss={onDismissError} />
+      )}
+
       {/* Penapis + tindakan pukal */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Select value={filter} onValueChange={(v) => onFilter(v as RowFilter)}>
+        <Select
+          value={filter}
+          disabled={syncing}
+          onValueChange={(v) => onFilter(v as RowFilter)}
+        >
           <SelectTrigger className="w-64">
             <SelectValue />
           </SelectTrigger>
@@ -155,10 +189,11 @@ export function ReviewPanel({
           </SelectContent>
         </Select>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
             variant="outline"
+            disabled={syncing}
             onClick={() => onBulkAction("discarded")}
           >
             <Trash2 className="h-4 w-4" />
@@ -167,7 +202,7 @@ export function ReviewPanel({
           <Button
             size="sm"
             variant="outline"
-            disabled={summary.valid === 0}
+            disabled={syncing || summary.valid === 0}
             onClick={() => onBulkAction("created_new")}
           >
             <CopyPlus className="h-4 w-4" />
@@ -175,14 +210,47 @@ export function ReviewPanel({
           </Button>
           <Button
             size="sm"
-            disabled={summary.pending === 0 || summary.valid === 0}
+            // Segerak dibenarkan sebaik sahaja ada keputusan — tidak perlu
+            // menunggu setiap baris diputuskan; baris `pending` dilangkau.
+            disabled={syncing || decidedCount === 0}
             onClick={onSync}
+            title={
+              decidedCount === 0
+                ? "Sahkan sekurang-kurangnya satu baris sebelum menyegerak."
+                : `Hantar ${decidedCount} keputusan ke /api/import/sync`
+            }
           >
-            <Send className="h-4 w-4" />
-            Confirm &amp; Sync to Master
+            {syncing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+            {syncing
+              ? "Menyegerak…"
+              : `Confirm & Sync to Master${decidedCount > 0 ? ` (${decidedCount})` : ""}`}
           </Button>
         </div>
       </div>
+
+      {/* Kemajuan penyegerakan */}
+      {syncing && (
+        <div className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+          <p>
+            {syncStep ?? "Menyegerakkan rekod…"}{" "}
+            <span className="text-sky-700">
+              Transaksi adalah atomic — jangan tutup tetingkap ini.
+            </span>
+          </p>
+        </div>
+      )}
+
+      {summary.pending > 0 && !syncing && (
+        <p className="text-xs text-muted-foreground">
+          {summary.pending} baris masih menunggu keputusan dan tidak akan
+          dihantar ke pelayan.
+        </p>
+      )}
 
       {/* Jadual preview */}
       <Card>
@@ -211,6 +279,7 @@ export function ReviewPanel({
                 <StagingRow
                   key={r.id}
                   record={r}
+                  disabled={syncing}
                   onAction={onAction}
                   onCompare={() => onCompare(r.id)}
                 />
@@ -253,13 +322,19 @@ function StagingRow({
   record,
   onAction,
   onCompare,
+  disabled = false,
 }: {
   record: StagingRecord;
   onAction: (id: string, action: RecordAction) => void;
   onCompare: () => void;
+  /** Kunci semua kawalan semasa penyegerakan berjalan. */
+  disabled?: boolean;
 }) {
   const r = record;
   const decided = r.action !== "pending";
+  // Gabungan hanya sah apabila padanan pendua merujuk UUID program sebenar
+  // dalam Supabase — RPC menolak `duplicate_match_id` bukan-UUID.
+  const canMerge = isUuid(r.duplicate?.matchId);
 
   return (
     <TableRow className={!r.isValid ? "bg-red-50/60" : undefined}>
@@ -357,20 +432,33 @@ function StagingRow({
         {decided ? (
           <div className="space-y-1.5">
             <ActionBadge action={r.action} />
-            {r.action === "discarded" ? (
+            {r.action !== "discarded" || disabled ? null : (
               <Button
                 size="sm"
                 variant="ghost"
                 className="h-7 px-2 text-xs"
+                disabled={disabled}
                 onClick={() => onAction(r.id, "pending")}
               >
                 <RotateCcw className="h-3 w-3" />
                 Buat asal
               </Button>
-            ) : null}
+            )}
+            {r.action === "merged" && !canMerge && (
+              <p className="text-xs text-amber-700">
+                Padanan bukan program Supabase — pilih &quot;Cipta
+                Baharu&quot;.
+              </p>
+            )}
           </div>
         ) : r.duplicate ? (
-          <Button size="sm" variant="outline" className="w-full" onClick={onCompare}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full"
+            disabled={disabled}
+            onClick={onCompare}
+          >
             <GitCompare className="h-3.5 w-3.5" />
             Bandingkan
           </Button>
@@ -379,6 +467,7 @@ function StagingRow({
             <Button
               size="sm"
               className="w-full"
+              disabled={disabled}
               onClick={() => onAction(r.id, "sync_confirmed")}
             >
               <CheckCircle2 className="h-3.5 w-3.5" />
@@ -390,6 +479,7 @@ function StagingRow({
                 variant="outline"
                 className="h-7 flex-1 px-1 text-xs"
                 title="Cipta program / rekod baharu"
+                disabled={disabled}
                 onClick={() => onAction(r.id, "created_new")}
               >
                 <CopyPlus className="h-3 w-3" />
@@ -400,6 +490,7 @@ function StagingRow({
                 variant="ghost"
                 className="h-7 w-7 px-0"
                 title="Buang rekod"
+                disabled={disabled}
                 onClick={() => onAction(r.id, "discarded")}
               >
                 <Trash2 className="h-3.5 w-3.5 text-red-500" />
@@ -415,6 +506,7 @@ function StagingRow({
               size="sm"
               variant="ghost"
               className="h-7 w-fit px-2 text-xs text-red-600"
+              disabled={disabled}
               onClick={() => onAction(r.id, "discarded")}
             >
               <Trash2 className="h-3 w-3" />
@@ -424,6 +516,63 @@ function StagingRow({
         )}
       </TableCell>
     </TableRow>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Papar ralat daripada /api/import/sync                               */
+/* ------------------------------------------------------------------ */
+
+function SyncErrorAlert({
+  error,
+  onDismiss,
+}: {
+  error: SyncErrorState;
+  onDismiss?: () => void;
+}) {
+  // Konflik governance / kebenaran diberi warna amber (boleh dipulihkan
+  // oleh pengguna); selebihnya merah.
+  const recoverable =
+    error.code === "GOVERNANCE_LOCKED" ||
+    error.code === "CLIENT_VALIDATION_ERROR" ||
+    error.code === "VALIDATION_ERROR" ||
+    error.code === "DATA_VALIDATION_ERROR";
+
+  const tone = recoverable
+    ? "border-amber-200 bg-amber-50 text-amber-900"
+    : "border-red-200 bg-red-50 text-red-900";
+
+  return (
+    <div className={`flex items-start gap-3 rounded-lg border p-4 text-sm ${tone}`}>
+      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <p className="font-semibold">
+          Penyegerakan gagal
+          <span className="ml-2 rounded bg-white/70 px-1.5 py-0.5 font-mono text-xs font-normal">
+            {error.code}
+          </span>
+        </p>
+        <p>{error.message}</p>
+        {error.details.length > 0 && (
+          <ul className="list-inside list-disc space-y-0.5 text-xs">
+            {error.details.map((detail, i) => (
+              <li key={i}>{detail}</li>
+            ))}
+          </ul>
+        )}
+        <p className="text-xs opacity-90">{error.hint}</p>
+      </div>
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Tutup amaran"
+          className="shrink-0 rounded p-1 transition-colors hover:bg-white/60"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
+    </div>
   );
 }
 
