@@ -44,12 +44,14 @@ komponen **shadcn/ui** (Radix UI).
 │       └── import-types.ts           # Jenis kongsi (Summary)
 ├── lib/
 │   ├── excel-parser.ts               # Parser SheetJS + pemetaan import_staging
-│   ├── master-records.ts             # Data induk untuk pengesanan pendua
+│   ├── import-api.ts                 # Sambungan UI → POST /api/import/sync
+│   ├── master-records.ts             # Data induk (Supabase / mock) untuk pendua
 │   ├── supabase/
 │   │   ├── client.ts                 # Browser client (@supabase/ssr)
 │   │   ├── server.ts                 # Server client (cookies)
 │   │   ├── middleware.ts             # Refresh sesi + proteksi laluan
-│   │   └── schema-import-staging.sql # Skema jadual import_staging
+│   │   ├── schema-import-staging.sql # Skema jadual import_staging
+│   │   └── sync-import-transaction.sql # RPC transaksi atomic sync_import_transaction
 │   ├── types.ts                      # Entiti domain (Programme, Participant, ...)
 │   ├── mock-data.ts                  # Data mock (6 program lengkap)
 │   ├── format.ts                     # formatMYR, formatDate, ...
@@ -104,6 +106,39 @@ menyediakannya dalam Staging Area sebelum ditulis ke pangkalan data induk.
   **Confirm & Sync to Master**, **Merge with Existing Record**,
   **Create New Programme**, **Discard** (dengan Buat Asal).
 - Penapis: Semua / Sah / Bermasalah / Disyaki pendua.
+
+### Penyegerakan ke Jadual Induk (Langkah 4.5)
+
+UI import kini dipautkan terus kepada API transaksi atomic. Aliran penuh
+butang **Confirm & Sync to Master**:
+
+```
+Excel → parser → import_batches + import_staging
+      → POST /api/import/sync → RPC sync_import_transaction() → jadual induk
+```
+
+- **`lib/import-api.ts`** — satu-satunya lapisan yang bercakap dengan
+  pelayan. Ia mementaskan batch ke Supabase, memetakan `StagingRecord`
+  kepada kontrak JSON API (`camelCase` → `snake_case` diuruskan oleh route),
+  mengesahkan payload di klien (cermin `validateBody()` pelayan), dan
+  menterjemah kod ralat kepada mesej Bahasa Melayu.
+- **`lib/master-records.ts`** — `fetchMasterRecords()` membaca `programmes`
+  + `invoices` sebenar daripada Supabase supaya pengesanan pendua
+  membandingkan fail Excel dengan data pengeluaran. Ini penting kerana
+  `matchId` menjadi **UUID sebenar**, membolehkan tindakan *Merge*
+  menghantar `duplicateMatchId` yang sah (RPC menolak nilai bukan-UUID).
+- **Pengendalian ralat** — `UNAUTHENTICATED` (401), `RLS_OR_ROLE_DENIED`
+  (403), `GOVERNANCE_LOCKED` (409, program dikunci Governance),
+  `DUPLICATE_ERROR` / `FOREIGN_KEY_ERROR` (409),
+  `DATA_VALIDATION_ERROR` (422) dan `SYNC_TRANSACTION_FAILED` (500)
+  dipaparkan beserta panduan pemulihan. Kegagalan **tidak** menukar fasa
+  wizard — pengguna kekal di panel review untuk membetulkan dan mencuba
+  semula, kerana transaksi atomic bermakna tiada perubahan separa disimpan.
+- **Mod demo** — tanpa env Supabase, aliran yang sama dijalankan secara
+  simulasi tempatan supaya UI kekal boleh diuji tanpa pangkalan data.
+
+Pasang RPC dengan menjalankan `lib/supabase/schema-import-staging.sql`
+diikuti `lib/supabase/sync-import-transaction.sql` dalam Supabase SQL Editor.
 
 Gagal tanpa fail sebenar: dua fail contoh disediakan di `public/samples/`
 (klik "Cuba" pada halaman import). Jana semula dengan

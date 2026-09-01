@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
   CloudUpload,
+  Database,
   FileSpreadsheet,
   Loader2,
 } from "lucide-react";
@@ -18,17 +19,32 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type {
+  MasterRecords,
   ParsedWorkbook,
   RecordAction,
   StagingRecord,
 } from "@/lib/excel-parser";
-import { getMasterRecords } from "@/lib/master-records";
+import {
+  ImportSyncError,
+  isSupabaseConfigured,
+  syncErrorHint,
+  syncWorkbook,
+  type SyncOutcome,
+} from "@/lib/import-api";
+import { fetchMasterRecords, getMasterRecords } from "@/lib/master-records";
 import type { Summary } from "./import-types";
 import { ReviewPanel, type RowFilter } from "./review-panel";
 
 /* ============================ Jenis UI ============================ */
 
 type Phase = "upload" | "review" | "done";
+
+export interface SyncErrorState {
+  code: string;
+  message: string;
+  hint: string;
+  details: string[];
+}
 
 const SAMPLE_FILES = [
   {
@@ -55,7 +71,32 @@ export function SmartExcelImport() {
   const [filter, setFilter] = useState<RowFilter>("all");
   const [compareId, setCompareId] = useState<string | null>(null);
 
-  const master = useMemo(() => getMasterRecords(), []);
+  // ---- Keadaan penyegerakan ke /api/import/sync (Langkah 4.5) ----
+  const [syncing, setSyncing] = useState(false);
+  const [syncStep, setSyncStep] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<SyncErrorState | null>(null);
+  const [outcome, setOutcome] = useState<SyncOutcome | null>(null);
+
+  // ---- Rekod induk (Supabase bila tersedia, mock sebagai sandaran) ----
+  const [master, setMaster] = useState<MasterRecords>(() => getMasterRecords());
+  const [masterLive, setMasterLive] = useState(false);
+  const [masterError, setMasterError] = useState<string | null>(null);
+
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchMasterRecords().then((result) => {
+      if (cancelled) return;
+      setMaster(result.master);
+      setMasterLive(result.live);
+      setMasterError(result.error);
+    });
+    return () => {
+      cancelled = true;
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const processFile = useCallback(
     async (file: File | { href: string; name: string }) => {
@@ -86,6 +127,8 @@ export function SmartExcelImport() {
           setFileName(name);
           setCompareId(null);
           setFilter("all");
+          setSyncError(null);
+          setOutcome(null);
           setPhase("review");
         }
       } catch (err) {
@@ -113,6 +156,7 @@ export function SmartExcelImport() {
       prev.map((r) => (r.id === id ? { ...r, action } : r)),
     );
     setCompareId((cur) => (cur === id ? null : cur));
+    setSyncError(null);
   }, []);
 
   const bulkAction = useCallback((action: RecordAction) => {
@@ -126,9 +170,12 @@ export function SmartExcelImport() {
         return { ...r, action };
       }),
     );
+    setSyncError(null);
   }, []);
 
   function reset() {
+    abortRef.current?.abort();
+    abortRef.current = null;
     setPhase("upload");
     setFileName("");
     setWorkbook(null);
@@ -136,7 +183,62 @@ export function SmartExcelImport() {
     setFilter("all");
     setCompareId(null);
     setParseError(null);
+    setSyncing(false);
+    setSyncStep(null);
+    setSyncError(null);
+    setOutcome(null);
   }
+
+  /**
+   * "Confirm & Sync to Master" — hantar semua keputusan ke API transaksi
+   * atomic `/api/import/sync`. Kegagalan tidak menukar fasa: pengguna kekal
+   * pada panel review supaya baris bermasalah boleh dibetulkan dan dicuba
+   * semula (tiada perubahan separa ditulis oleh pelayan).
+   */
+  const handleSync = useCallback(async () => {
+    if (!workbook || syncing) return;
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setSyncing(true);
+    setSyncError(null);
+    setSyncStep("Menyediakan penyegerakan…");
+
+    try {
+      const result = await syncWorkbook({
+        workbook,
+        records,
+        signal: controller.signal,
+        onProgress: (message) => setSyncStep(message),
+      });
+      setOutcome(result);
+      setPhase("done");
+    } catch (error) {
+      if (error instanceof ImportSyncError) {
+        setSyncError({
+          code: error.code,
+          message: error.message,
+          hint: syncErrorHint(error.code),
+          details: error.details,
+        });
+      } else {
+        setSyncError({
+          code: "INTERNAL_ERROR",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Ralat tidak dijangka semasa penyegerakan.",
+          hint: syncErrorHint("INTERNAL_ERROR"),
+          details: [],
+        });
+      }
+    } finally {
+      setSyncing(false);
+      setSyncStep(null);
+      abortRef.current = null;
+    }
+  }, [workbook, records, syncing]);
 
   const summary: Summary = useMemo(
     () => ({
@@ -167,11 +269,20 @@ export function SmartExcelImport() {
   }, [records, filter]);
 
   if (phase === "done") {
-    return <SyncDone summary={summary} fileName={fileName} onReset={reset} />;
+    return (
+      <SyncDone
+        summary={summary}
+        outcome={outcome}
+        fileName={fileName}
+        onReset={reset}
+      />
+    );
   }
 
   return (
     <div className="space-y-6">
+      <MasterSourceNotice live={masterLive} error={masterError} />
+
       {phase === "upload" && (
         <UploadCard
           parsing={parsing}
@@ -197,9 +308,55 @@ export function SmartExcelImport() {
           compareOpenId={compareId}
           onCloseCompare={() => setCompareId(null)}
           onReset={reset}
-          onSync={() => setPhase("done")}
+          onSync={() => void handleSync()}
+          syncing={syncing}
+          syncStep={syncStep}
+          syncError={syncError}
+          onDismissError={() => setSyncError(null)}
         />
       )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Petunjuk sumber rekod induk (Supabase vs mock)                      */
+/* ------------------------------------------------------------------ */
+
+function MasterSourceNotice({
+  live,
+  error,
+}: {
+  live: boolean;
+  error: string | null;
+}) {
+  if (live && !error) {
+    return (
+      <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+        <Database className="mt-0.5 h-4 w-4 shrink-0" />
+        <p>
+          Pengesanan pendua menggunakan <strong>data induk Supabase</strong>{" "}
+          secara langsung. Penyegerakan akan ditulis melalui transaksi atomic{" "}
+          <code className="rounded bg-white/70 px-1 py-0.5 text-xs">
+            /api/import/sync
+          </code>
+          .
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+      <p>
+        {error
+          ? `Rekod induk Supabase tidak dapat dibaca (${error}). `
+          : "Pemboleh ubah persekitaran Supabase belum ditetapkan. "}
+        Sistem menggunakan <strong>data mock</strong> untuk pengesanan pendua
+        dan penyegerakan dijalankan dalam <strong>mod simulasi</strong> tanpa
+        menulis ke pangkalan data.
+      </p>
     </div>
   );
 }
@@ -333,15 +490,24 @@ function UploadCard({
 
 function SyncDone({
   summary,
+  outcome,
   fileName,
   onReset,
 }: {
   summary: Summary;
+  outcome: SyncOutcome | null;
   fileName: string;
   onReset: () => void;
 }) {
+  // Nombor pelayan diutamakan; ringkasan UI hanya sandaran (mod demo).
   const processed =
-    summary.synced + summary.merged + summary.created + summary.discarded;
+    outcome?.processed ??
+    summary.synced + summary.merged + summary.created;
+  const created = outcome?.created ?? summary.created;
+  const merged = outcome?.merged ?? summary.merged;
+  const discarded = outcome?.discarded ?? summary.discarded;
+  const simulated = outcome?.simulated ?? !isSupabaseConfigured();
+
   return (
     <Card>
       <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
@@ -349,19 +515,38 @@ function SyncDone({
           <CheckCircle2 className="h-9 w-9" />
         </span>
         <div className="space-y-1">
-          <h2 className="text-lg font-semibold">Penyegerakan Selesai</h2>
+          <h2 className="text-lg font-semibold">
+            {simulated ? "Penyegerakan Selesai (Simulasi)" : "Penyegerakan Selesai"}
+          </h2>
           <p className="max-w-lg text-sm text-muted-foreground">
-            Keputusan untuk <strong>{processed}</strong> rekod daripada{" "}
-            <strong>{fileName}</strong> telah dihantar ke jadual induk.
+            <strong>{processed}</strong> rekod daripada{" "}
+            <strong>{fileName}</strong>{" "}
+            {simulated
+              ? "diproses dalam mod demo — tiada penulisan ke pangkalan data."
+              : "telah ditulis ke jadual induk melalui satu transaksi atomic."}
           </p>
         </div>
 
         <div className="grid w-full max-w-lg grid-cols-2 gap-3 sm:grid-cols-4">
-          <DoneStat label="Disegerak" value={summary.synced} tone="text-emerald-700" />
-          <DoneStat label="Digabungkan" value={summary.merged} tone="text-sky-700" />
-          <DoneStat label="Baharu" value={summary.created} tone="text-primary" />
-          <DoneStat label="Dibuang" value={summary.discarded} tone="text-slate-500" />
+          <DoneStat label="Diproses" value={processed} tone="text-emerald-700" />
+          <DoneStat label="Digabungkan" value={merged} tone="text-sky-700" />
+          <DoneStat label="Program Baharu" value={created} tone="text-primary" />
+          <DoneStat label="Dibuang" value={discarded} tone="text-slate-500" />
         </div>
+
+        {outcome && outcome.skipped > 0 && (
+          <p className="max-w-lg text-xs text-amber-700">
+            {outcome.skipped} rekod berjenis &quot;Tidak Dikenali&quot;
+            dilangkau kerana pelayan hanya menerima sebut harga, invois dan
+            kos.
+          </p>
+        )}
+
+        {outcome && !outcome.simulated && (
+          <p className="font-mono text-xs text-muted-foreground">
+            Batch ID: {outcome.batchId}
+          </p>
+        )}
 
         <Button onClick={onReset} className="mt-2">
           Muat Naik Fail Lain
