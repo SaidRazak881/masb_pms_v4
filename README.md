@@ -125,7 +125,15 @@ Supabase dan bertukar kepada data sebenar sebaik sahaja env diisi.
 │   └── R1 MIMOS_Academy_INCOME_STATEMENT.xlsx
 ├── scripts/
 │   ├── generate-sample-excel.mjs     # Jana fail Excel contoh
-│   └── test-parser.mjs               # Ujian parser terhadap fail contoh
+│   ├── test-parser.mjs               # Ujian parser terhadap fail contoh
+│   ├── test-sql-pglite.mjs           # Ujian pemasangan skema + idempotensi
+│   ├── test-sql-functional.mjs       # Ujian fungsi RPC (sync, lock, CR)
+│   ├── test-seed-after-master.mjs    # Ujian seed selepas skema induk
+│   ├── test-user-management-sql.mjs  # Ujian SQL Fasa 6 (14 kumpulan)
+│   ├── test-preflight-b-sql.mjs      # Sahkan blok preflight Langkah B (PROMPT-6)
+│   └── codebase-map.mjs              # Jana semula docs/CODEBASE-MAP.md
+├── .claude/skills/                   # Agent Skills (arahan proses tambahan)
+│   └── vibe-coding-workflow/SKILL.md # Spec→Plan→Build→Test→Review→Clean→Release
 ├── middleware.ts                     # Entry middleware Next.js
 ├── components.json                   # Konfigurasi shadcn/ui CLI
 ├── tailwind.config.ts
@@ -346,6 +354,7 @@ berpuluh-puluh polisi RLS.
 | `docs/ACTION-6-UAT-AUTH-USERS.md` | Senarai semak ujian manual Fasa 6 (log masuk, wajib tukar kata laluan, pendaftaran, kelulusan, sekatan, reset) |
 | `docs/CODEBASE-MAP.md` | Peta kod ringkas untuk konteks pembantu AI (jana semula: `node scripts/codebase-map.mjs`) |
 | `docs/PROMPT-TEMPLATE-FASA.md` | Templat wajib prompt GPT: Persona + Peta Kod + Tugasan + Larangan + Format Laporan |
+| `docs/SKILLS.md` | Daftar Agent Skill tambahan + pemetaan kepada aliran Fasa projek dan penyesuaian khusus (pengajaran daripada blocker A7 & preflight B) |
 
 ## Bermula
 
@@ -383,6 +392,7 @@ meneruskan tanpa pelayan Supabase).
 | `npm start`    | Jalankan binaan pengeluaran         |
 | `npm run lint` | Lint ESLint                         |
 | `node scripts/test-user-management-sql.mjs` | Ujian SQL Fasa 6 (PostgreSQL sebenar via PGlite): pemasangan pada DB kosong + 12 kumpulan ujian fungsi |
+| `node scripts/test-preflight-b-sql.mjs` | Sahkan blok preflight **Langkah B** dalam PROMPT-6: read-only, kalis ralat pada DB sebelum/selepas Fasa 6, tiada kata laluan bocor |
 | `node scripts/test-sql-pglite.mjs` | Ujian pemasangan skema induk + idempotensi |
 | `node scripts/test-sql-functional.mjs` | Ujian fungsi RPC (import sync, lock, change request) |
 | `node scripts/codebase-map.mjs` | Jana semula `docs/CODEBASE-MAP.md` |
