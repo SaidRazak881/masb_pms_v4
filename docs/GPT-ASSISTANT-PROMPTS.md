@@ -25,6 +25,22 @@ selepas selesai tugasan — supaya hasilnya boleh disemak dengan cepat.
 
 ---
 
+## ALIRAN FASA A (WAJIB) — Persona + Peta Kod
+
+> **Mulai fasa ini, SETIAP prompt baharu MESTI mengikut**
+> `docs/PROMPT-TEMPLATE-FASA.md`:
+>
+> 1. **Persona tetap** (`docs/personas/`) — pilih ikut jenis tugasan
+>    (SQL-Architect / QA-UAT / Security-Review / BA-Laporan).
+> 2. **Peta kod terkini** (`docs/CODEBASE-MAP.md`) — lampirkan sebagai konteks
+>    (jana semula dengan `node scripts/codebase-map.mjs` sebelum setiap fasa).
+> 3. **Blok tugasan + larangan + FORMAT LAPORAN 6 seksyen** seperti templat.
+>
+> Prompt lama di bawah (Prompt 1 dan seterusnya) kekal sebagai rujukan
+> sejarah — guna templat Fasa A untuk tugasan baharu.
+
+---
+
 ## PROMPT 1 — Pasang Pangkalan Data di Supabase (Tugasan Utama)
 
 > **Peranan kamu:** Jurutera pangkalan data yang teliti dan berhati-hati.
