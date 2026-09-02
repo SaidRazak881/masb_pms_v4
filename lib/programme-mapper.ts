@@ -27,8 +27,13 @@ export interface ProgrammeRow {
   start_date: string | null;
   end_date: string | null;
   venue: string | null;
+  city?: string | null;
+  state?: string | null;
   trainer: string | null;
+  trainer_email?: string | null;
+  trainer_phone?: string | null;
   programme_manager: string | null;
+  programme_manager_email?: string | null;
   contracted_amount: number;
   budget: number;
   actual_cost: number;
@@ -61,6 +66,11 @@ export function mapProgrammeRow(row: ProgrammeRow): Programme {
     trainer: row.trainer || "",
     programmeManager: row.programme_manager || "",
     description: row.description || "",
+    trainerEmail: row.trainer_email || undefined,
+    trainerPhone: row.trainer_phone || undefined,
+    programmeManagerEmail: row.programme_manager_email || undefined,
+    city: row.city || undefined,
+    state: row.state || undefined,
     budget: row.budget,
     actualCost: row.actual_cost,
     contractedAmount: row.contracted_amount,

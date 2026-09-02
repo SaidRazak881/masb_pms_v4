@@ -156,6 +156,13 @@ export interface Programme {
   programmeManager: string;
   description: string;
 
+  /** Maklumat hubungan tambahan (pilihan). */
+  trainerEmail?: string;
+  trainerPhone?: string;
+  programmeManagerEmail?: string;
+  city?: string;
+  state?: string;
+
   budget: number;
   actualCost: number;
   contractedAmount: number;

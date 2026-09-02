@@ -34,8 +34,13 @@ interface ProgrammeInput {
   start_date?: string;
   end_date?: string;
   venue?: string;
+  city?: string;
+  state?: string;
   trainer?: string;
+  trainer_email?: string;
+  trainer_phone?: string;
   programme_manager?: string;
+  programme_manager_email?: string;
   contracted_amount?: number;
   budget?: number;
   actual_cost?: number;
@@ -227,8 +232,13 @@ export async function createProgramme(input: ProgrammeInput): Promise<{
       start_date: input.start_date,
       end_date: input.end_date,
       venue: input.venue,
+      city: input.city,
+      state: input.state,
       trainer: input.trainer,
+      trainer_email: input.trainer_email,
+      trainer_phone: input.trainer_phone,
       programme_manager: input.programme_manager,
+      programme_manager_email: input.programme_manager_email,
       contracted_amount: input.contracted_amount,
       budget: input.budget,
       actual_cost: input.actual_cost,

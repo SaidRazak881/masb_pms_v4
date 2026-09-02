@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { updateProgramme } from "@/lib/actions/programme-actions";
 import {
   PROGRAMME_CATEGORIES,
@@ -70,6 +71,7 @@ export function EditProgrammeDialog({ programme }: EditProgrammeDialogProps) {
   const [message, setMessage] = React.useState<string | null>(null);
 
   const [title, setTitle] = React.useState(programme.title);
+  const [description, setDescription] = React.useState(programme.description);
   const [client, setClient] = React.useState(programme.client);
   const [category, setCategory] = React.useState<ProgrammeCategory>(
     programme.category,
@@ -79,7 +81,16 @@ export function EditProgrammeDialog({ programme }: EditProgrammeDialogProps) {
   const [endDate, setEndDate] = React.useState(dateValue(programme.endDate));
   const [venue, setVenue] = React.useState(programme.venue);
   const [trainer, setTrainer] = React.useState(programme.trainer);
+  const [trainerEmail, setTrainerEmail] = React.useState(
+    programme.trainerEmail ?? "",
+  );
+  const [trainerPhone, setTrainerPhone] = React.useState(
+    programme.trainerPhone ?? "",
+  );
   const [manager, setManager] = React.useState(programme.programmeManager);
+  const [managerEmail, setManagerEmail] = React.useState(
+    programme.programmeManagerEmail ?? "",
+  );
   const [contracted, setContracted] = React.useState(
     programme.contractedAmount ? String(programme.contractedAmount) : "",
   );
@@ -112,6 +123,7 @@ export function EditProgrammeDialog({ programme }: EditProgrammeDialogProps) {
     startTransition(async () => {
       const result = await updateProgramme(programme.id, {
         title: title.trim(),
+        description: description.trim() || undefined,
         organizer_name: client.trim(),
         category,
         delivery_mode: mode,
@@ -119,7 +131,10 @@ export function EditProgrammeDialog({ programme }: EditProgrammeDialogProps) {
         end_date: endDate || undefined,
         venue: venue.trim() || undefined,
         trainer: trainer.trim() || undefined,
+        trainer_email: trainerEmail.trim() || undefined,
+        trainer_phone: trainerPhone.trim() || undefined,
         programme_manager: manager.trim() || undefined,
+        programme_manager_email: managerEmail.trim() || undefined,
         contracted_amount: toNumber(contracted),
         budget: toNumber(budget),
         actual_cost: toNumber(actualCost),
@@ -143,7 +158,7 @@ export function EditProgrammeDialog({ programme }: EditProgrammeDialogProps) {
           Sunting Program
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Sunting Program</DialogTitle>
           <DialogDescription>
@@ -169,6 +184,16 @@ export function EditProgrammeDialog({ programme }: EditProgrammeDialogProps) {
               id="edit-client"
               value={client}
               onChange={(e) => setClient(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-desc">Penerangan</Label>
+            <Textarea
+              id="edit-desc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Ringkasan / objektif program (pilihan)"
             />
           </div>
 
@@ -251,13 +276,43 @@ export function EditProgrammeDialog({ programme }: EditProgrammeDialogProps) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="edit-manager">Pengurus Program</Label>
+              <Label htmlFor="edit-trainer-email">E-mel Jurulatih</Label>
+              <Input
+                id="edit-trainer-email"
+                type="email"
+                value={trainerEmail}
+                onChange={(e) => setTrainerEmail(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-trainer-phone">Telefon Jurulatih</Label>
+              <Input
+                id="edit-trainer-phone"
+                value={trainerPhone}
+                onChange={(e) => setTrainerPhone(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-manager">Pengurus Program (PIC)</Label>
               <Input
                 id="edit-manager"
                 value={manager}
                 onChange={(e) => setManager(e.target.value)}
               />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-manager-email">E-mel Pengurus Program</Label>
+            <Input
+              id="edit-manager-email"
+              type="email"
+              value={managerEmail}
+              onChange={(e) => setManagerEmail(e.target.value)}
+            />
           </div>
 
           <div className="grid grid-cols-3 gap-3">
