@@ -1,5 +1,7 @@
 "use client";
 
+import * as React from "react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -7,6 +9,7 @@ import {
   CloudUpload,
   Database,
   FileSpreadsheet,
+  LayoutDashboard,
   Loader2,
 } from "lucide-react";
 
@@ -122,8 +125,20 @@ export function SmartExcelImport() {
               "Tiada data dikesan dalam fail ini.",
           );
         } else {
+          // Auto-keputusan: rekod yang SAH (quotation/invoice/cost) terus
+          // ditanda "sync_confirmed" supaya pengguna boleh terus klik
+          // "Confirm & Sync" tanpa memilih setiap baris. Rekod tidak sah
+          // kekal "pending" untuk semakan/buang.
+          const autoDecided = result.records.map((r) =>
+            r.isValid &&
+            (r.entityKind === "quotation" ||
+              r.entityKind === "invoice" ||
+              r.entityKind === "cost")
+              ? { ...r, action: "sync_confirmed" as RecordAction }
+              : r,
+          );
           setWorkbook(result);
-          setRecords(result.records);
+          setRecords(autoDecided);
           setFileName(name);
           setCompareId(null);
           setFilter("all");
@@ -450,11 +465,10 @@ function UploadCard({
             Fail Contoh (struktur operasi MIMOS Academy)
           </CardTitle>
           <CardDescription>
-            Kedua-dua fail yang dinamakan dalam permintaan tidak wujud dalam
-            persekitaran ini — contoh di bawah meniru strukturnya. Klik
-            &quot;Cuba&quot; untuk menguji parser, atau muat naik fail sebenar
-            anda melalui zon di atas (tataletak pengepala yang berbeza tetap
-            disokong).
+            Fail contoh rasmi daripada folder <code>V4 RAW</code> turut
+            disertakan. Klik &quot;Cuba&quot; untuk menguji parser, atau muat
+            naik fail sebenar anda melalui zon di atas (tataletak pengepala
+            yang berbeza tetap disokong).
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
@@ -548,9 +562,17 @@ function SyncDone({
           </p>
         )}
 
-        <Button onClick={onReset} className="mt-2">
-          Muat Naik Fail Lain
-        </Button>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Button onClick={onReset} className="mt-2">
+            Muat Naik Fail Lain
+          </Button>
+          <Link href="/dashboard">
+            <Button variant="outline" className="mt-2">
+              <LayoutDashboard className="h-4 w-4" />
+              Kembali ke Dashboard
+            </Button>
+          </Link>
+        </div>
       </CardContent>
     </Card>
   );

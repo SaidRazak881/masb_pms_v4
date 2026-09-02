@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
 import { ImportHistory } from "@/components/import/import-history";
 import { SmartExcelImport } from "@/components/import/smart-excel-import";
@@ -13,6 +15,15 @@ export const metadata: Metadata = {
 export default function ImportPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
+      <div className="flex items-center gap-3">
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Kembali ke Dashboard
+        </Link>
+      </div>
       <div>
         <h1 className="text-2xl font-bold tracking-tight">
           Import Excel Pintar
