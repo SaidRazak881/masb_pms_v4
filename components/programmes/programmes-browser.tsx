@@ -45,17 +45,24 @@ import {
 } from "@/lib/types";
 import { getProgrammes, searchProgrammes } from "@/lib/actions/programme-actions";
 
-/** Pengguna mock — dalam pelaksanaan sebenar diambil daripada sesi Supabase. */
+/** Pengguna mock — fallback mod demo (tanpa sesi Supabase). */
 const CURRENT_USER = "Zarina Abu Bakar";
 
 const CATEGORIES = PROGRAMME_CATEGORIES;
 
 interface ProgrammesBrowserProps {
   programmes?: Programme[]; // Optional - jika disediakan, gunakan mock data
+  /** Nama penuh pengguna yang sedang log masuk (untuk tab "Program Saya"). */
+  currentUserName?: string;
 }
 
-export function ProgrammesBrowser({ programmes: initialProgrammes }: ProgrammesBrowserProps) {
-  const [tab, setTab] = useState<"mine" | "all">("mine");
+export function ProgrammesBrowser({
+  programmes: initialProgrammes,
+  currentUserName,
+}: ProgrammesBrowserProps) {
+  // Lalai kepada "Semua Program" — semua pengguna boleh melihat & mengurus
+  // semua program (PIC tidak menyekat kebenaran suntingan).
+  const [tab, setTab] = useState<"mine" | "all">("all");
   const [category, setCategory] = useState<ProgrammeCategory | "all">("all");
   const [year, setYear] = useState("all");
   const [lock, setLock] = useState<"all" | "locked" | "unlocked">("all");
@@ -127,7 +134,7 @@ export function ProgrammesBrowser({ programmes: initialProgrammes }: ProgrammesB
 
   const filtered = useMemo(() => {
     return programmes.filter((p) => {
-      if (tab === "mine" && p.programmeManager !== CURRENT_USER) return false;
+      if (tab === "mine" && p.programmeManager !== (currentUserName || CURRENT_USER)) return false;
       if (category !== "all" && p.category !== category) return false;
       if (year !== "all" && p.year !== Number(year)) return false;
       if (lock === "locked" && !p.locked) return false;
