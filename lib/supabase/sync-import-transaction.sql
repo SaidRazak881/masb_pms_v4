@@ -315,7 +315,11 @@ BEGIN
         WHEN 'engineering' THEN 'Engineering'::public.programme_category
         WHEN 'semiconductor' THEN 'Semiconductor'::public.programme_category
         WHEN 'room rental' THEN 'Room Rental'::public.programme_category
+        WHEN 'rental' THEN 'Room Rental'::public.programme_category
+        WHEN 'consultancy' THEN 'Consultancy'::public.programme_category
+        WHEN 'consulting' THEN 'Consultancy'::public.programme_category
         WHEN 'certification' THEN 'Certification'::public.programme_category
+        WHEN 'certificate' THEN 'Certification'::public.programme_category
         ELSE 'Non-Training'::public.programme_category
       END;
 

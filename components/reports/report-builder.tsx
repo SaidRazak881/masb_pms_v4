@@ -43,16 +43,14 @@ import {
   type ReportType,
 } from "@/lib/reporting";
 import { downloadReport } from "@/lib/report-excel";
-import type { Programme, ProgrammeCategory, ProgrammeStatus } from "@/lib/types";
+import {
+  PROGRAMME_CATEGORIES,
+  type Programme,
+  type ProgrammeCategory,
+  type ProgrammeStatus,
+} from "@/lib/types";
 
-const CATEGORIES: ProgrammeCategory[] = [
-  "AI & Data Science",
-  "Cybersecurity",
-  "Cloud & Infrastructure",
-  "Digital Transformation",
-  "Leadership & Management",
-  "IoT & Embedded Systems",
-];
+const CATEGORIES: ProgrammeCategory[] = PROGRAMME_CATEGORIES;
 
 const STATUSES: ProgrammeStatus[] = [
   "draft",

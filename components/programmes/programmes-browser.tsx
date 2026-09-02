@@ -13,15 +13,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -44,21 +35,20 @@ import {
   ModeBadge,
   ProgrammeStatusBadge,
 } from "@/components/programmes/status-badges";
+import { CreateProgrammeDialog } from "@/components/programmes/create-programme-dialog";
 import { formatDate, formatMYRShort } from "@/lib/format";
-import type { Programme, ProgrammeCategory, ProgrammeStatus } from "@/lib/types";
+import {
+  PROGRAMME_CATEGORIES,
+  type Programme,
+  type ProgrammeCategory,
+  type ProgrammeStatus,
+} from "@/lib/types";
 import { getProgrammes, searchProgrammes } from "@/lib/actions/programme-actions";
 
 /** Pengguna mock — dalam pelaksanaan sebenar diambil daripada sesi Supabase. */
 const CURRENT_USER = "Zarina Abu Bakar";
 
-const CATEGORIES = [
-  "AI & Data Science",
-  "Cybersecurity",
-  "Cloud & Infrastructure",
-  "Digital Transformation",
-  "Leadership & Management",
-  "IoT & Embedded Systems",
-] as const;
+const CATEGORIES = PROGRAMME_CATEGORIES;
 
 interface ProgrammesBrowserProps {
   programmes?: Programme[]; // Optional - jika disediakan, gunakan mock data
@@ -163,63 +153,7 @@ export function ProgrammesBrowser({ programmes: initialProgrammes }: ProgrammesB
           </TabsList>
         </Tabs>
 
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4" />
-              Program Baharu
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Daftar Program Baharu</DialogTitle>
-              <DialogDescription>
-                Mock UI: borang ringkas ini akan disambungkan kepada Supabase
-                pada fasa pelaksanaan.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="new-title">Tajuk Program</Label>
-                <Input id="new-title" placeholder="cth. Bengkel Keselamatan Awan" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Kategori</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih kategori" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Mod</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih mod" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="in_person">Bersemuka</SelectItem>
-                      <SelectItem value="online">Dalam Talian</SelectItem>
-                      <SelectItem value="hybrid">Hibrid</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline">Batal</Button>
-              <Button>Simpan Draf</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <CreateProgrammeDialog />
       </div>
 
       {/* Penapis */}

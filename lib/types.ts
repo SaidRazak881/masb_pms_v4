@@ -18,7 +18,29 @@ export type ProgrammeCategory =
   | "Cloud & Infrastructure"
   | "Digital Transformation"
   | "Leadership & Management"
-  | "IoT & Embedded Systems";
+  | "IoT & Embedded Systems"
+  | "Engineering"
+  | "Semiconductor"
+  | "Non-Training"
+  | "Room Rental"
+  | "Consultancy"
+  | "Certification";
+
+/** Senarai kategori program rasmi (selaras dengan enum programme_category). */
+export const PROGRAMME_CATEGORIES: ProgrammeCategory[] = [
+  "AI & Data Science",
+  "Cybersecurity",
+  "Cloud & Infrastructure",
+  "Digital Transformation",
+  "Leadership & Management",
+  "IoT & Embedded Systems",
+  "Engineering",
+  "Semiconductor",
+  "Non-Training",
+  "Room Rental",
+  "Consultancy",
+  "Certification",
+];
 
 export type FinancialDocType = "quotation" | "po" | "invoice";
 

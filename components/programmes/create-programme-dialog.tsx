@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * EditProgrammeDialog — dialog "Sunting Program" sebenar.
- * Memanggil server action `updateProgramme` (kemas kini terus ke Supabase
- * dengan RLS — program dikunci tidak boleh dikemas kini).
+ * CreateProgrammeDialog — dialog "Program Baharu" SEBENAR.
+ * Memanggil server action `createProgramme` (insert ke Supabase dengan RLS).
+ * Sebelum ini butang "Program Baharu" hanyalah mock UI tanpa fungsi.
  */
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2, Pencil } from "lucide-react";
+import { CheckCircle2, Loader2, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -29,16 +29,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { updateProgramme } from "@/lib/actions/programme-actions";
+import { createProgramme } from "@/lib/actions/programme-actions";
 import {
   PROGRAMME_CATEGORIES,
-  type Programme,
   type ProgrammeCategory,
-  type ProgrammeStatus,
   type TrainingMode,
 } from "@/lib/types";
-
-const CATEGORIES: ProgrammeCategory[] = PROGRAMME_CATEGORIES;
 
 const MODES: { value: TrainingMode; label: string }[] = [
   { value: "in_person", label: "Bersemuka" },
@@ -46,52 +42,47 @@ const MODES: { value: TrainingMode; label: string }[] = [
   { value: "hybrid", label: "Hibrid" },
 ];
 
-const STATUSES: { value: ProgrammeStatus; label: string }[] = [
-  { value: "draft", label: "Draf" },
-  { value: "active", label: "Aktif" },
-  { value: "completed", label: "Selesai" },
-  { value: "cancelled", label: "Dibatalkan" },
-  { value: "on_hold", label: "Ditangguh" },
-];
-
-function dateValue(value: string): string {
-  return value ? value.slice(0, 10) : "";
+/** Jana kod program auto jika pengguna tidak mengisinya. */
+function generateCode(): string {
+  const year = new Date().getFullYear();
+  const suffix = Date.now().toString(36).toUpperCase().slice(-6);
+  return `NEW/${year}/${suffix}`;
 }
 
-export interface EditProgrammeDialogProps {
-  programme: Programme;
-}
-
-export function EditProgrammeDialog({ programme }: EditProgrammeDialogProps) {
+export function CreateProgrammeDialog() {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
   const [message, setMessage] = React.useState<string | null>(null);
 
-  const [title, setTitle] = React.useState(programme.title);
-  const [client, setClient] = React.useState(programme.client);
+  const [title, setTitle] = React.useState("");
+  const [client, setClient] = React.useState("");
+  const [code, setCode] = React.useState("");
   const [category, setCategory] = React.useState<ProgrammeCategory>(
-    programme.category,
+    "AI & Data Science",
   );
-  const [mode, setMode] = React.useState<TrainingMode>(programme.mode);
-  const [startDate, setStartDate] = React.useState(dateValue(programme.startDate));
-  const [endDate, setEndDate] = React.useState(dateValue(programme.endDate));
-  const [venue, setVenue] = React.useState(programme.venue);
-  const [trainer, setTrainer] = React.useState(programme.trainer);
-  const [manager, setManager] = React.useState(programme.programmeManager);
-  const [contracted, setContracted] = React.useState(
-    programme.contractedAmount ? String(programme.contractedAmount) : "",
-  );
-  const [budget, setBudget] = React.useState(
-    programme.budget ? String(programme.budget) : "",
-  );
-  const [actualCost, setActualCost] = React.useState(
-    programme.actualCost ? String(programme.actualCost) : "",
-  );
-  const [status, setStatus] = React.useState<ProgrammeStatus>(
-    programme.status,
-  );
+  const [mode, setMode] = React.useState<TrainingMode>("in_person");
+  const [startDate, setStartDate] = React.useState("");
+  const [endDate, setEndDate] = React.useState("");
+  const [venue, setVenue] = React.useState("");
+  const [trainer, setTrainer] = React.useState("");
+  const [manager, setManager] = React.useState("");
+
+  function resetForm() {
+    setTitle("");
+    setClient("");
+    setCode("");
+    setCategory("AI & Data Science");
+    setMode("in_person");
+    setStartDate("");
+    setEndDate("");
+    setVenue("");
+    setTrainer("");
+    setManager("");
+    setError(null);
+    setMessage(null);
+  }
 
   function toNumber(value: string): number | undefined {
     if (!value.trim()) return undefined;
@@ -110,9 +101,10 @@ export function EditProgrammeDialog({ programme }: EditProgrammeDialogProps) {
     }
 
     startTransition(async () => {
-      const result = await updateProgramme(programme.id, {
+      const result = await createProgramme({
+        programme_code: code.trim() || generateCode(),
         title: title.trim(),
-        organizer_name: client.trim(),
+        organizer_name: client.trim() || "MIMOS Academy",
         category,
         delivery_mode: mode,
         start_date: startDate || undefined,
@@ -120,55 +112,71 @@ export function EditProgrammeDialog({ programme }: EditProgrammeDialogProps) {
         venue: venue.trim() || undefined,
         trainer: trainer.trim() || undefined,
         programme_manager: manager.trim() || undefined,
-        contracted_amount: toNumber(contracted),
-        budget: toNumber(budget),
-        actual_cost: toNumber(actualCost),
-        status,
+        status: "draft",
       });
 
       if (!result.success) {
-        setError(result.error ?? "Gagal menyimpan perubahan.");
+        setError(result.error ?? "Gagal mencipta program.");
         return;
       }
-      setMessage("Perubahan berjaya disimpan.");
+      setMessage("Program berjaya dicipta.");
+      resetForm();
       router.refresh();
     });
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) resetForm();
+      }}
+    >
       <DialogTrigger asChild>
-        <Button variant="outline">
-          <Pencil className="h-4 w-4" />
-          Sunting Program
+        <Button>
+          <Plus className="h-4 w-4" />
+          Program Baharu
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Sunting Program</DialogTitle>
+          <DialogTitle>Daftar Program Baharu</DialogTitle>
           <DialogDescription>
-            {programme.code} — kemas kini maklumat program. Audit trail akan
-            merekod perubahan ini.
+            Cipta program latihan baharu. Kod program dijana automatik jika
+            tidak diisi.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="edit-title">Tajuk Program</Label>
+            <Label htmlFor="new-title">Tajuk Program *</Label>
             <Input
-              id="edit-title"
+              id="new-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              placeholder="cth. Bengkel Keselamatan Awan"
               required
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="edit-client">Pelanggan / Penganjur</Label>
+            <Label htmlFor="new-client">Pelanggan / Penganjur</Label>
             <Input
-              id="edit-client"
+              id="new-client"
               value={client}
               onChange={(e) => setClient(e.target.value)}
+              placeholder="cth. Kementerian Pengangkutan Malaysia"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="new-code">Kod Program (pilihan)</Label>
+            <Input
+              id="new-code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder={`auto: ${generateCode()}`}
             />
           </div>
 
@@ -183,7 +191,7 @@ export function EditProgrammeDialog({ programme }: EditProgrammeDialogProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((c) => (
+                  {PROGRAMME_CATEGORIES.map((c) => (
                     <SelectItem key={c} value={c}>
                       {c}
                     </SelectItem>
@@ -213,18 +221,18 @@ export function EditProgrammeDialog({ programme }: EditProgrammeDialogProps) {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="edit-start">Tarikh Mula</Label>
+              <Label htmlFor="new-start">Tarikh Mula</Label>
               <Input
-                id="edit-start"
+                id="new-start"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="edit-end">Tarikh Tamat</Label>
+              <Label htmlFor="new-end">Tarikh Tamat</Label>
               <Input
-                id="edit-end"
+                id="new-end"
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
@@ -233,9 +241,9 @@ export function EditProgrammeDialog({ programme }: EditProgrammeDialogProps) {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="edit-venue">Lokasi</Label>
+            <Label htmlFor="new-venue">Lokasi</Label>
             <Input
-              id="edit-venue"
+              id="new-venue"
               value={venue}
               onChange={(e) => setVenue(e.target.value)}
             />
@@ -243,73 +251,21 @@ export function EditProgrammeDialog({ programme }: EditProgrammeDialogProps) {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="edit-trainer">Jurulatih</Label>
+              <Label htmlFor="new-trainer">Jurulatih</Label>
               <Input
-                id="edit-trainer"
+                id="new-trainer"
                 value={trainer}
                 onChange={(e) => setTrainer(e.target.value)}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="edit-manager">Pengurus Program</Label>
+              <Label htmlFor="new-manager">Pengurus Program</Label>
               <Input
-                id="edit-manager"
+                id="new-manager"
                 value={manager}
                 onChange={(e) => setManager(e.target.value)}
               />
             </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-contracted">Nilai Kontrak (RM)</Label>
-              <Input
-                id="edit-contracted"
-                type="number"
-                step="0.01"
-                value={contracted}
-                onChange={(e) => setContracted(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-budget">Belanjawan (RM)</Label>
-              <Input
-                id="edit-budget"
-                type="number"
-                step="0.01"
-                value={budget}
-                onChange={(e) => setBudget(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-cost">Kos Sebenar (RM)</Label>
-              <Input
-                id="edit-cost"
-                type="number"
-                step="0.01"
-                value={actualCost}
-                onChange={(e) => setActualCost(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Status</Label>
-            <Select
-              value={status}
-              onValueChange={(v) => setStatus(v as ProgrammeStatus)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUSES.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>
-                    {s.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           {error && (
@@ -334,7 +290,7 @@ export function EditProgrammeDialog({ programme }: EditProgrammeDialogProps) {
             </Button>
             <Button type="submit" disabled={pending}>
               {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Simpan Perubahan
+              Simpan Draf
             </Button>
           </DialogFooter>
         </form>

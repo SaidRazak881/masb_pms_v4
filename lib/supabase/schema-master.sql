@@ -70,6 +70,7 @@ BEGIN
   'Semiconductor',
   'Non-Training',
   'Room Rental',
+  'Consultancy',
   'Certification'
 );
   END IF;
