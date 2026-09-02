@@ -30,6 +30,7 @@ import type {
 import {
   ImportSyncError,
   isSupabaseConfigured,
+  isUuid,
   syncErrorHint,
   syncWorkbook,
   type SyncOutcome,
@@ -180,6 +181,18 @@ export function SmartExcelImport() {
         if (action === "discarded") {
           return r.action === "pending" ? { ...r, action } : r;
         }
+        // Gabung pukal: hanya pendua SAH yang memadankan program Supabase
+        // (UUID) dan masih menunggu keputusan. Yang lain kekal pending.
+        if (action === "merged") {
+          if (
+            r.action !== "pending" ||
+            !r.isValid ||
+            !isUuid(r.duplicate?.matchId)
+          ) {
+            return r;
+          }
+          return { ...r, action };
+        }
         // Tindakan positif hanya untuk rekod sah yang belum diputuskan.
         if (!r.isValid || r.action !== "pending") return r;
         return { ...r, action };
@@ -270,6 +283,19 @@ export function SmartExcelImport() {
     [records],
   );
 
+  // Bilangan pendua yang BOLEH digabung serentak: sah, masih menunggu
+  // keputusan, dan padanan merujuk UUID program Supabase yang sebenar.
+  const mergeableCount = useMemo(
+    () =>
+      records.filter(
+        (r) =>
+          r.action === "pending" &&
+          r.isValid &&
+          isUuid(r.duplicate?.matchId),
+      ).length,
+    [records],
+  );
+
   const visible = useMemo(() => {
     switch (filter) {
       case "valid":
@@ -315,6 +341,7 @@ export function SmartExcelImport() {
           workbook={workbook}
           records={visible}
           summary={summary}
+          mergeableCount={mergeableCount}
           filter={filter}
           onFilter={setFilter}
           onAction={applyAction}

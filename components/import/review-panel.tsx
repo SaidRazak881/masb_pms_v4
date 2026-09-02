@@ -11,6 +11,7 @@ import {
   CopyPlus,
   FileSpreadsheet,
   GitCompare,
+  GitMerge,
   Loader2,
   RotateCcw,
   Send,
@@ -66,6 +67,7 @@ export function ReviewPanel({
   workbook,
   records,
   summary,
+  mergeableCount = 0,
   filter,
   onFilter,
   onAction,
@@ -83,6 +85,8 @@ export function ReviewPanel({
   workbook: ParsedWorkbook;
   records: StagingRecord[];
   summary: Summary;
+  /** Bilangan pendua sah yang boleh digabung serentak (seluruh batch). */
+  mergeableCount?: number;
   filter: RowFilter;
   onFilter: (f: RowFilter) => void;
   onAction: (id: string, action: RecordAction) => void;
@@ -198,6 +202,20 @@ export function ReviewPanel({
           >
             <Trash2 className="h-4 w-4" />
             Buang Yang Menunggu
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={syncing || mergeableCount === 0}
+            onClick={() => onBulkAction("merged")}
+            title={
+              mergeableCount === 0
+                ? "Tiada pendua yang boleh digabung — perlukan padanan program Supabase yang sah."
+                : `Gabung ${mergeableCount} pendua kepada program sedia ada secara serentak`
+            }
+          >
+            <GitMerge className="h-4 w-4" />
+            Merge Semua ({mergeableCount})
           </Button>
           <Button
             size="sm"
