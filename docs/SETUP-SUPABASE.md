@@ -370,6 +370,72 @@ lapis-ke-2 yang tidak bergantung kepada RLS.
 **Implikasi operasi:** jangan tunda pemasangan `user-management.sql`.
 Selagi ia belum dipasang, lubang ini terbuka kepada semua 19 akaun.
 
+### 8.1b Blocker C13 — `has_role()` live tidak sedar `super_admin`
+
+**Dikesan semasa pemasangan live Langkah C (2026-09-03).** ChatGPT melaporkan
+C13 🔴 dengan bukti `super_admin_pos = 0` dan
+`prosrc = SELECT public.current_user_role() = p_role;`, kemudian **berhenti
+dengan betul** tanpa membetulkannya sendiri.
+
+**Punca akar — kesilapan arahan PROMPT-6, bukan kecuaian pelaksana.**
+Fasa 6 menambah cawangan `IF v_role::text = 'super_admin' THEN RETURN true`
+kepada `public.has_role()` dalam **`schema-master.sql`** (baris 274–289) dan
+**`fix-rls-recursion.sql`** (baris 48–63). Tetapi PROMPT-6 Langkah A
+menyenaraikan hanya `user-management.sql` untuk dipasang, dan menandakan
+kedua-dua fail lain *"JANGAN jalankan semula — sudah dipasang pada fasa
+lepas"*. Produksi memasang keduanya semasa Fasa 1–5, **sebelum** cawangan itu
+wujud. Bukti git: branch Fasa 5 `arena/01a05cd4-masb-pms-v4` mengandungi
+`LANGUAGE sql` + `SELECT public.current_user_role() = p_role;` dalam
+kedua-dua fail.
+
+**Kesan sebenar** (selepas Bahagian 8a menaik taraf Master Admin ke
+`super_admin`):
+
+```
+has_role('admin')           = (super_admin = admin)           = FALSE
+has_role('head_governance') = FALSE   ... 7 role lain = FALSE
+has_role('super_admin')     = TRUE    (satu-satunya)
+```
+
+**9 polisi RLS** bergantung pada `has_role()`: `"Admin boleh lihat semua
+profil"` (user_profiles SELECT), `"Pengguna boleh kemaskini programmes jika
+tidak dikunci"`, `participants`, `invoices`, `financial_docs`,
+`programme_costs`, `cost_items`, `programme_documents`. Master Admin
+kehilangan kesemuanya — termasuk hak kemaskini program **terkunci** yang
+sebelum ini beliau ada sebagai `admin`.
+
+**Bahaya khusus: kerosakan ini SENYAP di UI.** `can_manage_users()` tidak
+menggunakan `has_role()` (ia menyemak `role = 'super_admin'` ATAU e-mel Master
+Admin), jadi `/admin/users` kelihatan sihat sepenuhnya sementara akses data
+modul lain telah hilang.
+
+**Pembaikan:** jalankan `lib/supabase/fix-rls-recursion.sql` di live —
+lihat **`docs/PROMPT-6B-FIX-C13-HAS-ROLE.md`** (kriteria V1–V8). Fail ini
+selamat dijalankan selepas `user-management.sql`: **3** fungsi + **9** polisi
+(`DROP POLICY IF EXISTS` → `CREATE POLICY`), dan **sifar** kenyataan
+`GRANT`/`REVOKE` privilej jadual, jadi column grant Fasa 6 (Bahagian 7d) tidak
+tersentuh.
+
+**Bukti automatik:** `scripts/test-c13-has-role-drift.mjs` — memasang urutan
+rasmi + Fasa 6, mengesahkan pewarisan 8 role, **melakukan semula drift** dengan
+menurun taraf `has_role()` ke versi Fasa 5, membuktikan super_admin kehilangan
+7 role, menjalankan pembaikan, dan mengesahkan pemulihan penuh + objek Fasa 6
+tidak terjejas (column grant 6 kolum, 8 RPC, dwi-pengawal A7, md5
+`app_settings`, 2 trigger, enum).
+
+**Had ujian itu (jujur):** role `postgres` dalam PGlite ialah **superuser
+dengan `rolbypassrls = true`**, jadi RLS langsung tidak dikuatkuasakan dalam
+ujian tempatan. Skrip ini membuktikan **logik `has_role()`** dan **bilangan
+polisi bergantung**, bukan baris mana yang kelihatan kepada pengguna.
+Pengesahan RLS hujung-ke-hujung hanya boleh dibuat di Supabase live (V2, V3,
+V6, V7). Nota susunan: Fasa 6 mesti dipasang **sebelum** akaun dicipta dalam
+ujian, kerana profil dihasilkan oleh trigger `on_auth_user_created`.
+
+**Peraturan proses baharu:** apabila satu fasa mengubah fail SQL milik fasa
+terdahulu, fail itu **MESTI disenaraikan sebagai "perlu dijalankan semula"**,
+dan semakan pra-pemasangan mesti ditambah bagi fungsi yang diubah tetapi
+tinggal di fail lama.
+
 ### 8.2 Blocker A7 — penemuan audit ChatGPT & pembaikan (2026-09-02)
 
 **Penemuan (tepat, disahkan semula oleh Arena):**

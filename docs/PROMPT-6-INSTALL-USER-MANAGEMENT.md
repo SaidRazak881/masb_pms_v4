@@ -116,13 +116,41 @@ Muat turun fail ini (klik **Raw**):
 > versi lama yang mengandungi **blocker A7**. BERHENTI, laporkan, dan muat
 > semula fail — jangan jalankan apa-apa.
 
-Rujukan (baca jika perlu, JANGAN jalankan semula — sudah dipasang pada fasa
-lepas):
+Rujukan (baca jika perlu):
 
 2. `lib/supabase/schema-master.sql`
 3. `lib/supabase/fix-rls-recursion.sql`
 4. `lib/supabase/governance-lock.sql`
 5. `lib/supabase/change-requests.sql`
+
+> ⚠️ **PEMBETULAN SELEPAS INSIDEN C13 (2026-09-03) — ARAHAN LAMA DI BAWAH
+> ADALAH SALAH.** Versi asal prompt ini menulis *"JANGAN jalankan semula —
+> sudah dipasang pada fasa lepas"*. Itu menyebabkan blocker C13 di produksi.
+>
+> **Sebenarnya:** Fasa 6 **mengubah** `public.has_role()` dalam
+> `schema-master.sql` **dan** `fix-rls-recursion.sql` (menambah cawangan
+> `IF v_role::text = 'super_admin' THEN RETURN true`). Produksi memasang
+> kedua-dua fail itu semasa Fasa 1–5, **sebelum** cawangan itu wujud, jadi
+> `has_role()` live kekal versi lama dan Master Admin kehilangan 7 role
+> selepas Bahagian 8a menaik taraf beliau ke `super_admin`.
+>
+> **Peraturan baharu:** apabila satu fasa mengubah fail SQL milik fasa
+> terdahulu, fail itu **MESTI dijalankan semula**. Bagi Fasa 6, jalankan
+> **`lib/supabase/fix-rls-recursion.sql`** (fail paling kecil dan selamat:
+> 3 fungsi + 9 polisi, sifar GRANT/REVOKE privilej jadual). Lihat
+> **`docs/PROMPT-6B-FIX-C13-HAS-ROLE.md`**.
+>
+> **Semakan pra-pemasangan (WAJIB sebelum Langkah C):**
+> ```sql
+> SELECT l.lanname AS language,
+>        position('super_admin' in p.prosrc) AS super_admin_pos
+>   FROM pg_proc p
+>   JOIN pg_namespace n ON n.oid = p.pronamespace
+>   JOIN pg_language l ON l.oid = p.prolang
+>  WHERE n.nspname = 'public' AND p.proname = 'has_role';
+> ```
+> Jika `super_admin_pos = 0` → jalankan `fix-rls-recursion.sql` **selepas**
+> `user-management.sql`, kemudian sahkan C13.
 
 Selepas membaca `user-management.sql`, senaraikan dalam laporan anda:
 
@@ -376,7 +404,7 @@ Selepas itu, sediakan **SATU blok SQL pengesahan read-only** yang menyemak:
 | C10 | Column grant | `authenticated` hanya ada UPDATE pada `avatar_url, department, designation, full_name, phone, updated_at` — **tiada** `role`, `account_status`, `must_change_password`, `is_active`, `approved_*`, `blocked_*`. Laporkan **SEBELUM** (dari B8: grant lama termasuk `role`/`is_active`) dan **SELEPAS** untuk membuktikan lubang eskalasi privilege §8.1a telah ditutup. Jika `role` masih boleh ditulis selepas pasang → 🔴 BLOCKER, berhenti |
 | C11 | `authenticated` tiada INSERT/DELETE pada `user_profiles` | 0 baris |
 | C12 | `app_settings` | Kedua-dua key wujud. **JANGAN cetak nilai `default_password`.** Sahkan dengan cap jari: `SELECT key, length(value) AS panjang, md5(value) AS cap_jari FROM public.app_settings ORDER BY key;` → `default_password` mesti `panjang=10`, `cap_jari=cc3d4118520072361b5318c6d3441873` (disahkan oleh `scripts/test-preflight-b-sql.mjs` sebagai cap jari kata laluan lalai rasmi). `super_admin_email` boleh dicetak (bukan rahsia). |
-| C13 | `has_role` sedar-super_admin | `prosrc` mengandungi `super_admin` |
+| C13 | `has_role` sedar-super_admin | `lanname = plpgsql`, `super_admin_pos > 0`, `prosrc` mengandungi `super_admin`. **Jika gagal → 🔴 BLOCKER, berhenti dan guna `docs/PROMPT-6B-FIX-C13-HAS-ROLE.md`.** Ini benar-benar gagal pada pemasangan live 2026-09-03 kerana punca di nota Langkah A |
 | C14 | RLS masih aktif pada semua jadual perniagaan | tiada jadual dengan `relrowsecurity = false` |
 
 Sediakan juga **satu ujian fungsian read-only** yang membuktikan RPC menolak

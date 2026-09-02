@@ -131,6 +131,7 @@ Supabase dan bertukar kepada data sebenar sebaik sahaja env diisi.
 │   ├── test-seed-after-master.mjs    # Ujian seed selepas skema induk
 │   ├── test-user-management-sql.mjs  # Ujian SQL Fasa 6 (14 kumpulan)
 │   ├── test-preflight-b-sql.mjs      # Sahkan blok preflight Langkah B (PROMPT-6)
+│   ├── test-c13-has-role-drift.mjs   # Regresi blocker C13: has_role() sedar super_admin
 │   └── codebase-map.mjs              # Jana semula docs/CODEBASE-MAP.md
 ├── .claude/skills/                   # Agent Skills (arahan proses tambahan)
 │   └── vibe-coding-workflow/SKILL.md # Spec→Plan→Build→Test→Review→Clean→Release
@@ -351,6 +352,7 @@ berpuluh-puluh polisi RLS.
 | `docs/DEPLOY-VERCEL.md` | Sambung GitHub → Vercel, env variables, checklist UAT, troubleshooting |
 | `docs/GPT-ASSISTANT-PROMPTS.md` | Prompt siap-tampal untuk ChatGPT + format laporan wajib |
 | `docs/PROMPT-6-INSTALL-USER-MANAGEMENT.md` | **Fasa 6 (TERKINI)** — pasang `user-management.sql` di Supabase live, kemas kini Production Branch Vercel, verifikasi |
+| `docs/PROMPT-6B-FIX-C13-HAS-ROLE.md` | **Blocker C13** — `has_role()` live tidak sedar `super_admin`; pasang `fix-rls-recursion.sql` + kriteria V1–V8 |
 | `docs/ACTION-6-UAT-AUTH-USERS.md` | Senarai semak ujian manual Fasa 6 (log masuk, wajib tukar kata laluan, pendaftaran, kelulusan, sekatan, reset) |
 | `docs/CODEBASE-MAP.md` | Peta kod ringkas untuk konteks pembantu AI (jana semula: `node scripts/codebase-map.mjs`) |
 | `docs/PROMPT-TEMPLATE-FASA.md` | Templat wajib prompt GPT: Persona + Peta Kod + Tugasan + Larangan + Format Laporan |
@@ -393,6 +395,7 @@ meneruskan tanpa pelayan Supabase).
 | `npm run lint` | Lint ESLint                         |
 | `node scripts/test-user-management-sql.mjs` | Ujian SQL Fasa 6 (PostgreSQL sebenar via PGlite): pemasangan pada DB kosong + 12 kumpulan ujian fungsi |
 | `node scripts/test-preflight-b-sql.mjs` | Sahkan blok preflight **Langkah B** dalam PROMPT-6: read-only, kalis ralat pada DB sebelum/selepas Fasa 6, tiada kata laluan bocor |
+| `node scripts/test-c13-has-role-drift.mjs` | Regresi **blocker C13**: lakukan semula drift `has_role()` versi Fasa 5, buktikan super_admin kehilangan 7 role, sahkan `fix-rls-recursion.sql` memulihkan |
 | `node scripts/test-sql-pglite.mjs` | Ujian pemasangan skema induk + idempotensi |
 | `node scripts/test-sql-functional.mjs` | Ujian fungsi RPC (import sync, lock, change request) |
 | `node scripts/codebase-map.mjs` | Jana semula `docs/CODEBASE-MAP.md` |
