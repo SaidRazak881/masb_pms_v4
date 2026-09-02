@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-02 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: 22ce7b4 Dokumen: evaluasi 9 alat AI/MCP - sebelum vs selepas + pelan fasa · arena/01a05cd4-masb-pms-v4
+> Git: 21f18cb Fasa 5: MFA TOTP untuk admin/head_governance + log masuk 2-langkah + halaman /security (tukar kata laluan sendiri) · arena/01a05cd4-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 
@@ -21,6 +21,7 @@
 - /programmes/:id  `(app/(dashboard)/programmes/[id]/page.tsx)`
 - /programmes  `(app/(dashboard)/programmes/page.tsx)`
 - /reports  `(app/(dashboard)/reports/page.tsx)`
+- /security  `(app/(dashboard)/security/page.tsx)`
 - /api/import/sync  `(app/api/import/sync/route.ts)`
 - /  `(app/page.tsx)`
 
@@ -56,6 +57,7 @@
 - `components/programmes/programmes-browser.tsx`
 - `components/programmes/status-badges.tsx`
 - `components/reports/report-builder.tsx`
+- `components/security/mfa-guard.tsx`
 - `components/ui/badge.tsx`
 - `components/ui/button.tsx`
 - `components/ui/card.tsx`
@@ -83,6 +85,7 @@
 - `lib/import-api.ts`
 - `lib/import-shared.ts`
 - `lib/master-records.ts`
+- `lib/mfa.ts`
 - `lib/mock-data.ts`
 - `lib/participants-data.ts`
 - `lib/programme-mapper.ts`
@@ -159,6 +162,7 @@
 - `app/(auth)/login/page.tsx`
 - `app/(dashboard)/programmes/[id]/page.tsx`
 - `app/(dashboard)/programmes/page.tsx`
+- `app/(dashboard)/security/page.tsx`
 
 ## 7. Dokumen & Prompt GPT (docs/)
 
