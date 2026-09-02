@@ -70,6 +70,62 @@ berlaku dalam projek ini:
    Jangan pasang SQL (Langkah C) sebelum output Langkah B disahkan. Jangan tukar
    Vercel Production Branch (Langkah E) sebelum SQL dipasang dan C1–C14 lulus.
 
+## Ketetapan pengguna (2026-09-03) — TERIKAT untuk semua sesi
+
+Dua keputusan pengguna yang mesti dipatuhi oleh mana-mana agen Arena yang
+meneruskan kerja ini:
+
+### 1. Ketat pintu gerbang: **SEDERHANA**
+
+- **Bebas tanpa bertanya:** fasa Build + Test + Review & Clean dalam satu
+  pusingan kerja — tulis kod, tambah/baiki ujian, jalankan semua suite, audit
+  kendiri, betulkan bug yang dijumpai, kemas kini dokumen.
+- **GERBANG KERAS — wajib berhenti dan tunggu kebenaran eksplisit pengguna**
+  sebelum apa-apa yang menyentuh produksi atau tidak boleh dipulihkan:
+  - memasang / mengubah SQL di Supabase live (termasuk meminta ChatGPT
+    melakukannya)
+  - menukar Vercel **Production Branch**
+  - merge ke `main`, atau membuka PR ke `main`
+  - memadam apa-apa fail di `main` atau mana-mana data perniagaan
+  - `git push --force` ke branch yang bukan branch sesi Arena semasa
+  - menetapkan semula kata laluan sebenar pengguna
+- **Nota:** agen Arena **tidak boleh** mencapai Supabase atau Vercel dari
+  sandbox (rangkaian ke `*.vercel.app` dan `raw.githubusercontent.com`
+  disekat). Semua tindakan produksi dilaksanakan oleh **ChatGPT** melalui
+  prompt, atau oleh pengguna sendiri.
+
+### 2. Zip `vibe-coding-workflow.zip` di branch `main`: **CADANG PADAM**
+
+Kandungan zip sudah dipasang di `.claude/skills/vibe-coding-workflow/SKILL.md`
+pada branch `arena/01a06274-masb-pms-v4` (verbatim, disahkan dengan `diff`).
+Dua salinan = dua sumber kebenaran yang boleh berhanyut.
+
+- **Agen TIDAK AKAN memadamnya** — `main` dilindungi oleh larangan sedia ada
+  dan pemadaman adalah tindakan tidak boleh dipulihkan.
+- Pengguna yang memutuskan dan melaksanakan pemadaman sendiri (arahan di
+  bawah).
+- Sehingga ia dipadam, **`.claude/skills/vibe-coding-workflow/SKILL.md` ialah
+  sumber kebenaran**. Jangan baca semula zip itu.
+
+Arahan pemadaman (pilih salah satu):
+
+```bash
+# Cara 1 — CLI (dari checkout tempatan anda)
+git checkout main && git pull
+git rm vibe-coding-workflow.zip
+git commit -m "chore: buang zip skill (kandungan kini di .claude/skills/)"
+git push origin main
+
+# Cara 2 — UI GitHub
+# main → vibe-coding-workflow.zip → ikon tong sampah → Commit changes
+```
+
+Selepas pemadaman, sahkan skill masih ada:
+`.claude/skills/vibe-coding-workflow/SKILL.md` pada branch arena (ia akan
+masuk ke `main` bersama Fasa 6 apabila anda meluluskan merge kelak).
+
+---
+
 ## Cara agen patut memulakan skill ini
 
 Apabila pengguna meminta ciri baharu atau perubahan bukan remeh:
