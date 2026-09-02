@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-02 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: e7e0b3a Fasa 6 (susulan): audit keselamatan kendiri + betulkan parameter next= · arena/01a06274-masb-pms-v4
+> Git: e47bf94 docs(PROMPT-6): ganti pin hash dengan cap jari kandungan (hash mudah mati) · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 

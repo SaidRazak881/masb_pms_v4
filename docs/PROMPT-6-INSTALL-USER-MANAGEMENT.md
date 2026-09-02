@@ -172,32 +172,173 @@ blocker 🔴 — jangan teruskan ke Langkah B.
 
 #### LANGKAH B — Semak keadaan live (READ-ONLY)
 
-Sediakan SATU blok SQL read-only untuk saya jalankan dahulu. Ia mesti
-melaporkan:
+Jalankan blok SQL di bawah di **Supabase Dashboard → projek
+`lmenmfsbjgxfhnykkgow` → SQL Editor** dan tampel **keseluruhan** output.
 
-1. Senarai `user_profiles`: bilangan baris, pecahan mengikut `role`.
-2. Sama ada kolum `account_status` / `must_change_password` **sudah** wujud
-   (untuk mengesan sama ada Fasa 6 pernah dipasang separa).
-3. Sama ada nilai enum `super_admin` sudah wujud dalam `app_role`.
-4. Sama ada akaun `saidrazak881@gmail.com` wujud dalam `auth.users` **dan**
-   `user_profiles`, dan apakah role semasanya.
-5. Bilangan baris dalam `auth.users` dan berapa yang ada
-   `email_confirmed_at IS NOT NULL`.
-6. Senarai trigger pada `auth.users`
-   (`select tgname from pg_trigger where tgrelid='auth.users'::regclass and not tgisinternal`).
-7. Sama ada fungsi `public.can_manage_users`, `public.admin_list_users`,
-   `public.my_account_status`, `public.mark_password_changed` sudah wujud.
-8. Column privileges semasa `authenticated` pada `user_profiles`
-   (INSERT/UPDATE/DELETE).
-9. Nilai semasa `public.app_settings` **jika** jadual itu wujud.
+> **Blok ini telah ditetapkan oleh Arena — guna APA ADANYA, jangan tulis
+> semula.** Dua syarat reka bentuk yang wajib dipatuhi:
+>
+> 1. **Kalis ralat.** Pada pemasangan bersih, kolum `account_status`, jadual
+>    `app_settings`, fungsi `admin_*` dan trigger Fasa 6 **belum wujud**.
+>    Supabase SQL Editor menjalankan semua kenyataan sebagai **satu transaksi**
+>    dan **berhenti pada ralat pertama**, jadi satu rujukan rosak memusnahkan
+>    **keseluruhan** output B1–B10. Tiga perangkap berbeza, tiga penyelesaian
+>    berbeza:
+>
+>    | Objek belum wujud | Cara SELAMAT | Cara yang GAGAL |
+>    | --------------- | ------------ | --------------- |
+>    | **Kolum** (`up.account_status`) | `to_jsonb(up)->>'account_status'` — diselesaikan pada runtime | `up.account_status` terus dalam SELECT |
+>    | **Jadual** (`public.app_settings`) | `to_regclass('public.app_settings')` + `pg_attribute` — jadual **langsung tidak dinamakan** dalam FROM/JOIN | `FROM`/`JOIN public.app_settings`, **walaupun** dibalut `CASE` atau diberi syarat `AND to_regclass(...) IS NOT NULL` — PostgreSQL mengikat nama jadual pada waktu **PARSE** (ralat `42P01`) |
+>    | **Fungsi** (`my_account_status()`) | semak kewujudan melalui katalog `pg_proc` | `SELECT public.my_account_status()` |
+>
+> 2. **Tiada kata laluan dalam laporan Langkah B.** B9 **tidak membaca nilai**
+>    `default_password` sama sekali — ia hanya melaporkan kewujudan jadual dan
+>    senarai kolum melalui katalog. Cap jari `md5` kata laluan lalai disahkan
+>    di **Langkah C** (C-x) selepas pemasangan, apabila jadual itu memang sudah
+>    wujud dan rujukan terus adalah selamat.
+>
+> Blok ini **read-only sepenuhnya** — tiada INSERT/UPDATE/DELETE/DDL, tiada
+> `service_role`, tiada reset kata laluan, tiada panggilan RPC pengurusan.
 
-**Jangan** sertakan sebarang kata laluan, hash, atau anon/service key dalam
-blok ini.
+```sql
+-- ============================================================
+-- FASA 6 — LANGKAH B: READ-ONLY LIVE PREFLIGHT (v3, kalis ralat)
+-- Tiada WRITE. Tiada kata laluan/hash/key dalam output.
+-- DISAHKAN oleh scripts/test-preflight-b-sql.mjs pada DUA keadaan:
+--   (a) sebelum Fasa 6 dipasang  (b) selepas Fasa 6 dipasang
+-- Selamat dijalankan SEBELUM Fasa 6 dipasang.
+-- ============================================================
 
-Saya akan tampal outputnya. Berdasarkan output itu, nyatakan sama ada
-pemasangan adalah **bersih** (Fasa 6 belum pernah dipasang) atau
-**ulang-pasang** (sebahagian objek sudah wujud) — dan sahkan bahawa fail itu
-selamat dijalankan dalam kedua-dua kes.
+-- B1. Bilangan + pecahan role dalam user_profiles
+SELECT 'B1_role_breakdown' AS check_name,
+       COALESCE(up.role::text, '(tiada profil)') AS role,
+       count(*)::int AS user_count
+  FROM public.user_profiles up
+ GROUP BY up.role
+ ORDER BY 2;
+
+-- B2. Kolum Fasa 6 pada user_profiles: wujud atau belum
+SELECT 'B2_fasa6_columns' AS check_name, t.col AS column_name,
+       CASE WHEN c.column_name IS NULL THEN '❌ BELUM WUJUD'
+            ELSE '✅ wujud (' || c.data_type || ')' END AS status
+  FROM (VALUES ('account_status'),('must_change_password'),
+               ('password_changed_at'),('approved_by'),('approved_at'),
+               ('blocked_by'),('blocked_at'),('block_reason')) AS t(col)
+  LEFT JOIN information_schema.columns c
+         ON c.table_schema='public' AND c.table_name='user_profiles'
+        AND c.column_name=t.col
+ ORDER BY t.col;
+
+-- B3. Enum super_admin dalam app_role
+SELECT 'B3_super_admin_enum' AS check_name,
+       CASE WHEN EXISTS (SELECT 1 FROM pg_type t JOIN pg_enum e ON e.enumtypid=t.oid
+                          JOIN pg_namespace n ON n.oid=t.typnamespace
+                          WHERE n.nspname='public' AND t.typname='app_role'
+                            AND e.enumlabel='super_admin')
+            THEN '✅ super_admin wujud' ELSE '❌ BELUM ditambah' END AS status;
+
+-- B4. Master Admin dalam auth.users (+ profil jika ada).
+--     Guna to_jsonb() supaya TIDAK ralat jika account_status belum wujud.
+SELECT 'B4_master_admin' AS check_name, au.email,
+       CASE WHEN up.id IS NULL THEN '❌ profil TIDAK wujud'
+            ELSE '✅ profil wujud' END AS profile_exists,
+       COALESCE(up.role::text,'(tiada)') AS current_role,
+       COALESCE(to_jsonb(up)->>'account_status','(kolum belum wujud)') AS current_account_status,
+       COALESCE(to_jsonb(up)->>'must_change_password','(kolum belum wujud)') AS must_change_password
+  FROM auth.users au
+  LEFT JOIN public.user_profiles up ON up.id = au.id
+ WHERE lower(au.email) = 'saidrazak881@gmail.com';
+
+-- B5. Bilangan auth.users + pengesahan e-mel
+SELECT 'B5_auth_users' AS check_name, count(*)::int AS auth_users_count,
+       count(*) FILTER (WHERE email_confirmed_at IS NOT NULL)::int AS email_confirmed_count
+  FROM auth.users;
+
+-- B6. Trigger bukan-dalaman pada auth.users
+SELECT 'B6_auth_users_triggers' AS check_name,
+       coalesce(string_agg(t.tgname, ', ' ORDER BY t.tgname), '(tiada trigger)') AS triggers
+  FROM pg_trigger t
+ WHERE t.tgrelid = 'auth.users'::regclass AND NOT t.tgisinternal;
+
+-- B7. Fungsi Fasa 6: wujud atau belum (katalog sahaja, tiada panggilan)
+SELECT 'B7_function_presence' AS check_name, f.fn AS function_name,
+       CASE WHEN p.oid IS NULL THEN '❌ BELUM wujud' ELSE '✅ wujud' END AS status,
+       CASE WHEN p.oid IS NULL THEN NULL ELSE p.prosecdef END AS security_definer
+  FROM (VALUES ('can_manage_users'),('is_super_admin'),('assert_can_manage_users'),
+               ('my_account_status'),('my_password_change_required'),
+               ('mark_password_changed'),('default_password'),
+               ('admin_list_users'),('admin_user_summary'),('admin_approve_user'),
+               ('admin_set_user_blocked'),('admin_change_user_role'),
+               ('admin_reset_user_password'),
+               ('admin_reset_all_passwords_to_default'),
+               ('admin_require_password_change')) AS f(fn)
+  LEFT JOIN pg_proc p ON p.proname = f.fn
+   AND p.pronamespace = (SELECT oid FROM pg_namespace WHERE nspname='public')
+ ORDER BY f.fn;
+
+-- B8. Privilej kolum 'authenticated' pada user_profiles (INSERT/UPDATE/DELETE)
+SELECT 'B8_column_privileges' AS check_name,
+       coalesce(string_agg(cp.privilege_type || '(' || cp.column_name || ')',
+                           ', ' ORDER BY cp.privilege_type, cp.column_name),
+                '(tiada privilej tulis langsung)') AS grants
+  FROM information_schema.column_privileges cp
+ WHERE cp.table_schema='public' AND cp.table_name='user_profiles'
+   AND cp.grantee='authenticated'
+   AND cp.privilege_type IN ('INSERT','UPDATE','DELETE');
+
+-- B9. app_settings: kewujudan melalui KATALOG SAHAJA.
+--     PENTING — perangkap yang MESTI dielak: nama `public.app_settings`
+--     TIDAK BOLEH muncul sama sekali dalam kenyataan ini, walaupun di dalam
+--     subkuari CASE atau CTE. PostgreSQL mengikat nama jadual pada waktu
+--     PARSE, jadi `relation "public.app_settings" does not exist` (42P01)
+--     tetap berlaku dan meruntuhkan SELURUH output B1–B10 pada pemasangan
+--     bersih. `to_regclass()` + `pg_attribute` diselesaikan pada RUNTIME
+--     dan tidak memerlukan jadual itu dinamakan.
+--     Nilai `default_password` TIDAK dibaca di sini (tiada kata laluan dalam
+--     laporan Langkah B). Cap jari md5 disahkan di Langkah C selepas pasang.
+SELECT 'B9_app_settings' AS check_name,
+       CASE WHEN to_regclass('public.app_settings') IS NULL
+            THEN '❌ jadual BELUM wujud (jangkaan bagi pemasangan bersih)'
+            ELSE '✅ jadual wujud' END AS table_status,
+       CASE WHEN to_regclass('public.app_settings') IS NULL THEN '(n/a)'
+            ELSE coalesce((SELECT string_agg(a.attname, ', '
+                              ORDER BY a.attnum)
+                       FROM pg_attribute a
+                      WHERE a.attrelid = to_regclass('public.app_settings')
+                        AND a.attnum > 0 AND NOT a.attisdropped), '(tiada kolum)')
+       END AS columns,
+       (SELECT count(*)::int FROM information_schema.columns c
+         WHERE c.table_schema='public' AND c.table_name='app_settings'
+           AND c.column_name IN ('key','value')) AS kolum_key_value_daripada_2;
+
+-- B10. Ringkasan pemasangan (satu baris keputusan)
+SELECT 'B10_rumusan' AS check_name,
+       (SELECT count(*) FROM public.user_profiles)::int AS profil_users,
+       (SELECT count(*) FROM auth.users)::int AS auth_users,
+       (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+         WHERE n.nspname='public' AND p.proname LIKE 'admin\_%')::int AS admin_rpc_wujud,
+       (SELECT count(*) FROM information_schema.columns
+         WHERE table_schema='public' AND table_name='user_profiles'
+           AND column_name IN ('account_status','must_change_password'))::int AS kolum_fasa6_daripada_2,
+       CASE WHEN to_regclass('public.app_settings') IS NULL
+            THEN 'app_settings: tiada' ELSE 'app_settings: ada' END AS app_settings;
+```
+
+**Selepas menerima output, laporkan:**
+
+- Jadual **B1–B10** dengan status 🟢/🟡/🔴 dan tafsiran setiap satu.
+- Keputusan **CLEAN INSTALL** (Fasa 6 belum pernah dipasang) atau
+  **REINSTALL / ULANG-PASANG** (sebahagian objek sudah wujud), dengan sebab.
+- Pengesahan bahawa `user-management.sql` **selamat** dijalankan dalam keadaan
+  itu (idempoten — A3).
+- Jangkaan **tepat** apa yang akan berubah pada data live selepas Bahagian 8
+  (8a promosi Master Admin, 8b aktifkan akaun pending sedia ada, 8c reset
+  SEMUA kata laluan ke lalai).
+- Jika Supabase membalas ralat: **JANGAN** betulkan sendiri. Tampel ralat penuh
+  (ERROR / DETAIL / HINT / CONTEXT / SQLSTATE) dan berhenti.
+
+**Jangan** sertakan sebarang kata laluan, hash kata laluan, atau
+anon/service key dalam laporan anda.
 
 ---
 
@@ -231,10 +372,10 @@ Selepas itu, sediakan **SATU blok SQL pengesahan read-only** yang menyemak:
 | C6 | `must_change_password` | `true` untuk SEMUA akaun |
 | C7 | Kata laluan lalai | semua `auth.users.encrypted_password` memadani `extensions.crypt('masb.12345', encrypted_password)` — laporkan **kiraan** sahaja, JANGAN papar hash |
 | C8 | Trigger pada `auth.users` | `on_auth_user_created`, `on_auth_user_updated` |
-| C9 | RPC Fasa 6 wujud | 10 fungsi `admin_*` + `can_manage_users`, `is_super_admin`, `my_account_status`, `my_password_change_required`, `mark_password_changed`, `default_password`, `assert_password_acceptable`, `assert_can_manage_users`, `handle_new_auth_user`, `sync_auth_user_update` |
+| C9 | RPC Fasa 6 wujud | **tepat 8** fungsi `admin_*` (`admin_list_users`, `admin_user_summary`, `admin_approve_user`, `admin_set_user_blocked`, `admin_change_user_role`, `admin_reset_user_password`, `admin_reset_all_passwords_to_default`, `admin_require_password_change`) — semua `SECURITY DEFINER` — + `can_manage_users`, `is_super_admin`, `my_account_status`, `my_password_change_required`, `mark_password_changed`, `default_password`, `assert_password_acceptable`, `assert_can_manage_users`, `handle_new_auth_user`, `sync_auth_user_update` |
 | C10 | Column grant | `authenticated` hanya ada UPDATE pada `avatar_url, department, designation, full_name, phone, updated_at` |
 | C11 | `authenticated` tiada INSERT/DELETE pada `user_profiles` | 0 baris |
-| C12 | `app_settings` | `default_password = masb.12345`, `super_admin_email = saidrazak881@gmail.com` |
+| C12 | `app_settings` | Kedua-dua key wujud. **JANGAN cetak nilai `default_password`.** Sahkan dengan cap jari: `SELECT key, length(value) AS panjang, md5(value) AS cap_jari FROM public.app_settings ORDER BY key;` → `default_password` mesti `panjang=10`, `cap_jari=cc3d4118520072361b5318c6d3441873` (disahkan oleh `scripts/test-preflight-b-sql.mjs` sebagai cap jari kata laluan lalai rasmi). `super_admin_email` boleh dicetak (bukan rahsia). |
 | C13 | `has_role` sedar-super_admin | `prosrc` mengandungi `super_admin` |
 | C14 | RLS masih aktif pada semua jadual perniagaan | tiada jadual dengan `relrowsecurity = false` |
 
