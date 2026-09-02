@@ -253,10 +253,8 @@ CREATE POLICY "Admin boleh lihat semua profil"
   ON public.user_profiles FOR SELECT
   TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM public.user_profiles up 
-      WHERE up.id = auth.uid() AND up.role IN ('admin', 'manager')
-    )
+    public.has_role('admin'::public.app_role)
+    OR public.has_role('manager'::public.app_role)
   );
 
 -- =====================================================================
@@ -415,11 +413,9 @@ CREATE POLICY "Pengguna boleh kemaskini programmes jika tidak dikunci"
   USING (
     -- Benarkan kemaskini jika program tidak dikunci
     (is_locked = false OR unlock_expires_at > now()) OR
-    -- Atau jika pengguna adalah head_governance
-    (EXISTS (
-      SELECT 1 FROM public.user_profiles up 
-      WHERE up.id = auth.uid() AND up.role IN ('head_governance', 'admin')
-    ))
+    -- Atau jika pengguna adalah head_governance / admin
+    public.has_role('head_governance'::public.app_role)
+    OR public.has_role('admin'::public.app_role)
   )
   WITH CHECK (
     -- Pastikan governance_lock_status konsisten
@@ -508,12 +504,9 @@ CREATE POLICY "Pengguna boleh kemaskini participants jika program tidak dikunci"
     (EXISTS (
       SELECT 1 FROM public.programmes p 
       WHERE p.id = programme_id AND (p.is_locked = false OR p.unlock_expires_at > now())
-    )) OR
-    -- Atau jika pengguna adalah head_governance
-    (EXISTS (
-      SELECT 1 FROM public.user_profiles up 
-      WHERE up.id = auth.uid() AND up.role IN ('head_governance', 'admin')
     ))
+    OR public.has_role('head_governance'::public.app_role)
+    OR public.has_role('admin'::public.app_role)
   )
   WITH CHECK (true);
 
@@ -602,11 +595,10 @@ CREATE POLICY "Pengguna boleh kemaskini financial_docs jika program tidak dikunc
     (EXISTS (
       SELECT 1 FROM public.programmes p 
       WHERE p.id = programme_id AND (p.is_locked = false OR p.unlock_expires_at > now())
-    )) OR
-    (EXISTS (
-      SELECT 1 FROM public.user_profiles up 
-      WHERE up.id = auth.uid() AND up.role IN ('head_governance', 'admin', 'finance')
     ))
+    OR public.has_role('head_governance'::public.app_role)
+    OR public.has_role('admin'::public.app_role)
+    OR public.has_role('finance'::public.app_role)
   )
   WITH CHECK (true);
 
@@ -689,11 +681,10 @@ CREATE POLICY "Pengguna boleh kemaskini invoices jika program tidak dikunci"
     (EXISTS (
       SELECT 1 FROM public.programmes p
       WHERE p.id = programme_id AND (p.is_locked = false OR p.unlock_expires_at > now())
-    )) OR
-    (EXISTS (
-      SELECT 1 FROM public.user_profiles up
-      WHERE up.id = auth.uid() AND up.role IN ('head_governance', 'admin', 'finance')
     ))
+    OR public.has_role('head_governance'::public.app_role)
+    OR public.has_role('admin'::public.app_role)
+    OR public.has_role('finance'::public.app_role)
   )
   WITH CHECK (true);
 
@@ -748,11 +739,10 @@ CREATE POLICY "Pengguna boleh kemaskini programme_costs jika program tidak dikun
     (EXISTS (
       SELECT 1 FROM public.programmes p 
       WHERE p.id = programme_id AND (p.is_locked = false OR p.unlock_expires_at > now())
-    )) OR
-    (EXISTS (
-      SELECT 1 FROM public.user_profiles up 
-      WHERE up.id = auth.uid() AND up.role IN ('head_governance', 'admin', 'finance')
     ))
+    OR public.has_role('head_governance'::public.app_role)
+    OR public.has_role('admin'::public.app_role)
+    OR public.has_role('finance'::public.app_role)
   )
   WITH CHECK (true);
 
@@ -814,11 +804,10 @@ CREATE POLICY "Pengguna boleh kemaskini cost_items jika program tidak dikunci"
     (EXISTS (
       SELECT 1 FROM public.programmes p 
       WHERE p.id = programme_id AND (p.is_locked = false OR p.unlock_expires_at > now())
-    )) OR
-    (EXISTS (
-      SELECT 1 FROM public.user_profiles up 
-      WHERE up.id = auth.uid() AND up.role IN ('head_governance', 'admin', 'finance')
     ))
+    OR public.has_role('head_governance'::public.app_role)
+    OR public.has_role('admin'::public.app_role)
+    OR public.has_role('finance'::public.app_role)
   )
   WITH CHECK (true);
 
@@ -879,11 +868,9 @@ CREATE POLICY "Pengguna boleh kemaskini programme_documents jika program tidak d
     (EXISTS (
       SELECT 1 FROM public.programmes p 
       WHERE p.id = programme_id AND (p.is_locked = false OR p.unlock_expires_at > now())
-    )) OR
-    (EXISTS (
-      SELECT 1 FROM public.user_profiles up 
-      WHERE up.id = auth.uid() AND up.role IN ('head_governance', 'admin')
     ))
+    OR public.has_role('head_governance'::public.app_role)
+    OR public.has_role('admin'::public.app_role)
   )
   WITH CHECK (true);
 

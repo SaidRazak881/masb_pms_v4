@@ -406,10 +406,7 @@ CREATE POLICY "Pengguna terauth boleh kemaskini programmes"
     -- Benarkan kemaskini jika program tidak dikunci
     (is_locked = false OR unlock_expires_at > now()) OR
     -- Atau jika pengguna adalah head_governance
-    (EXISTS (
-      SELECT 1 FROM public.user_profiles up 
-      WHERE up.id = auth.uid() AND up.role = 'head_governance'
-    ))
+    public.has_role('head_governance'::public.app_role)
   )
   WITH CHECK (
     -- Pastikan governance_lock_status konsisten
