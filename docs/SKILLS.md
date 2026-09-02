@@ -89,40 +89,36 @@ meneruskan kerja ini:
   - memadam apa-apa fail di `main` atau mana-mana data perniagaan
   - `git push --force` ke branch yang bukan branch sesi Arena semasa
   - menetapkan semula kata laluan sebenar pengguna
-- **Nota:** agen Arena **tidak boleh** mencapai Supabase atau Vercel dari
-  sandbox (rangkaian ke `*.vercel.app` dan `raw.githubusercontent.com`
-  disekat). Semua tindakan produksi dilaksanakan oleh **ChatGPT** melalui
-  prompt, atau oleh pengguna sendiri.
+### 1a. Pembahagian tugas Supabase & Vercel — **MUTLAK**
 
-### 2. Zip `vibe-coding-workflow.zip` di branch `main`: **CADANG PADAM**
+Pengguna telah menetapkan (dan mengulangi pada 2026-09-03): **ChatGPT
+menguruskan SEPENUHNYA semua kerja yang melibatkan Supabase dan Vercel.**
 
-Kandungan zip sudah dipasang di `.claude/skills/vibe-coding-workflow/SKILL.md`
-pada branch `arena/01a06274-masb-pms-v4` (verbatim, disahkan dengan `diff`).
-Dua salinan = dua sumber kebenaran yang boleh berhanyut.
+| Peranan | Tanggungjawab |
+| ------- | ------------- |
+| **Arena (agen ini)** | Tulis SEMUA kod + SQL + ujian dalam repositori. Sediakan prompt lengkap untuk ChatGPT (mengikut `docs/PROMPT-TEMPLATE-FASA.md`). Semak laporan ChatGPT dan tentukan tindakan seterusnya. **Tidak pernah** melaksanakan, atau menawarkan untuk melaksanakan, sebarang kerja Supabase/Vercel. |
+| **ChatGPT** | Satu-satunya pelaksana di Supabase (SQL Editor, Auth, Storage, RLS) dan Vercel (env var, Production Branch, deployment). Menjalankan blok SQL, mengisi jadual verifikasi, melaporkan dengan bukti. |
+| **Pengguna** | Ujian manual (UAT), kelulusan setiap gerbang, keputusan merge/release, menampal laporan antara Arena dan ChatGPT. |
 
-- **Agen TIDAK AKAN memadamnya** — `main` dilindungi oleh larangan sedia ada
-  dan pemadaman adalah tindakan tidak boleh dipulihkan.
-- Pengguna yang memutuskan dan melaksanakan pemadaman sendiri (arahan di
-  bawah).
-- Sehingga ia dipadam, **`.claude/skills/vibe-coding-workflow/SKILL.md` ialah
-  sumber kebenaran**. Jangan baca semula zip itu.
+Jadi apabila sampai langkah produksi, hasil kerja Arena ialah **prompt untuk ChatGPT** —
+bukan arahan SQL kepada pengguna, dan bukan percubaan mencapai sistem live.
 
-Arahan pemadaman (pilih salah satu):
+**Nota teknikal:** sandbox Arena juga memang **tidak boleh** mencapai Supabase
+atau Vercel (rangkaian ke `*.vercel.app` dan `raw.githubusercontent.com`
+disekat), jadi pengesahan sistem live mesti datang daripada laporan ChatGPT
+atau pengguna — **jangan sekali-kali direka**.
 
-```bash
-# Cara 1 — CLI (dari checkout tempatan anda)
-git checkout main && git pull
-git rm vibe-coding-workflow.zip
-git commit -m "chore: buang zip skill (kandungan kini di .claude/skills/)"
-git push origin main
+### 2. Zip `vibe-coding-workflow.zip`: **SELESAI — DIPADAM OLEH PENGGUNA**
 
-# Cara 2 — UI GitHub
-# main → vibe-coding-workflow.zip → ikon tong sampah → Commit changes
-```
+| Perkara | Status |
+| ------- | ------ |
+| Kandungan zip | Dipasang verbatim di `.claude/skills/vibe-coding-workflow/SKILL.md` (md5 `224ca61192f345299b45bc5b3f2bd614`) |
+| Zip di `main` | ✅ **Dipadam oleh pengguna** pada 2026-09-03 — komit `5e371fb "Delete vibe-coding-workflow.zip"` |
+| Sumber kebenaran | `.claude/skills/vibe-coding-workflow/SKILL.md` pada branch `arena/01a06274-masb-pms-v4` — **satu-satunya** salinan |
+| Tindakan agen | Tiada. **Jangan** cuba pulihkan zip itu atau baca ia dari sejarah git |
 
-Selepas pemadaman, sahkan skill masih ada:
-`.claude/skills/vibe-coding-workflow/SKILL.md` pada branch arena (ia akan
-masuk ke `main` bersama Fasa 6 apabila anda meluluskan merge kelak).
+Skill ini akan masuk ke `main` bersama Fasa 6 apabila pengguna meluluskan
+merge/PR kelak.
 
 ---
 
