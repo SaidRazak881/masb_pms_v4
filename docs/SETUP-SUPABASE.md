@@ -309,6 +309,67 @@ Perkara yang telah **disemak dalam kod** dan keputusannya:
 - Selepas Bahagian 8c, semua 19 pengguna berkongsi `masb.12345` sehingga
   masing-masing menukarnya. Edarkan arahan tukar kata laluan serta-merta.
 
+### 8.1a B8 — lubang eskalasi privilege yang WUJUD SEKARANG di produksi
+
+**Dikesan oleh preflight Langkah B (2026-09-03) pada projek live
+`lmenmfsbjgxfhnykkgow`.** ChatGPT menandakannya 🟡 dengan tafsiran "akan
+diperketatkan oleh Fasa 6". Tafsiran itu betul tetapi **terlalu lembut** —
+ini ialah lubang yang boleh dieksploitasi **sekarang**, sebelum Fasa 6
+dipasang.
+
+**Mekanisme (dua syarat, kedua-duanya benar hari ini):**
+
+1. Polisi RLS dalam `schema-master.sql` (baris 330–334):
+   ```sql
+   CREATE POLICY "Pengguna boleh kemaskini profil sendiri"
+     ON public.user_profiles FOR UPDATE
+     TO authenticated
+     USING (auth.uid() = id)
+     WITH CHECK (auth.uid() = id);
+   ```
+   Polisi ini **tidak mengehadkan kolum** — hanya baris.
+2. Supabase memberi `authenticated` privilej INSERT/UPDATE/DELETE secara
+   **lalai** pada semua jadual dalam skema `public`. `schema-master.sql`
+   mengandungi **sifar** kenyataan `GRANT`/`REVOKE`, jadi tiada apa yang
+   mengehadkan kolum.
+
+**Akibat:** mana-mana daripada 19 pengguna yang boleh log masuk boleh
+menaikkan pangkat dirinya sendiri hari ini dengan satu panggilan terus:
+
+```sql
+-- BUKTI KONSEP. JANGAN JALANKAN. Direkodkan untuk menunjukkan lubang.
+update public.user_profiles set role = 'head_governance' where id = auth.uid();
+```
+
+RLS membenarkannya (baris sendiri), dan privilej kolum membenarkannya (tiada
+sekatan). `head_governance` ialah role pelulus Change Request dan pemegang
+kuasa buka-kunci governance lock — jadi ini memintas keseluruhan model
+tadbir urus, termasuk kunci kewangan dan status Bumiputera.
+
+**Pembaikan = Bahagian 7d dalam `user-management.sql`:**
+
+```sql
+REVOKE UPDATE ON public.user_profiles FROM authenticated;
+GRANT UPDATE (avatar_url, department, designation, full_name, phone, updated_at)
+  ON public.user_profiles TO authenticated;
+REVOKE INSERT, DELETE ON public.user_profiles FROM authenticated;
+```
+
+Selepas ini, `role` dan `account_status` **tidak wujud** dalam senarai kolum
+yang boleh ditulis, jadi cubaan eskalasi gagal dengan `42501 insufficient
+privilege` **walaupun** polisi RLS membenarkan baris itu. Ini pertahanan
+lapis-ke-2 yang tidak bergantung kepada RLS.
+
+**Bukti pembaikan berkesan:** UJIAN 11 dalam
+`scripts/test-user-management-sql.mjs` menyemak
+`information_schema.column_privileges` dan **gagal** jika mana-mana daripada
+`role`, `account_status`, `must_change_password`, `approved_by`,
+`approved_at`, `blocked_by`, `blocked_at`, `is_active` boleh ditulis oleh
+`authenticated`. Ujian ini hijau.
+
+**Implikasi operasi:** jangan tunda pemasangan `user-management.sql`.
+Selagi ia belum dipasang, lubang ini terbuka kepada semua 19 akaun.
+
 ### 8.2 Blocker A7 — penemuan audit ChatGPT & pembaikan (2026-09-02)
 
 **Penemuan (tepat, disahkan semula oleh Arena):**
