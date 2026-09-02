@@ -101,17 +101,20 @@ Muat turun fail ini (klik **Raw**):
 
 1. https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/lib/supabase/user-management.sql
 
-> ⚠️ **Versi yang MESTI anda peroleh: komit `702e48d` atau lebih baharu.**
-> Semak dahulu sebelum audit — cari dalam fail baris ini di dalam
-> `admin_reset_all_passwords_to_default()`:
+> ⚠️ **Semak cap jari kandungan SEBELUM memulakan audit** — jangan bergantung
+> pada hash komit (sejarah repositori ini pernah ditulis semula, jadi hash
+> mudah mati). Ambil `user-management.sql` dari HEAD branch
+> `arena/01a06274-masb-pms-v4`, kemudian sahkan ketiga-tiga cap jari ini:
 >
-> ```sql
-> PERFORM public.assert_can_manage_users();
-> ```
+> | Cap jari | Jangkaan |
+> | -------- | -------- |
+> | Carian `PERFORM public.assert_can_manage_users();` | muncul **tepat 8 kali** |
+> | Dalam badan `admin_reset_all_passwords_to_default()` | ada `PERFORM public.assert_can_manage_users();` **diikuti** `IF NOT public.is_super_admin() THEN` (dwi-pengawal) |
+> | Carian `assert_can_manage_users` (semua occurrence) | **tepat 11 kali** — 8 PERFORM + 1 CREATE FUNCTION + 1 REVOKE + 1 GRANT |
 >
-> Jika baris itu TIADA (hanya `IF NOT public.is_super_admin() THEN`), anda
-> sedang membaca versi lama yang mengandungi **blocker A7**. Muat semula fail
-> dan jangan teruskan.
+> Jika cap jari tidak sepadan (cth. hanya 7 PERFORM), anda sedang membaca
+> versi lama yang mengandungi **blocker A7**. BERHENTI, laporkan, dan muat
+> semula fail — jangan jalankan apa-apa.
 
 Rujukan (baca jika perlu, JANGAN jalankan semula — sudah dipasang pada fasa
 lepas):
@@ -147,9 +150,12 @@ Kemudian **sahkan atau nafikan** setiap kenyataan ini (berikan bukti baris):
 
 **Cara mengira A7 dengan tepat (elak kesilapan audit):** jalankan carian
 `PERFORM public.assert_can_manage_users();` dalam fail — mesti muncul **tepat
-8 kali**. Jangan kira occurrences `assert_can_manage_users` secara kasar,
-kerana 3 lagi occurrence ialah baris `CREATE FUNCTION`, `REVOKE` dan `GRANT`
-(jumlah 11). Senaraikan baris bagi setiap 8 fungsi `admin_*` sebagai bukti.
+8 kali**. Jangan kira occurrences `assert_can_manage_users` secara kasar
+(seperti `grep -c`) dan terus membuat kesimpulan, kerana 3 lagi occurrence
+ialah baris `CREATE FUNCTION`, `REVOKE` dan `GRANT` (jumlah 11). Kesilapan
+kiraan inilah yang menyebabkan audit Arena sendiri terlepas blocker A7 pada
+mulanya. Senaraikan **nombor baris** bagi setiap 8 fungsi `admin_*` sebagai
+bukti dalam laporan anda.
 
 > **Sejarah A7 (sudah diperbaiki).** Audit pertama pada 2026-09-02 menemui
 > bahawa `admin_reset_all_passwords_to_default()` hanya menyemak
