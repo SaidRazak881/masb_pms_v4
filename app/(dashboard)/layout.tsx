@@ -1,6 +1,7 @@
 import { Bell, GraduationCap, Search } from "lucide-react";
 
 import { SidebarNav } from "@/components/layout/sidebar-nav";
+import { MobileNav } from "@/components/layout/mobile-nav";
 import { LogoutButton } from "@/components/layout/logout-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,6 +99,7 @@ export default async function DashboardLayout({
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6">
           <div className="flex items-center gap-2 lg:hidden">
+            <MobileNav />
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <GraduationCap className="h-4 w-4" />
             </div>

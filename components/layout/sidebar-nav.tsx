@@ -40,6 +40,8 @@ const NAV_ITEMS = [
   },
 ];
 
+export { NAV_ITEMS };
+
 export function SidebarNav() {
   const pathname = usePathname();
 
