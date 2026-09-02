@@ -746,6 +746,15 @@ DECLARE
   v_default TEXT := public.default_password();
   v_count BIGINT;
 BEGIN
+  -- Pengawal standard (sama seperti semua admin_* lain): mesti Super Admin
+  -- DAN akaun sendiri mesti 'active'. Tanpa semakan status, Super Admin yang
+  -- telah DISEKAT masih boleh menjalankan tindakan pukal ini.
+  PERFORM public.assert_can_manage_users();
+
+  -- Lapis kedua khusus tindakan pukal: pengesahan role super_admin yang
+  -- ketat (tanpa fallback e-mel Master Admin yang ada dalam
+  -- can_manage_users()). Tindakan paling merosakkan dalam sistem mendapat
+  -- pengawal paling ketat.
   IF NOT public.is_super_admin() THEN
     RAISE EXCEPTION 'ACCESS_DENIED: tindakan pukal hanya untuk Super Admin'
       USING ERRCODE = '42501';

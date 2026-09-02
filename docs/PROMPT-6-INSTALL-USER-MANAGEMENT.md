@@ -101,6 +101,18 @@ Muat turun fail ini (klik **Raw**):
 
 1. https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/lib/supabase/user-management.sql
 
+> ⚠️ **Versi yang MESTI anda peroleh: komit `702e48d` atau lebih baharu.**
+> Semak dahulu sebelum audit — cari dalam fail baris ini di dalam
+> `admin_reset_all_passwords_to_default()`:
+>
+> ```sql
+> PERFORM public.assert_can_manage_users();
+> ```
+>
+> Jika baris itu TIADA (hanya `IF NOT public.is_super_admin() THEN`), anda
+> sedang membaca versi lama yang mengandungi **blocker A7**. Muat semula fail
+> dan jangan teruskan.
+
 Rujukan (baca jika perlu, JANGAN jalankan semula — sudah dipasang pada fasa
 lepas):
 
@@ -129,10 +141,25 @@ Kemudian **sahkan atau nafikan** setiap kenyataan ini (berikan bukti baris):
 | A4 | Tiada `DROP TABLE` / `DROP POLICY` yang memusnahkan data perniagaan (programmes, invoices, participants, audit_logs) |
 | A5 | `admin_reset_user_password` dan Bahagian 8c menulis ke `auth.users.encrypted_password` menggunakan `extensions.crypt(...)` |
 | A6 | Column-level `GRANT UPDATE` kepada `authenticated` TIDAK termasuk `role`, `account_status`, `must_change_password`, `approved_by`, `approved_at`, `blocked_by`, `blocked_at`, `is_active` |
-| A7 | Setiap RPC `admin_*` memanggil `assert_can_manage_users()` dan menulis `log_audit(...)` |
+| A7 | **Kesemua lapan (8)** RPC `admin_*` memanggil `PERFORM public.assert_can_manage_users();` dan menulis `log_audit(...)` |
 | A8 | `has_role()` dalam `schema-master.sql` / `fix-rls-recursion.sql` memulangkan `true` untuk sebarang role jika pengguna ialah `super_admin` |
+| A9 | `admin_reset_all_passwords_to_default()` mempunyai **dwi-pengawal**: `assert_can_manage_users()` DAN `IF NOT public.is_super_admin() THEN` |
 
-Jika mana-mana kenyataan A1–A8 **TIDAK** benar, BERHENTI dan laporkan sebagai
+**Cara mengira A7 dengan tepat (elak kesilapan audit):** jalankan carian
+`PERFORM public.assert_can_manage_users();` dalam fail — mesti muncul **tepat
+8 kali**. Jangan kira occurrences `assert_can_manage_users` secara kasar,
+kerana 3 lagi occurrence ialah baris `CREATE FUNCTION`, `REVOKE` dan `GRANT`
+(jumlah 11). Senaraikan baris bagi setiap 8 fungsi `admin_*` sebagai bukti.
+
+> **Sejarah A7 (sudah diperbaiki).** Audit pertama pada 2026-09-02 menemui
+> bahawa `admin_reset_all_passwords_to_default()` hanya menyemak
+> `is_super_admin()`, yang TIDAK menyemak `account_status`. Akibatnya Super
+> Admin yang telah **disekat** masih boleh mereset kata laluan semua pengguna.
+> Ia telah diperbaiki (dwi-pengawal) dan kini dilindungi oleh dua ujian
+> automatik: UJIAN 13 (berfungsi) dan UJIAN 14 (pengawal struktur sumber)
+> dalam `scripts/test-user-management-sql.mjs`.
+
+Jika mana-mana kenyataan A1–A9 **TIDAK** benar, BERHENTI dan laporkan sebagai
 blocker 🔴 — jangan teruskan ke Langkah B.
 
 ---
@@ -316,7 +343,7 @@ E9 ialah pengesahan bahawa MFA benar-benar dibuang dari production.
 Branch + fail yang dimuat turun (dengan pengesahan anda membaca kandungan
 sebenar, bukan cache). Ringkasan objek dalam `user-management.sql` (enum,
 jadual, kolum, fungsi + SECURITY DEFINER ya/tidak, polisi RLS, trigger,
-GRANT/REVOKE, dan kesan Bahagian 8 terhadap data live). Jadual A1–A8 dengan
+GRANT/REVOKE, dan kesan Bahagian 8 terhadap data live). Jadual A1–A9 dengan
 ✅/❌ + bukti baris.
 
 **Seksyen 2 — Tindakan yang diambil**

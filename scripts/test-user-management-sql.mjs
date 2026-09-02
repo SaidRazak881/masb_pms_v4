@@ -615,6 +615,121 @@ for (const f of [...FILES, FILE_FASA6]) {
 }
 
 // ---------------------------------------------------------------------------
+// UJIAN 13: SUPER ADMIN DISEKAT tidak boleh jalankan tindakan pukal.
+//
+// Regression test untuk blocker A7 (audit ChatGPT, 2026-09-02):
+// `admin_reset_all_passwords_to_default()` dahulunya hanya menyemak
+// `is_super_admin()`, yang TIDAK menyemak `account_status`. Akibatnya Super
+// Admin yang telah disekat masih boleh mereset kata laluan SEMUA pengguna.
+console.log('\n--- UJIAN 13: Super Admin disekat → tindakan pukal ditolak ---');
+{
+  const super2 = await makeUser('super.admin.kedua@mimos.my', 'Super Admin Kedua', 'admin');
+
+  // Role 'super_admin' TIDAK boleh diberi melalui RPC/UI — hanya melalui SQL
+  // oleh pemilik sistem (guard ROLE_NOT_ALLOWED). Jadi naik taraf di sini
+  // dilakukan secara langsung, meniru laluan Bahagian 8a pemasangan.
+  await db.query(
+    `UPDATE public.user_profiles SET role = 'super_admin', account_status = 'active',
+            is_active = true WHERE id = $1`, [super2]);
+  ok('super_admin kedua dicipta melalui laluan SQL pemilik sistem');
+
+  // Kes positif: super_admin yang active + belum pernah tukar kata laluan
+  // mesti BOLEH menjalankan tindakan pukal (fix tidak boleh terlalu ketat).
+  await asUser(super2, async () => {
+    try {
+      const r = await db.query('SELECT public.admin_reset_all_passwords_to_default()');
+      const n = Number(r.rows[0].admin_reset_all_passwords_to_default);
+      if (n > 0) ok(`super_admin active → reset pukal BERJAYA (${n} akaun)`);
+      else bad(`reset pukal membalas ${n} akaun — jangka > 0`);
+    } catch (e) {
+      bad(`super_admin active sepatutnya dibenarkan reset pukal: ${e.message}`);
+    }
+  });
+
+  // Sekat super_admin kedua supaya tindakan pukal boleh diuji semula.
+  await asUser(superId, async () => {
+    await db.query(`SELECT public.admin_set_user_blocked($1, true, 'Ujian: akaun super disekat')`,
+      [super2]);
+  });
+  ok('super_admin kedua disekat oleh super_admin utama');
+
+  await asUser(super2, async () => {
+    const calls = [
+      ['admin_reset_all_passwords_to_default()', 'tindakan pukal reset semua kata laluan'],
+      ['admin_list_users(null, null)',            'baca senarai pengguna'],
+      ['admin_user_summary()',                    'baca KPI pengguna'],
+    ];
+    for (const [call, label] of calls) {
+      try {
+        await db.query(`SELECT * FROM public.${call}`);
+        bad(`Super Admin DISEKAT sepatutnya ditolak: ${label}`);
+      } catch (e) {
+        if (/ACCOUNT_NOT_ACTIVE|ACCESS_DENIED/.test(e.message)) {
+          ok(`Super Admin disekat → ${label} DITOLAK (${/ACCOUNT_NOT_ACTIVE/.test(e.message) ? 'ACCOUNT_NOT_ACTIVE' : 'ACCESS_DENIED'})`);
+        } else {
+          bad(`${label}: ralat tidak dijangka → ${e.message}`);
+        }
+      }
+    }
+  });
+
+  // Pulihkan keadaan supaya ujian seterus tidak terjejas.
+  await asUser(superId, async () => {
+    await db.query(`SELECT public.admin_set_user_blocked($1, false, null)`, [super2]);
+  });
+  ok('super_admin kedua dipulihkan (unblock)');
+}
+
+// ---------------------------------------------------------------------------
+// UJIAN 14: PENGAWAL STRUKTUR — setiap fungsi admin_* dalam sumber SQL mesti
+// memanggil assert_can_manage_users(). Ujian ini membaca FAIL, bukan DB, jadi
+// ia menangkap regresi walaupun fungsi itu tidak dipanggil dalam ujian lain.
+console.log('\n--- UJIAN 14: Pengawal struktur — semua admin_* guna assert_can_manage_users ---');
+{
+  const src = fs.readFileSync(FILE_FASA6, 'utf8');
+  const names = new Set();
+  for (const m of src.matchAll(/CREATE OR REPLACE FUNCTION public\.(admin_[a-z_0-9]+)\s*\(/g)) {
+    names.add(m[1]);
+  }
+  if (names.size < 8) bad(`jangka >= 8 fungsi admin_*, jumpa ${names.size}`);
+  else ok(`${names.size} fungsi admin_* dijumpai dalam sumber`);
+
+  // Potong sumber kepada satu blok per fungsi (CREATE ... sehingga $$; penutup).
+  const bodies = new Map();
+  const re = /CREATE OR REPLACE FUNCTION public\.(admin_[a-z_0-9]+)\s*\([\s\S]*?\n\$\$;/g;
+  for (const m of src.matchAll(re)) bodies.set(m[1], m[0]);
+
+  const missing = [...names].filter((n) => !bodies.has(n));
+  if (missing.length) bad(`gagal mengekstrak badan fungsi: ${missing.join(', ')}`);
+
+  const noAssert = [...bodies].filter(([, body]) => !/PERFORM\s+public\.assert_can_manage_users\s*\(\s*\)\s*;/i.test(body))
+    .map(([n]) => n);
+  if (noAssert.length) {
+    bad(`BLOCKER A7 berulang — tiada assert_can_manage_users(): ${noAssert.join(', ')}`);
+  } else {
+    ok('semua admin_* memanggil assert_can_manage_users() (Super Admin + akaun active)');
+  }
+
+  // Tindakan pukal juga mesti ada lapis kedua is_super_admin() yang ketat.
+  const bulk = bodies.get('admin_reset_all_passwords_to_default') ?? '';
+  if (/PERFORM\s+public\.assert_can_manage_users\s*\(\s*\)\s*;/i.test(bulk)
+      && /IF\s+NOT\s+public\.is_super_admin\s*\(\s*\)\s+THEN/i.test(bulk)) {
+    ok('admin_reset_all_passwords_to_default: dwi-pengawal (assert + is_super_admin)');
+  } else {
+    bad('admin_reset_all_passwords_to_default kehilangan salah satu pengawal');
+  }
+
+  // Pengesahan silang: fungsi yang benar-benar wujud dalam DB.
+  const live = await db.query(`
+    SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public' AND p.proname LIKE 'admin\\_%' ORDER BY 1`);
+  const liveNames = live.rows.map((r) => r.proname);
+  const absent = [...names].filter((n) => !liveNames.includes(n));
+  if (absent.length) bad(`fungsi ada dalam sumber tetapi tidak dipasang: ${absent.join(', ')}`);
+  else ok(`semua ${names.size} fungsi admin_* wujud dalam pangkalan data`);
+}
+
+// ---------------------------------------------------------------------------
 console.log('\n--- RINGKASAN OBJEK FASA 6 ---');
 {
   const fns = await db.query(`

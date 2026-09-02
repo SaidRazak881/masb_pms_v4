@@ -284,7 +284,7 @@ Perkara yang telah **disemak dalam kod** dan keputusannya:
 
 | # | Perkara disemak | Keputusan |
 |---|-----------------|-----------|
-| 1 | Setiap RPC `admin_*` (8 fungsi) memanggil `assert_can_manage_users()` | ✅ 8/8 — kuasa disemak di DB, bukan di UI |
+| 1 | Setiap RPC `admin_*` (8 fungsi) memanggil `assert_can_manage_users()` | ✅ 8/8 — dikuatkuasakan oleh UJIAN 14 (pengawal struktur sumber). *Diperbaiki selepas audit ChatGPT menemui `admin_reset_all_passwords_to_default()` hanya menyemak `is_super_admin()` — lihat §8.2* |
 | 2 | Column-level GRANT menghalang pengguna menaikkan `role` / `account_status` sendiri | ✅ `REVOKE UPDATE` penuh, kemudian `GRANT UPDATE` hanya 6 kolum selamat |
 | 3 | `app_settings` (tempat `default_password`) tidak boleh ditulis klien | ✅ `REVOKE INSERT, UPDATE, DELETE` dari `authenticated` & `anon` |
 | 4 | Open redirect melalui `?redirect=` / `?next=` | ✅ Kedua-duanya ditolak jika tidak bermula `/` atau bermula `//` |
@@ -308,3 +308,46 @@ Perkara yang telah **disemak dalam kod** dan keputusannya:
   `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 - Selepas Bahagian 8c, semua 19 pengguna berkongsi `masb.12345` sehingga
   masing-masing menukarnya. Edarkan arahan tukar kata laluan serta-merta.
+
+### 8.2 Blocker A7 — penemuan audit ChatGPT & pembaikan (2026-09-02)
+
+**Penemuan (tepat, disahkan semula oleh Arena):**
+`public.admin_reset_all_passwords_to_default()` — satu-satunya fungsi tindakan
+**pukal** dalam sistem — hanya menyemak `IF NOT public.is_super_admin()`,
+manakala 7 fungsi `admin_*` lain memanggil `PERFORM assert_can_manage_users()`.
+
+**Kenapa ini kelemahan keselamatan sebenar, bukan isu gaya:**
+
+| Pengawal | Semak role super_admin | Fallback e-mel Master Admin | Semak `account_status = 'active'` |
+| -------- | :---: | :---: | :---: |
+| `is_super_admin()` (digunakan sebelum fix) | ✅ | ❌ | ❌ |
+| `assert_can_manage_users()` (standard) | ✅ | ✅ | ✅ |
+
+Akibatnya: Super Admin yang telah **disekat** masih boleh mereset kata laluan
+**semua** pengguna (termasuk Super Admin lain) selagi token aksesnya belum
+luput. Fungsi paling merosakkan mendapat pengawal paling lemah.
+
+**Pembaikan:** dwi-pengawal — `PERFORM assert_can_manage_users();` (standard:
+role + status active) **diikuti** `IF NOT public.is_super_admin() THEN` (lapis
+ketat tanpa fallback e-mel, khusus tindakan pukal).
+
+**Perlindungan agar tidak berulang** (`scripts/test-user-management-sql.mjs`):
+
+- **UJIAN 13 (berfungsi):** cipta super_admin kedua → sahkan beliau *boleh*
+  reset pukal semasa `active` → sekat beliau → sahkan reset pukal,
+  `admin_list_users` dan `admin_user_summary` semuanya ditolak
+  `ACCOUNT_NOT_ACTIVE` → pulihkan.
+- **UJIAN 14 (pengawal struktur):** membaca SUMBER SQL (bukan DB), mengekstrak
+  setiap badan fungsi `admin_*` dan **gagal** jika mana-mana satu tiada
+  `PERFORM public.assert_can_manage_users();`; juga sahkan dwi-pengawal fungsi
+  pukal dan bahawa semua 8 fungsi benar-benar dipasang.
+
+Keberkesanan ujian telah **dibuktikan**: apabila SQL dipulangkan sementara ke
+versi berbug, suite menghasilkan **3 kegagalan** (Super Admin disekat berjaya
+menjalankan reset pukal). Selepas fix dipulihkan: 🎉 semua lulus.
+
+**Kesilapan audit Arena yang membawa kepada bug ini terlepas:** kiraan kasar
+`grep -c assert_can_manage_users` = 10 dianggap "8 fungsi + definisi + grant",
+sedangkan 3 daripadanya ialah baris `CREATE FUNCTION`/`REVOKE`/`GRANT` — jadi
+hanya 7 fungsi sebenarnya dilindungi. Pengiraan kini dilakukan secara struktur
+oleh UJIAN 14, bukan oleh manusia.
