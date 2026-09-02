@@ -209,7 +209,7 @@ SELECT 'V8_no_data_change' AS check_name,
 | V1 | `super_admin_pos` | **> 0** (bukan 0) |
 | V1 | `security_definer` | `true` |
 | V2 | `returns_true` | **`true` untuk SEMUA 8 role** — inilah pewarisan super_admin |
-| V3 | `policy_count` | **9** |
+| V3 | `policy_count` | ~~9~~ **DIBETULKAN → lihat bawah** |
 | V4 | `grants` | tepat `UPDATE(avatar_url), UPDATE(department), UPDATE(designation), UPDATE(full_name), UPDATE(phone), UPDATE(updated_at)` — **tiada** `role`, `account_status`, `is_active` |
 | V5 | `admin_rpc` | **8** |
 | V5 | `has_role_count` | **1** (tiada fungsi bertindan) |
@@ -220,7 +220,27 @@ SELECT 'V8_no_data_change' AS check_name,
 | V7 | `role` / `account_status` | `super_admin` / `active` |
 | V8 | `profil` / `auth_users` / `wajib_tukar` | **19 / 19 / 19** — tidak berubah |
 
-Jika **mana-mana** kriteria gagal → **BERHENTI**, laporkan sebagai blocker,
+> ⚠️ **KESILAPAN ARENA — V3 telah dibetulkan (2026-09-03).** Kriteria asal
+> menetapkan `policy_count = 9`. Angka `9` **betul bagi pemasangan bersih**
+> (disahkan automatik: tepat 9, semuanya dari `fix-rls-recursion.sql`), tetapi
+> **salah sebagai kriteria live** kerana query V3 mengira **semua** polisi
+> dalam skema `public` yang merujuk `has_role(`, termasuk polisi pada jadual
+> yang bukan ciptaan SQL rasmi repo. Live membalas **17** = 9 rasmi + 8 milik
+> tiga jadual warisan (`profiles`, `programme_participants`, `user_roles`) yang
+> **tiada dalam repo**.
+>
+> **Kriteria V3 yang betul:** `policy_count` ≥ 9, **dan** kesemua 9 entri rasmi
+> hadir (`cost_items.UPDATE`, `financial_docs.UPDATE`, `invoices.UPDATE`,
+> `participants.UPDATE`, `programme_costs.UPDATE`,
+> `programme_documents.UPDATE`, `programmes.UPDATE` ×2,
+> `user_profiles.SELECT`). Bilangan tambahan **diterima** dan mesti diaudit —
+> lihat **`docs/PROMPT-6C-AUDIT-LEGACY-TABLES.md`**.
+>
+> **Peraturan pengajaran:** jangan tetapkan kriteria penerimaan berdasarkan
+> satu fail apabila query mengira keseluruhan skema. Baseline `9` kini
+> diterbitkan secara automatik oleh `scripts/test-preflight-b-sql.mjs`.
+
+Jika **mana-mana** kriteria lain gagal → **BERHENTI**, laporkan sebagai blocker,
 jangan cuba membetulkan sendiri.
 
 ### Langkah 5 — Selepas V1–V8 lulus

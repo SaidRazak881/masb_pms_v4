@@ -353,6 +353,7 @@ berpuluh-puluh polisi RLS.
 | `docs/GPT-ASSISTANT-PROMPTS.md` | Prompt siap-tampal untuk ChatGPT + format laporan wajib |
 | `docs/PROMPT-6-INSTALL-USER-MANAGEMENT.md` | **Fasa 6 (TERKINI)** — pasang `user-management.sql` di Supabase live, kemas kini Production Branch Vercel, verifikasi |
 | `docs/PROMPT-6B-FIX-C13-HAS-ROLE.md` | **Blocker C13** — `has_role()` live tidak sedar `super_admin`; pasang `fix-rls-recursion.sql` + kriteria V1–V8 |
+| `docs/PROMPT-6C-AUDIT-LEGACY-TABLES.md` | **V3 dibetulkan** + audit READ-ONLY 4 jadual warisan (`profiles`, `programme_participants`, `user_roles`) yang tiada dalam repo — W1–W8 |
 | `docs/ACTION-6-UAT-AUTH-USERS.md` | Senarai semak ujian manual Fasa 6 (log masuk, wajib tukar kata laluan, pendaftaran, kelulusan, sekatan, reset) |
 | `docs/CODEBASE-MAP.md` | Peta kod ringkas untuk konteks pembantu AI (jana semula: `node scripts/codebase-map.mjs`) |
 | `docs/PROMPT-TEMPLATE-FASA.md` | Templat wajib prompt GPT: Persona + Peta Kod + Tugasan + Larangan + Format Laporan |

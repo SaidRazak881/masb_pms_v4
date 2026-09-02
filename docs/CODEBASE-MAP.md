@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-02 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: 200e400 docs: B8 = lubang eskalasi privilege LIVE (bukan sekadar 'akan diperketatkan') · arena/01a06274-masb-pms-v4
+> Git: 6a896cb fix(C13): PROMPT-6B untuk has_role() tidak sedar super_admin + ujian regresi drift · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 
@@ -211,6 +211,7 @@
 - `PROMPT-5-RESET-PASSWORDS.md`
 - `PROMPT-6-INSTALL-USER-MANAGEMENT.md`
 - `PROMPT-6B-FIX-C13-HAS-ROLE.md`
+- `PROMPT-6C-AUDIT-LEGACY-TABLES.md`
 - `PROMPT-TEMPLATE-FASA.md`
 - `SETUP-SUPABASE.md`
 - `SKILLS.md`

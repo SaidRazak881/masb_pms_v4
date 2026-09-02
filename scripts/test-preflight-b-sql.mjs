@@ -403,6 +403,49 @@ if (after) {
   } else bad(`B6 (selepas): ${JSON.stringify(b6?.rows)}`);
 }
 
+// BASELINE automatik untuk kriteria V3 dalam PROMPT-6B.
+// Arena menetapkan `policy_count = 9` untuk V3. Baseline pemasangan bersih
+// MEMANG 9 — jadi angka itu betul, tetapi SKOP query V3 berbeza: ia mengira
+// SEMUA polisi dalam skema public yang merujuk has_role(, jadi pada projek
+// live yang mempunyai jadual warisan (profiles, programme_participants,
+// user_roles) bilangannya 17 = 9 rasmi + 8 warisan. Kriteria penerimaan mesti
+// dinyatakan sebagai "9 rasmi hadir + lebihan diaudit", bukan "tepat 9".
+// Baseline diterbitkan di sini supaya kriteria tidak lagi diteka oleh manusia.
+{
+  const pol = await db.query(`
+    SELECT count(*)::int AS n,
+           string_agg(pol.tablename || '.' || pol.cmd, ', '
+                      ORDER BY pol.tablename, pol.cmd) AS senarai
+      FROM pg_policies pol
+     WHERE pol.schemaname = 'public'
+       AND (pol.qual LIKE '%has_role(%' OR pol.with_check LIKE '%has_role(%')`);
+  const n = pol.rows[0].n;
+  const rasmi = ['cost_items.UPDATE','financial_docs.UPDATE','invoices.UPDATE',
+    'participants.UPDATE','programme_costs.UPDATE','programme_documents.UPDATE',
+    'programmes.UPDATE','programmes.UPDATE','user_profiles.SELECT'];
+  const ada = pol.rows[0].senarai.split(', ');
+  const hilang = rasmi.filter((r) => {
+    const i = ada.indexOf(r);
+    if (i === -1) return true;
+    ada.splice(i, 1);
+    return false;
+  });
+  if (hilang.length === 0) {
+    if (n === 9) {
+      ok('BASELINE V3: pemasangan bersih = TEPAT 9 polisi bergantung has_role(), '
+       + 'semuanya dari fix-rls-recursion.sql (polisi has_role schema-master.sql '
+       + 'digugurkan & dicipta semula oleh fix)');
+    } else {
+      ok(`BASELINE V3: pemasangan bersih = ${n} polisi bergantung has_role() `
+       + `(${n > 9 ? n - 9 + ' lebihan bukan dari fix-rls-recursion.sql' : 'kurang dari 9 — semak!'})`);
+    }
+    console.log(`     senarai: ${pol.rows[0].senarai}`);
+    console.log('     → kriteria V3 live = baseline + polisi jadual warisan (bukan 9)');
+  } else {
+    bad(`polisi rasmi hilang: ${hilang.join(', ')}`);
+  }
+}
+
 /* =========================================================================
    7. KESELAMATAN: blok B mesti tidak mengubah apa-apa
    ========================================================================= */
