@@ -6,6 +6,7 @@ import {
   BarChart3,
   GraduationCap,
   LayoutDashboard,
+  Shield,
   Upload,
   Users,
 } from "lucide-react";
@@ -37,6 +38,11 @@ const NAV_ITEMS = [
     title: "Laporan",
     href: "/reports",
     icon: BarChart3,
+  },
+  {
+    title: "Keselamatan",
+    href: "/security",
+    icon: Shield,
   },
 ];
 

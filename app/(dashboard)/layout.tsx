@@ -1,5 +1,6 @@
 import { Bell, GraduationCap, Search } from "lucide-react";
 
+import { MfaGuard } from "@/components/security/mfa-guard";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { LogoutButton } from "@/components/layout/logout-button";
@@ -130,6 +131,7 @@ export default async function DashboardLayout({
           </div>
         </header>
 
+        <MfaGuard />
         <main className="flex-1 bg-slate-50 p-6">{children}</main>
       </div>
     </div>
