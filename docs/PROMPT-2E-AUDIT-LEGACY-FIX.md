@@ -65,7 +65,7 @@
 >    buang jadual/tipe/fungsi `private.*`; ubah data perniagaan.
 >
 > **Sumber rasmi (MESTI muat turun SEMULA dari GitHub, branch
-> `arena/01a05cd4-masb-pms-v4`, komit terkini):**
+> `arena/01a06274-masb-pms-v4`, komit terkini):**
 >
 > - `lib/supabase/schema-master.sql`
 > - `lib/supabase/sync-import-transaction.sql`

@@ -41,13 +41,25 @@ AS $$
   );
 $$;
 
+-- Fasa 6: super_admin mewarisi SEMUA kuasa. Fungsi ini hanya digunakan untuk
+-- keputusan kebenaran (polisi RLS / RPC), bukan untuk paparan role — jadi
+-- memulangkan true bagi sebarang role yang diminta adalah selamat dan
+-- mengelakkan suntingan berpuluh-puluh polisi secara berasingan.
 CREATE OR REPLACE FUNCTION public.has_role(p_role public.app_role)
 RETURNS boolean
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 AS $$
-  SELECT public.current_user_role() = p_role;
+DECLARE
+  v_role public.app_role;
+BEGIN
+  v_role := public.current_user_role();
+  IF v_role::text = 'super_admin' THEN
+    RETURN true;
+  END IF;
+  RETURN v_role = p_role;
+END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.current_user_role() TO authenticated;

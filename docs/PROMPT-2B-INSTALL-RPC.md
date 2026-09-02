@@ -61,7 +61,7 @@
 >    jangan ubah data sedia ada.
 >
 > **Sumber rasmi (MESTI muat turun SEMULA dari GitHub, branch
-> `arena/01a05cd4-masb-pms-v4`, komit terkini):**
+> `arena/01a06274-masb-pms-v4`, komit terkini):**
 >
 > 1. `lib/supabase/schema-master.sql`
 > 2. `lib/supabase/schema-import-staging.sql`

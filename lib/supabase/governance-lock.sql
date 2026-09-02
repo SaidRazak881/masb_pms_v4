@@ -107,7 +107,9 @@ STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
-  SELECT public.current_role_name() IN ('manager', 'admin', 'head_governance');
+  -- Fasa 6: super_admin ditambah sebagai pelulus.
+  SELECT public.current_role_name() IN
+         ('manager', 'admin', 'head_governance', 'super_admin');
 $$;
 
 -- Adakah program boleh disunting sekarang?

@@ -330,6 +330,7 @@ export async function getCurrentGovernanceRole(): Promise<GovernanceRole> {
 
   const role = (data as { role?: string } | null)?.role;
   if (
+    role === "super_admin" ||
     role === "admin" ||
     role === "manager" ||
     role === "executive" ||

@@ -10,7 +10,7 @@
 
 ## 1. Status yang sudah disahkan (jangan ulangi — ringkaskan sahaja)
 
-- Production: `https://masb-pms-v4.vercel.app` · Target `production` · READY · commit `9a80408` (= HEAD branch `arena/01a05cd4-masb-pms-v4`).
+- Production: `https://masb-pms-v4.vercel.app` · Target `production` · READY · commit `9a80408` (= HEAD branch `arena/01a06274-masb-pms-v4`).
 - Env Supabase aktif (bukti: middleware redirect `/programmes` → `/login?redirect=%2Fprogrammes`; `/login` papar borang sebenar, tiada "Mod Demo").
 - Password ujian **`masb.12345` MASIH SAH** (pengesahan pengguna).
 

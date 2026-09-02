@@ -206,6 +206,90 @@ BEGIN
 END
 $$;
 
+-- NOTA SUSUNAN (pembaikan Fasa 6): current_user_id / current_user_role /
+-- current_role_name / has_role / log_audit dipisahkan mengikut kebergantungan:
+--   * fungsi ROLE diletakkan DI SINI kerana polisi RLS Bahagian 2-10 memanggil
+--     public.has_role() semasa CREATE POLICY (badan LANGUAGE sql dihurai serta-merta).
+--   * log_audit kekal SELEPAS Bahagian 10 kerana badannya (plpgsql) merujuk
+--     jadual public.audit_logs yang mesti wujud dahulu.
+-- Sebelum pembaikan ini, pemasangan pada pangkalan data KOSONG gagal dengan
+-- "function public.has_role(app_role) does not exist".
+
+-- =====================================================================
+-- BAHAGIAN 11: FUNGSI PEMBANTU
+-- =====================================================================
+
+-- Fungsi untuk mendapatkan ID pengguna semasa
+CREATE OR REPLACE FUNCTION public.current_user_id()
+RETURNS UUID
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN auth.uid();
+END;
+$$;
+
+-- Fungsi untuk mendapatkan peranan pengguna semasa
+CREATE OR REPLACE FUNCTION public.current_user_role()
+RETURNS public.app_role
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_role public.app_role;
+BEGIN
+  SELECT up.role INTO v_role
+    FROM public.user_profiles up
+   WHERE up.id = auth.uid();
+  RETURN COALESCE(v_role, 'viewer'::public.app_role);
+END;
+$$;
+
+-- Alias nama peranan sebagai TEXT
+-- (digunakan oleh RPC change-request legacy: review_change_request, dll.)
+CREATE OR REPLACE FUNCTION public.current_role_name()
+RETURNS TEXT
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_role TEXT;
+BEGIN
+  SELECT up.role::text INTO v_role
+    FROM public.user_profiles up
+   WHERE up.id = auth.uid();
+  RETURN COALESCE(v_role, 'viewer');
+END;
+$$;
+
+-- Fungsi untuk semak kebolehan pengguna
+-- Fasa 6: super_admin mewarisi SEMUA kuasa. Fungsi ini hanya digunakan untuk
+-- keputusan kebenaran (polisi RLS / RPC), bukan untuk paparan role — jadi
+-- memulangkan true bagi sebarang role yang diminta adalah selamat dan
+-- mengelakkan suntingan berpuluh-puluh polisi secara berasingan.
+CREATE OR REPLACE FUNCTION public.has_role(p_role public.app_role)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_role public.app_role;
+BEGIN
+  v_role := public.current_user_role();
+  IF v_role::text = 'super_admin' THEN
+    RETURN true;
+  END IF;
+  RETURN v_role = p_role;
+END;
+$$;
+
+-- =====================================================================
+
 -- =====================================================================
 -- BAHAGIAN 2: JADUAL USER PROFILES
 -- =====================================================================
@@ -875,9 +959,12 @@ CREATE POLICY "Pengguna boleh kemaskini programme_documents jika program tidak d
   )
   WITH CHECK (true);
 
+
+
+-- =====================================================================
+
 -- =====================================================================
 -- BAHAGIAN 10: JADUAL AUDIT_LOGS (LOG AUDIT)
--- =====================================================================
 
 CREATE TABLE IF NOT EXISTS public.audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -908,48 +995,10 @@ CREATE POLICY "Pengguna terauth boleh lihat audit_logs"
   TO authenticated
   USING (true);
 
--- =====================================================================
--- BAHAGIAN 11: FUNGSI PEMBANTU
--- =====================================================================
-
--- Fungsi untuk mendapatkan ID pengguna semasa
-CREATE OR REPLACE FUNCTION public.current_user_id()
-RETURNS UUID
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-AS $$
-  SELECT auth.uid();
-$$;
-
--- Fungsi untuk mendapatkan peranan pengguna semasa
-CREATE OR REPLACE FUNCTION public.current_user_role()
-RETURNS public.app_role
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-AS $$
-  SELECT COALESCE(
-    (SELECT up.role FROM public.user_profiles up WHERE up.id = auth.uid()),
-    'viewer'::public.app_role
-  );
-$$;
-
--- Alias nama peranan sebagai TEXT
--- (digunakan oleh RPC change-request legacy: review_change_request, dll.)
-CREATE OR REPLACE FUNCTION public.current_role_name()
-RETURNS TEXT
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-AS $$
-  SELECT COALESCE(
-    (SELECT up.role::text FROM public.user_profiles up WHERE up.id = auth.uid()),
-    'viewer'
-  );
-$$;
-
--- Fungsi untuk log audit
+-- Fungsi untuk log audit. MESTI berada SELEPAS jadual public.audit_logs
+-- dicipta: badan plpgsql dirujuk semasa CREATE FUNCTION, jadi jika fungsi ini
+-- diletak lebih awal pemasangan pada DB kosong gagal dengan
+-- "relation public.audit_logs does not exist".
 CREATE OR REPLACE FUNCTION public.log_audit(
   p_table_name TEXT,
   p_record_id UUID,
@@ -979,17 +1028,6 @@ BEGIN
 END;
 $$;
 
--- Fungsi untuk semak kebolehan pengguna
-CREATE OR REPLACE FUNCTION public.has_role(p_role public.app_role)
-RETURNS BOOLEAN
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-AS $$
-  SELECT public.current_user_role() = p_role;
-$$;
-
--- =====================================================================
 -- BAHAGIAN 12: TRIGGER UNTUK AUDIT LOG
 -- =====================================================================
 

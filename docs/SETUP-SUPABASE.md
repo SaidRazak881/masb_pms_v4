@@ -41,11 +41,29 @@ berikut **SATU PER SATU mengikut urutan**:
 | 3 | `lib/supabase/sync-import-transaction.sql` | RPC transaksi atomik `sync_import_transaction()` |
 | 4 | `lib/supabase/governance-lock.sql` | Modul Governance: lock/unlock, `programme_unlock_requests`, RPC `request_programme_unlock`, `review_programme_unlock`, `lock_programme` |
 | 5 | `lib/supabase/change-requests.sql` | Modul Change Requests: jadual `change_requests`, RPC `submit_change_request`, `review_change_request`, `cancel_change_request` |
-| 6 | `lib/supabase/seed-v4-raw.sql` | (PILIHAN) Data awal dari V4 RAW |
-| 7 | `lib/supabase/migrations/v4-raw-data-inserts.sql` | (PILIHAN) INSERT data V4 RAW yang diproses |
+| 6 | `lib/supabase/fix-rls-recursion.sql` | **WAJIB** — betulkan RLS infinite recursion pada `user_profiles` (ganti subquery dengan `has_role()` SECURITY DEFINER) |
+| 7 | `lib/supabase/fix-add-programme-categories.sql` | Tambah kategori `Room Rental`, `Consultancy`, `Certification` ke enum |
+| 8 | `lib/supabase/user-management.sql` | **Fasa 6** — enum `super_admin` + `account_status`, kolum `must_change_password`, RPC `admin_*`, trigger `on_auth_user_created`, column-level GRANT, reset semua kata laluan ke `masb.12345` |
+| 9 | `lib/supabase/seed-v4-raw.sql` | (PILIHAN) Data awal dari V4 RAW |
+| 10 | `lib/supabase/migrations/v4-raw-data-inserts.sql` | (PILIHAN) INSERT data V4 RAW yang diproses |
 
 > Jika anda mahu data contoh yang telah diproses daripada fail Excel V4 RAW,
-> jalankan 6 dan 7. Jika mahu bermula kosong, langkau kedua-duanya.
+> jalankan 9 dan 10. Jika mahu bermula kosong, langkau kedua-duanya.
+>
+> **Nota Fasa 6:** fail 8 (`user-management.sql`) mengandungi `COMMIT;` di
+> tengah skrip. Ini **wajib** kerana PostgreSQL tidak membenarkan nilai enum
+> yang baru ditambah (`super_admin`) digunakan dalam transaksi yang sama.
+> Jangan buang `COMMIT;` tersebut, dan jangan pecahkan fail itu kepada
+> bahagian yang dijalankan berasingan tanpa urutan yang betul.
+>
+> **Ujian tempatan sebelum pasang ke Supabase:**
+> ```bash
+> node scripts/test-user-management-sql.mjs
+> ```
+> Skrip ini memasang SEMUA 8 fail ke pangkalan data PostgreSQL sebenar
+> (PGlite WASM) yang kosong, kemudian menjalankan 12 kumpulan ujian fungsi
+> (kelulusan, sekatan, tukar role, reset kata laluan, guard anti-eskalasi,
+> audit, idempotensi).
 
 ### Semakan selepas pasang
 
@@ -111,6 +129,12 @@ values
 | `manager` | Lulus permohonan buka kunci |
 | `admin` | Import, cipta program, urus template laporan |
 | `head_governance` | **Lock/unlock program**, lulus change request |
+| `super_admin` | **Master Admin** — semua kuasa di atas + urus akaun pengguna (lulus, sekat, reset kata laluan, tukar role). Diberi melalui SQL sahaja, bukan UI |
+
+> `public.has_role()` **sedar-super_admin**: ia memulangkan `true` untuk
+> sebarang role yang diminta jika pengguna semasa ialah `super_admin`.
+> Jadi Super Admin mewarisi semua kuasa `admin`, `head_governance`,
+> `manager` dan `finance` tanpa perlu menyunting polisi RLS satu per satu.
 
 ---
 
@@ -188,10 +212,46 @@ order by created_at desc limit 5;
 | RLS menolak INSERT pada `import_staging` | Polisi belum wujud | Jalankan `schema-import-staging.sql` |
 | `42601: permission denied` | Guna anon key untuk operasi pentadbiran | Guna **SQL Editor** (service role) atau log masuk sebagai pengguna berkenaan |
 | Halaman papar "Mod demo" walaupun env diisi | Env tidak dibaca | Sahkan `.env.local` dan **restart** `npm run dev` |
+| `function public.has_role(app_role) does not exist` semasa pasang `schema-master.sql` | Fail lama (pra-Fasa 6) — fungsi pembantu ditakrif selepas ia dirujuk polisi RLS | Guna `schema-master.sql` semasa; blok FUNGSI PEMBANTU sudah dipindah ke hadapan |
+| `unsafe use of new value of enum type "app_role"` | `COMMIT;` tengah fail `user-management.sql` dibuang | Kekalkan `COMMIT;` selepas Bahagian 1 (lihat nota di atas) |
+| `function public.can_manage_users() does not exist` | `user-management.sql` belum dipasang | Jalankan fail 8 |
+| Pendaftaran baharu tiada baris dalam `user_profiles` | Trigger `on_auth_user_created` tiada | Jalankan fail 8; semak `select tgname from pg_trigger where tgrelid='auth.users'::regclass and not tgisinternal` |
+| Semua pengguna terkunci di `/security` selepas pasang Fasa 6 | `must_change_password = true` untuk semua (niat: kata laluan lalai) | Ini **dijangka** — setiap pengguna log masuk dengan `masb.12345` kemudian tukar kata laluan |
 
 ---
 
-## 7. Nota keselamatan
+## 7. Pengesahan & kata laluan (Fasa 6)
+
+Sistem menggunakan **e-mel + kata laluan sahaja** — MFA/TOTP telah dibuang.
+
+| Perkara | Tetapan |
+| ------- | ------- |
+| Kata laluan lalai | `masb.12345` (disimpan dalam `public.app_settings.default_password`) |
+| Akaun Master Admin | `saidrazak881@gmail.com` → role `super_admin` |
+| Wajib tukar kata laluan | `user_profiles.must_change_password = true` → UI alihkan ke `/security?required=1` |
+| Pendaftaran sendiri | `/register` → profil auto-cipta dengan `account_status = 'pending'` |
+| Lupa kata laluan | `/forgot-password` → `resetPasswordForEmail()` → `/security?reset=1` |
+
+**Tetapan wajib di Supabase Dashboard → Authentication:**
+
+1. **Providers → Email**: aktifkan. `Confirm email` boleh **dimatikan** supaya
+   pengguna baharu boleh log masuk terus selepas diluluskan (trigger tetap
+   mencipta profil `pending`). Jika anda biarkan ia hidup, pengguna perlu klik
+   pautan pengesahan e-mel dahulu — kedua-dua cara disokong.
+2. **URL Configuration**:
+   - `Site URL` = `https://masb-pms-v4.vercel.app`
+   - `Redirect URLs` = tambah `https://masb-pms-v4.vercel.app/security**`
+     (diperlukan oleh aliran set semula kata laluan)
+3. **Attack Protection**: biarkan kadar-had lalai Supabase aktif.
+
+> Oleh kerana MFA dibuang, kawalan pampasan ialah: kata laluan lalai **wajib**
+> ditukar, polisi kata laluan dikuatkuasakan di pangkalan data
+> (`assert_password_acceptable`), dan Super Admin boleh menyekat akaun serta
+> menamatkan semua sesinya serta-merta.
+
+---
+
+## 8. Nota keselamatan
 
 - **Jangan** gunakan `service_role` dalam aplikasi frontend.
 - RLS diaktifkan pada semua jadual utama — polisi `UPDATE` pada
@@ -202,3 +262,18 @@ order by created_at desc limit 5;
   API.
 - Audit log dijana automatik oleh trigger untuk create/update/delete pada
   jadual utama.
+- **Pengurusan pengguna (Fasa 6):** `authenticated` TIDAK mempunyai privilege
+  `UPDATE` pada kolum sensitif `user_profiles` (`role`, `account_status`,
+  `must_change_password`, `approved_*`, `blocked_*`). Hanya kolum profil
+  selamat (`full_name`, `phone`, `designation`, `department`, `avatar_url`,
+  `updated_at`) boleh ditulis sendiri. Semua tindakan pengurusan melalui RPC
+  `admin_*` (SECURITY DEFINER) yang menyemak `can_manage_users()` dan menulis
+  audit log. Semak dengan:
+  ```sql
+  select column_name from information_schema.column_privileges
+   where table_schema='public' and table_name='user_profiles'
+     and grantee='authenticated' and privilege_type='UPDATE'
+   order by 1;
+  ```
+  Jawapan yang betul: `avatar_url, department, designation, full_name, phone,
+  updated_at` — **tiada** `role` atau `account_status`.

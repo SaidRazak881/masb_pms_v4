@@ -7,6 +7,8 @@ const PROTECTED_PREFIXES = [
   "/import",
   "/participants",
   "/reports",
+  "/security",
+  "/admin",
 ];
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
@@ -24,8 +26,13 @@ export async function updateSession(request: NextRequest) {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   // Mod demo: tiada bukti kelayakan Supabase — langkau pengesahan.
+  // Header `x-pathname` tetap dihantar kerana layout dashboard membacanya
+  // untuk memutuskan sama ada halaman semasa dikecualikan daripada
+  // pengalihan wajib-tukar-kata-laluan.
   if (!url || !anonKey) {
-    return supabaseResponse;
+    const demoResponse = NextResponse.next({ request });
+    demoResponse.headers.set("x-pathname", request.nextUrl.pathname);
+    return demoResponse;
   }
 
   const supabase = createServerClient(url, anonKey, {
@@ -60,6 +67,11 @@ export async function updateSession(request: NextRequest) {
     loginUrl.searchParams.set("redirect", path);
     return NextResponse.redirect(loginUrl);
   }
+
+  // Akaun belum diluluskan / disekat tidak dibenarkan ke modul aplikasi.
+  // (Semakan status terperinci dilakukan di layout dashboard kerana
+  //  middleware Edge tidak sepatutnya membuat pertanyaan pangkalan data.)
+  supabaseResponse.headers.set("x-pathname", path);
 
   return supabaseResponse;
 }

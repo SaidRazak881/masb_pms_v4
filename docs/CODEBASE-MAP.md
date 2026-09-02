@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-02 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: 21f18cb Fasa 5: MFA TOTP untuk admin/head_governance + log masuk 2-langkah + halaman /security (tukar kata laluan sendiri) · arena/01a05cd4-masb-pms-v4
+> Git: 535fb13 Add files via upload · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 
@@ -14,7 +14,12 @@
 
 ## 2. Laluan Aplikasi (app/)
 
+- /account-blocked  `(app/(auth)/account-blocked/page.tsx)`
+- /forgot-password  `(app/(auth)/forgot-password/page.tsx)`
 - /login  `(app/(auth)/login/page.tsx)`
+- /pending-approval  `(app/(auth)/pending-approval/page.tsx)`
+- /register  `(app/(auth)/register/page.tsx)`
+- /admin/users  `(app/(dashboard)/admin/users/page.tsx)`
 - /dashboard  `(app/(dashboard)/dashboard/page.tsx)`
 - /import  `(app/(dashboard)/import/page.tsx)`
 - /participants  `(app/(dashboard)/participants/page.tsx)`
@@ -27,6 +32,7 @@
 
 ## 3. Komponen Utama (components/)
 
+- `components/admin/user-management.tsx`
 - `components/dashboard/dashboard-overview.tsx`
 - `components/governance/change-request-dialog.tsx`
 - `components/governance/change-request-history.tsx`
@@ -57,7 +63,7 @@
 - `components/programmes/programmes-browser.tsx`
 - `components/programmes/status-badges.tsx`
 - `components/reports/report-builder.tsx`
-- `components/security/mfa-guard.tsx`
+- `components/security/account-guard.tsx`
 - `components/ui/badge.tsx`
 - `components/ui/button.tsx`
 - `components/ui/card.tsx`
@@ -75,6 +81,9 @@
 - `lib/actions/import-actions.ts`
 - `lib/actions/participant-actions.ts`
 - `lib/actions/programme-actions.ts`
+- `lib/actions/user-management-actions.ts`
+- `lib/auth-client.ts`
+- `lib/auth.ts`
 - `lib/change-request-actions.ts`
 - `lib/change-requests.ts`
 - `lib/dashboard-data.ts`
@@ -85,7 +94,6 @@
 - `lib/import-api.ts`
 - `lib/import-shared.ts`
 - `lib/master-records.ts`
-- `lib/mfa.ts`
 - `lib/mock-data.ts`
 - `lib/participants-data.ts`
 - `lib/programme-mapper.ts`
@@ -95,6 +103,7 @@
 - `lib/supabase/middleware.ts`
 - `lib/supabase/server.ts`
 - `lib/types.ts`
+- `lib/user-management.ts`
 - `lib/utils.ts`
 
 ## 5. Pangkalan Data — Skema SQL (lib/supabase/)
@@ -128,8 +137,8 @@
 ### `lib/supabase/schema-master.sql`
 - **Jadual:** user_profiles, organizers, programmes, participants, financial_docs, invoices, programme_costs, cost_items, programme_documents, audit_logs
 - **Enum:** programme_status, programme_category, delivery_mode, payment_status, financial_doc_type, bumi_status, participant_status, cost_category, document_type, audit_action, app_role
-- **Fungsi/RPC:** current_user_id, current_user_role, current_role_name, log_audit, has_role, programmes_audit_trigger, participants_audit_trigger, financial_docs_audit_trigger
-- **Polisi RLS:** Pengguna boleh lihat profil sendiri · Pengguna boleh kemaskini profil sendiri · Admin boleh lihat semua profil · Pengguna terauth boleh lihat organizers · Pengguna terauth boleh tambah organizers · Pengguna terauth boleh kemaskini organizers · Pengguna terauth boleh lihat programmes · Pengguna terauth boleh tambah programmes · Pengguna boleh kemaskini programmes jika tidak dikunci · Pengguna boleh padam programmes sendiri jika draf · Pengguna terauth boleh lihat participants · Pengguna terauth boleh tambah participants · Pengguna boleh kemaskini participants jika program tidak dikunci · Pengguna boleh padam participants jika program draf · Pengguna terauth boleh lihat financial_docs · Pengguna terauth boleh tambah financial_docs · Pengguna boleh kemaskini financial_docs jika program tidak dikunci · Pengguna terauth boleh lihat invoices · Pengguna terauth boleh tambah invoices · Pengguna boleh kemaskini invoices jika program tidak dikunci · Pengguna terauth boleh lihat programme_costs · Pengguna terauth boleh tambah programme_costs · Pengguna boleh kemaskini programme_costs jika program tidak dikunci · Pengguna terauth boleh lihat cost_items · Pengguna terauth boleh tambah cost_items · Pengguna boleh kemaskini cost_items jika program tidak dikunci · Pengguna terauth boleh lihat programme_documents · Pengguna terauth boleh tambah programme_documents · Pengguna boleh kemaskini programme_documents jika program tidak dikunci · Pengguna terauth boleh lihat audit_logs
+- **Fungsi/RPC:** current_user_id, current_user_role, current_role_name, has_role, log_audit, programmes_audit_trigger, participants_audit_trigger, financial_docs_audit_trigger
+- **Polisi RLS:** (badan LANGUAGE sql dihurai serta-merta). · Pengguna boleh lihat profil sendiri · Pengguna boleh kemaskini profil sendiri · Admin boleh lihat semua profil · Pengguna terauth boleh lihat organizers · Pengguna terauth boleh tambah organizers · Pengguna terauth boleh kemaskini organizers · Pengguna terauth boleh lihat programmes · Pengguna terauth boleh tambah programmes · Pengguna boleh kemaskini programmes jika tidak dikunci · Pengguna boleh padam programmes sendiri jika draf · Pengguna terauth boleh lihat participants · Pengguna terauth boleh tambah participants · Pengguna boleh kemaskini participants jika program tidak dikunci · Pengguna boleh padam participants jika program draf · Pengguna terauth boleh lihat financial_docs · Pengguna terauth boleh tambah financial_docs · Pengguna boleh kemaskini financial_docs jika program tidak dikunci · Pengguna terauth boleh lihat invoices · Pengguna terauth boleh tambah invoices · Pengguna boleh kemaskini invoices jika program tidak dikunci · Pengguna terauth boleh lihat programme_costs · Pengguna terauth boleh tambah programme_costs · Pengguna boleh kemaskini programme_costs jika program tidak dikunci · Pengguna terauth boleh lihat cost_items · Pengguna terauth boleh tambah cost_items · Pengguna boleh kemaskini cost_items jika program tidak dikunci · Pengguna terauth boleh lihat programme_documents · Pengguna terauth boleh tambah programme_documents · Pengguna boleh kemaskini programme_documents jika program tidak dikunci · Pengguna terauth boleh lihat audit_logs
 - **Trigger:** programmes_audit_trigger, participants_audit_trigger, financial_docs_audit_trigger
 
 ### `lib/supabase/seed-v4-raw.sql`
@@ -142,10 +151,18 @@
 ### `lib/supabase/sync-import-transaction.sql`
 - **Fungsi/RPC:** append_import_audit, sync_import_transaction
 
+### `lib/supabase/user-management.sql`
+- **Jadual:** app_settings
+- **Enum:** account_status
+- **Fungsi/RPC:** is_super_admin, can_manage_users, my_account_status, my_password_change_required, assert_can_manage_users, default_password, assert_password_acceptable, admin_list_users, admin_user_summary, admin_approve_user, admin_set_user_blocked, admin_change_user_role, admin_reset_user_password, admin_reset_all_passwords_to_default, admin_require_password_change, mark_password_changed, handle_new_auth_user, sync_auth_user_update
+- **Polisi RLS:** Super Admin sahaja boleh lihat tetapan · Super Admin boleh lihat semua profil · Pengguna boleh lihat profil sendiri · Pengguna boleh kemaskini profil sendiri
+- **Trigger:** on_auth_user_created, on_auth_user_updated
+
 ## 6. Fail dengan Rujukan Mock / Demo (perlu perhatian bila 'live')
 
 - `lib/actions/import-actions.ts`
 - `lib/actions/programme-actions.ts`
+- `lib/actions/user-management-actions.ts`
 - `lib/change-request-actions.ts`
 - `lib/dashboard-data.ts`
 - `lib/governance-actions.ts`
@@ -154,12 +171,15 @@
 - `lib/mock-data.ts`
 - `lib/participants-data.ts`
 - `lib/supabase/middleware.ts`
+- `components/admin/user-management.tsx`
 - `components/dashboard/dashboard-overview.tsx`
 - `components/import/import-history.tsx`
 - `components/import/smart-excel-import.tsx`
 - `components/participants/participants-browser.tsx`
 - `components/programmes/programmes-browser.tsx`
+- `app/(auth)/forgot-password/page.tsx`
 - `app/(auth)/login/page.tsx`
+- `app/(auth)/register/page.tsx`
 - `app/(dashboard)/programmes/[id]/page.tsx`
 - `app/(dashboard)/programmes/page.tsx`
 - `app/(dashboard)/security/page.tsx`
@@ -187,10 +207,35 @@
 - `PROMPT-4F-FIX-RLS-RECURSION.md`
 - `PROMPT-4G-RETEST-IMPORT-NAV.md`
 - `PROMPT-4H-ADD-CATEGORIES.md`
+- `PROMPT-5-RESET-PASSWORDS.md`
 - `PROMPT-TEMPLATE-FASA.md`
 - `SETUP-SUPABASE.md`
 
-## 8. Isu Terbuka & Perhatian
+## 8. Fasa 6 — Pengesahan & Pengurusan Pengguna (TERKINI)
 
-- Lihat nota dalam dokumen fasa terakhir (`docs/PROMPT-*.md`) untuk isu berbaki.
-- Pengesahan akhir: guna `npm run build` sebelum push; deploy auto ke Vercel (production branch `arena/01a05cd4-masb-pms-v4`).
+**MFA/TOTP telah DIBUANG sepenuhnya.** Sistem kini menggunakan e-mel + kata laluan sahaja.
+
+- Kata laluan lalai pertama: `masb.12345` (`lib/auth.ts` DEFAULT_PASSWORD,
+  `public.app_settings.default_password` di DB). Pengguna WAJIB tukar selepas
+  log masuk (`must_change_password` → redirect `/security?required=1`).
+- Master Admin / Super Admin: `saidrazak881@gmail.com` → role `super_admin`,
+  dashboard khusus `/admin/users`.
+- Pendaftaran sendiri: `/register` → trigger `on_auth_user_created` cipta profil
+  `pending` + role `viewer` → Super Admin luluskan.
+- Lupa kata laluan: `/forgot-password` → e-mel pemulihan → `/security?reset=1`.
+- Status akaun: `pending` / `active` / `blocked`. Dikuatkuasakan sisi pelayan di
+  `app/(dashboard)/layout.tsx` + `components/security/account-guard.tsx`.
+- SQL: `lib/supabase/user-management.sql` (RPC `admin_*`, column-level GRANT
+  menghalang eskalasi role, audit log setiap tindakan).
+- Ujian SQL (PGlite): `node scripts/test-user-management-sql.mjs`
+  → pemasangan DB kosong + 12 kumpulan ujian fungsi.
+
+## 9. Isu Terbuka & Perhatian
+
+- **Sejarah git telah ditulis semula** (komit "Add files via upload"): semua hash
+  komit yang dirujuk dalam `docs/PROMPT-*.md` fasa terdahulu (21f18cb, 13078f2,
+  8066e95, 8057579, 536ccc9) TIDAK lagi wujud. Rujuk kandungan fail semasa, bukan hash.
+- Branch produksi Vercel perlu dikemas kini kepada branch semasa (lihat
+  `docs/PROMPT-6-INSTALL-USER-MANAGEMENT.md`).
+- Pengesahan akhir: `npm run build` + `node scripts/test-user-management-sql.mjs`
+  sebelum push.

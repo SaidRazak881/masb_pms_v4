@@ -14,12 +14,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 
-import { NAV_ITEMS } from "@/components/layout/sidebar-nav";
+import { visibleNavItems } from "@/components/layout/sidebar-nav";
 import { cn } from "@/lib/utils";
+import type { UserRole } from "@/lib/auth";
 
-export function MobileNav() {
+export function MobileNav({ role }: { role?: UserRole | null }) {
   const pathname = usePathname();
   const [open, setOpen] = React.useState(false);
+  const items = visibleNavItems(role);
 
   // Tutup panel apabila laluan berubah.
   React.useEffect(() => {
@@ -40,7 +42,7 @@ export function MobileNav() {
       {open && (
         <div className="absolute left-0 top-11 z-50 w-64 rounded-lg border bg-white p-2 shadow-xl">
           <nav className="flex flex-col gap-1">
-            {NAV_ITEMS.map((item) => {
+            {items.map((item) => {
               const active =
                 pathname === item.href ||
                 pathname.startsWith(`${item.href}/`);

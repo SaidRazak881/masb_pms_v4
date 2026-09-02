@@ -41,6 +41,29 @@ selepas selesai tugasan — supaya hasilnya boleh disemak dengan cepat.
 
 ---
 
+## ⭐ FASA 6 (TERKINI) — Pengesahan & Pengurusan Pengguna
+
+**MFA/TOTP telah DIBUANG.** Sistem kini menggunakan **e-mel + kata laluan
+sahaja**, dengan kata laluan lalai `masb.12345` yang **wajib** ditukar pada
+log masuk pertama, pendaftaran sendiri yang memerlukan kelulusan, dan
+dashboard **Super Admin** (`saidrazak881@gmail.com`) di `/admin/users`.
+
+| Keperluan | Dokumen |
+| --------- | ------- |
+| Prompt GPT untuk pasang SQL Fasa 6 + tukar Production Branch Vercel | **`docs/PROMPT-6-INSTALL-USER-MANAGEMENT.md`** |
+| Senarai semak ujian manual (log masuk, pendaftaran, kelulusan, sekatan, reset, regresi) | **`docs/ACTION-6-UAT-AUTH-USERS.md`** |
+| Urutan pemasangan SQL penuh (10 fail) | `docs/SETUP-SUPABASE.md` |
+| Konteks struktur sistem untuk GPT | `docs/CODEBASE-MAP.md` (Bahagian 8) |
+
+**Branch semasa: `arena/01a06274-masb-pms-v4`.**
+Branch Fasa 5 (`arena/01a05cd4-...`) dan semua hash komit lama yang disebut
+dalam prompt di bawah **tidak lagi sah** (sejarah git ditulis semula).
+
+> ⛔ `docs/PROMPT-5-RESET-PASSWORDS.md` dan `docs/ACTION-5-UAT-MFA.md`
+> **TIDAK lagi digunakan** — kedua-duanya digantikan oleh Fasa 6.
+
+---
+
 ## PROMPT 1 — Pasang Pangkalan Data di Supabase (Tugasan Utama)
 
 > **Peranan kamu:** Jurutera pangkalan data yang teliti dan berhati-hati.
@@ -51,12 +74,16 @@ selepas selesai tugasan — supaya hasilnya boleh disemak dengan cepat.
 > **Langkah:**
 >
 > 1. Muat turun fail-fail SQL berikut dari repositori GitHub
->    `SaidRazak881/masb_pms_v4` (folder `lib/supabase/`):
+>    `SaidRazak881/masb_pms_v4` (folder `lib/supabase/`) — urutan rasmi
+>    terkini ada 10 fail, lihat `docs/SETUP-SUPABASE.md`:
 >    - `schema-master.sql`
 >    - `schema-import-staging.sql`
 >    - `sync-import-transaction.sql`
 >    - `governance-lock.sql`
 >    - `change-requests.sql`
+>    - `fix-rls-recursion.sql`          ← ditambah selepas prompt ini ditulis
+>    - `fix-add-programme-categories.sql`
+>    - `user-management.sql`            ← Fasa 6 (pengesahan & pengguna)
 >    - (pilihan) `seed-v4-raw.sql`
 >    - (pilihan) `migrations/v4-raw-data-inserts.sql`
 > 2. Baca SETIAP fail SQL dengan teliti dan senaraikan:

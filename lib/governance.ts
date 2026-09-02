@@ -26,7 +26,8 @@ export type GovernanceRole =
   | "executive"
   | "manager"
   | "admin"
-  | "head_governance";
+  | "head_governance"
+  | "super_admin";
 
 /** Susunan hierarki peranan — indeks lebih tinggi = lebih berkuasa. */
 const ROLE_RANK: Record<GovernanceRole, number> = {
@@ -35,6 +36,9 @@ const ROLE_RANK: Record<GovernanceRole, number> = {
   manager: 2,
   admin: 3,
   head_governance: 3,
+  // Fasa 6: Super Admin mewarisi semua kuasa governance (lihat juga
+  // public.has_role() dalam SQL yang mengembalikan true untuk super_admin).
+  super_admin: 4,
 };
 
 /** Peranan yang dibenarkan MELULUS/MENOLAK permohonan buka kunci. */
@@ -42,6 +46,7 @@ export const APPROVER_ROLES: GovernanceRole[] = [
   "manager",
   "admin",
   "head_governance",
+  "super_admin",
 ];
 
 /** Peranan yang dibenarkan MENGUNCI program secara manual. */
@@ -49,6 +54,7 @@ export const LOCKER_ROLES: GovernanceRole[] = [
   "manager",
   "admin",
   "head_governance",
+  "super_admin",
 ];
 
 /** Label paparan Bahasa Melayu bagi setiap peranan. */
@@ -58,6 +64,7 @@ export const ROLE_LABEL: Record<GovernanceRole, string> = {
   manager: "Pengurus",
   admin: "Pentadbir",
   head_governance: "Head Governance",
+  super_admin: "Super Admin",
 };
 
 export function hasRoleAtLeast(

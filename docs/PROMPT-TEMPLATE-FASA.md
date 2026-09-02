@@ -18,13 +18,13 @@
 | Analisis perniagaan / spesifikasi / laporan keputusan | `docs/personas/PERSONA-BA-LAPORAN.md` |
 
 > Arahan kepada ChatGPT: *"Baca fail persona di
-> https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a05cd4-masb-pms-v4/{PATH}
+> https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/{PATH}
 > (klik Raw) dan AMALKAN persona itu sepanjang tugasan."*
 
 ## BLOK 2 — PETA KOD (lampiran standard)
 
 > Arahan: *"Baca peta kod terkini di
-> https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a05cd4-masb-pms-v4/docs/CODEBASE-MAP.md
+> https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/docs/CODEBASE-MAP.md
 > (klik Raw). Gunakan sebagai konteks struktur sistem — modul mana yang wujud, jadual/RPC mana
 > yang ada, fail mana masih mock/demo. JANGAN cadangkan perkara yang sudah wujud."*
 >
@@ -44,7 +44,7 @@
    `lock_programme`, `unlock_programme`, `request_programme_unlock`,
    `submit_change_request`, `review_change_request`) — ujian tulis melalui UI pengguna.
 4. JANGAN reset/ubah password mana-mana akaun (Fasa 5 khas, dengan prompt berasingan).
-5. JANGAN merge ke `main` / tukar Production Branch Vercel (`arena/01a05cd4-masb-pms-v4`).
+5. JANGAN merge ke `main` / tukar Production Branch Vercel (`arena/01a06274-masb-pms-v4`).
 6. JANGAN tampal anon key penuh / rahsia dalam laporan.
 7. JANGAN mereka-reka bukti — setiap LULUS mesti ada bukti verbatim; jika tidak dapat uji,
    tulis `⏳ MENUNGGU PENGGUNA`.

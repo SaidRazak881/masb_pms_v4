@@ -5,6 +5,31 @@ menetapkan environment variables, dan menguji Preview Deployment.
 
 ---
 
+## 0. Keadaan produksi SEMASA (Fasa 6)
+
+| Perkara | Nilai |
+| ------- | ----- |
+| URL produksi | `https://masb-pms-v4.vercel.app` |
+| **Production Branch** | **`arena/01a06274-masb-pms-v4`** |
+| Projek Supabase | `lmenmfsbjgxfhnykkgow` |
+| Model pengesahan | E-mel + kata laluan **sahaja** (MFA dibuang pada Fasa 6) |
+| Kata laluan lalai | `masb.12345` — wajib ditukar pada log masuk pertama |
+| Super Admin | `saidrazak881@gmail.com` → `/admin/users` |
+
+> **Penting:** projek ini **tidak** deploy dari `main`. `main` ketinggalan
+> (keadaan pra-Fasa 5). Setiap sesi Arena menggunakan branch
+> `arena/<id>-masb-pms-v4` yang tersendiri, jadi **Production Branch mesti
+> dikemas kini** setiap kali kerja berpindah ke branch baharu — lihat
+> `docs/PROMPT-6-INSTALL-USER-MANAGEMENT.md` Langkah E.
+>
+> **Tetapan Supabase Auth yang diperlukan oleh Fasa 6:**
+> Authentication → URL Configuration → `Site URL` =
+> `https://masb-pms-v4.vercel.app`, dan tambah Redirect URL
+> `https://masb-pms-v4.vercel.app/security**` (untuk aliran
+> `/forgot-password` → `/security?reset=1`).
+
+---
+
 ## 1. Prasyarat
 
 - Repositori GitHub: `SaidRazak881/masb_pms_v4`

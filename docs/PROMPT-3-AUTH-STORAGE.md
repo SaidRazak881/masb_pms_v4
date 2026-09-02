@@ -42,7 +42,7 @@
 > audit_logs).
 >
 > **Sumber (MESTI muat turun dari GitHub, branch
-> `arena/01a05cd4-masb-pms-v4`):**
+> `arena/01a06274-masb-pms-v4`):**
 >
 > 1. `V4 RAW/User Profiles Mapping.xlsx` — senarai pengguna rasmi (19
 >    pengguna, kolum: Bil, staff_name, role, email, Defauls Password)
@@ -268,6 +268,6 @@
   + 4 polisi.
 - Selepas laporan 3 diluluskan, langkah seterusnya ialah **Prompt #4**
   (`docs/PROMPT-4-DEPLOY-E2E.md`): deploy Vercel (Production Branch =
-  `arena/01a05cd4-masb-pms-v4`; env: `NEXT_PUBLIC_SUPABASE_URL` +
+  `arena/01a06274-masb-pms-v4`; env: `NEXT_PUBLIC_SUPABASE_URL` +
   `NEXT_PUBLIC_SUPABASE_ANON_KEY`) + ujian API & senarai semak manual.
   **Nota:** login page kini guna Supabase Auth sebenar (komit `56bc392`).

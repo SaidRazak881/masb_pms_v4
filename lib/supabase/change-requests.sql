@@ -268,7 +268,7 @@ BEGIN
 
   -- Hanya head_governance / admin / manager boleh memutuskan
   v_role := public.current_role_name();
-  IF v_role NOT IN ('head_governance', 'admin', 'manager') THEN
+  IF v_role NOT IN ('head_governance', 'admin', 'manager', 'super_admin') THEN
     RAISE EXCEPTION 'FORBIDDEN' USING ERRCODE = '42501';
   END IF;
 

@@ -24,7 +24,7 @@
 
 1. Buka Supabase Dashboard → SQL Editor → New query.
 2. **Salin penuh kandungan fail ini dari GitHub:**
-   `https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a05cd4-masb-pms-v4/lib/supabase/fix-rls-recursion.sql`
+   `https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/lib/supabase/fix-rls-recursion.sql`
    (klik "Raw" untuk salin teks penuh — jangan sunting apa-apa).
 3. Jalankan sekali. Fail idempotent — boleh jalankan dua kali untuk bukti.
 4. **JANGAN** ubah apa-apa selain fail tersebut.

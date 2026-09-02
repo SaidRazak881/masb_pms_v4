@@ -2,7 +2,7 @@
 
 > **Status:** Sedia digunakan — semua fail SQL rasmi telah dibetulkan,
 > diuji pada PostgreSQL sebenar (PGlite) dan di-push ke branch
-> `arena/01a05cd4-masb-pms-v4` (komit terkini `2d9baa6`).
+> `arena/01a06274-masb-pms-v4` (komit terkini `2d9baa6`).
 >
 > **Selepas semakan laporan GPT fasa 1 (9 blocker):** SEMUA blocker
 > (A–I) telah diselesaikan dalam komit `9309291` — lihat senarai di bawah.
@@ -30,7 +30,7 @@ Sasaran: projek Supabase **`lmenmfsbjgxfhnykkgow`** (sama seperti Prompt #1).
 ## Nota semakan laporan GPT fasa 1 — SEMUA blocker telah dibetulkan
 
 Laporan fasa 1 menyenaraikan 9 blocker. Semuanya telah diselesaikan dalam
-komit `9309291` (branch `arena/01a05cd4-masb-pms-v4`), dan disahkan pada
+komit `9309291` (branch `arena/01a06274-masb-pms-v4`), dan disahkan pada
 PostgreSQL sebenar (PGlite). Jangan biarkan GPT mengulangi siasatan lama
 atau menunggu kebenaran untuk perkara yang sudah selesai:
 
@@ -65,14 +65,14 @@ dengan tandatangan lama (cth. `lock_programme`), bukan fungsi lain.
 > (`lmenmfsbjgxfhnykkgow`) dan kamu berhenti serta melaporkan blocker.
 > Sejak itu, **semua fail SQL rasmi telah dibetulkan, diuji pada
 > PostgreSQL sebenar, dan di-commit** ke repositori yang sama pada
-> branch `arena/01a05cd4-masb-pms-v4`, commit terbaru `2d9baa6`.
+> branch `arena/01a06274-masb-pms-v4`, commit terbaru `2d9baa6`.
 > Semua blocker fasa 1 (A–I) telah dibetulkan — muat turun SEMULA fail
 > dari commit ini, jangan guna cache fasa 1.
 > Tugasan kamu sekarang ialah **menyelaraskan (reconcile) pangkalan data
 > live dengan fail SQL rasmi yang sudah dibetulkan**, secara ADITIF sahaja.
 >
 > **Sumber rasmi (MESTI muat turun dari GitHub, branch
-> `arena/01a05cd4-masb-pms-v4`, commit `9309291`):**
+> `arena/01a06274-masb-pms-v4`, commit `9309291`):**
 >
 > 1. `lib/supabase/schema-master.sql` — skema induk (jadual, enum, fungsi
 >    asas, trigger audit, RLS, jadual `invoices`)

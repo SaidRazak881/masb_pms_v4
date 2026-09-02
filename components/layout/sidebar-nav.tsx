@@ -8,12 +8,22 @@ import {
   LayoutDashboard,
   Shield,
   Upload,
+  UserCog,
   Users,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import type { UserRole } from "@/lib/auth";
 
-const NAV_ITEMS = [
+type NavItem = {
+  title: string;
+  href: string;
+  icon: typeof LayoutDashboard;
+  /** Jika ditetapkan, item hanya dipaparkan untuk role ini. */
+  roles?: UserRole[];
+};
+
+const NAV_ITEMS: NavItem[] = [
   {
     title: "Dashboard",
     href: "/dashboard",
@@ -44,16 +54,28 @@ const NAV_ITEMS = [
     href: "/security",
     icon: Shield,
   },
+  {
+    title: "Admin Pengguna",
+    href: "/admin/users",
+    icon: UserCog,
+    roles: ["super_admin"],
+  },
 ];
 
 export { NAV_ITEMS };
 
-export function SidebarNav() {
+/** Item navigasi yang dibenarkan untuk role semasa. */
+export function visibleNavItems(role: UserRole | null | undefined): NavItem[] {
+  return NAV_ITEMS.filter((item) => !item.roles || (role && item.roles.includes(role)));
+}
+
+export function SidebarNav({ role }: { role?: UserRole | null }) {
   const pathname = usePathname();
+  const items = visibleNavItems(role);
 
   return (
     <nav className="flex flex-col gap-1 px-3 py-4">
-      {NAV_ITEMS.map((item) => {
+      {items.map((item) => {
         const active =
           pathname === item.href || pathname.startsWith(`${item.href}/`);
         const Icon = item.icon;
@@ -71,6 +93,11 @@ export function SidebarNav() {
           >
             <Icon className="h-4 w-4" />
             {item.title}
+            {item.roles?.includes("super_admin") && (
+              <span className="ml-auto rounded bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+                Super
+              </span>
+            )}
           </Link>
         );
       })}

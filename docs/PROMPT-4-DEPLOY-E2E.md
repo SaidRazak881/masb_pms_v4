@@ -38,7 +38,7 @@
 >
 > **Konteks sedia ada:**
 > - Repositori GitHub: `SaidRazak881/masb_pms_v4`
-> - Branch aktif: **`arena/01a05cd4-masb-pms-v4`** (komit terkini `56bc392`)
+> - Branch aktif: **`arena/01a06274-masb-pms-v4`** (komit terkini `56bc392`)
 > - Supabase: projek `lmenmfsbjgxfhnykkgow`, URL
 >   `https://lmenmfsbjgxfhnykkgow.supabase.co`, anon key:
 >   `<ANON_KEY_ANDA>`
@@ -55,9 +55,9 @@
 >    `masb_pms_v4`.
 > 2. **PENTING — Production Branch:** Vercel secara lalai menetapkan
 >    `main` sebagai production branch, tetapi repositori ini menggunakan
->    branch `arena/01a05cd4-masb-pms-v4`. Arahkan pengguna: di **Project
+>    branch `arena/01a06274-masb-pms-v4`. Arahkan pengguna: di **Project
 >    Settings → Git → Production Branch**, tetapkan
->    `arena/01a05cd4-masb-pms-v4` (ATAU pilih branch tersebut semasa
+>    `arena/01a06274-masb-pms-v4` (ATAU pilih branch tersebut semasa
 >    import). Jangan minta pengguna merge ke main tanpa kelulusan.
 > 3. **Environment Variables** (di Vercel):
 >    - `NEXT_PUBLIC_SUPABASE_URL` = `https://lmenmfsbjgxfhnykkgow.supabase.co`

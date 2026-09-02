@@ -1,5 +1,25 @@
 # PROMPT 5 — RESET KATA LALUAN 19 AKAUN (DB LIVE) + NOTA MFA
 
+> ## ⛔ DIGANTIKAN OLEH FASA 6 — JANGAN JALANKAN PROMPT INI
+>
+> **Sebab:**
+> 1. **MFA/TOTP telah dibuang sepenuhnya** daripada sistem (Fasa 6). Sistem kini
+>    menggunakan **e-mel + kata laluan sahaja**. Langkah MFA dalam prompt ini
+>    tidak lagi terpakai dan halaman `/security` tidak lagi mempunyai panel MFA.
+> 2. **Reset kata laluan rawak telah dibatalkan.** Fasa 6 mengembalikan SEMUA
+>    akaun kepada kata laluan lalai `masb.12345` (lihat Bahagian 8c dalam
+>    `lib/supabase/user-management.sql`) dan **mewajibkan** setiap pengguna
+>    menukarnya semasa log masuk pertama.
+> 3. Selepas Fasa 6, Super Admin boleh set semula kata laluan mana-mana
+>    pengguna melalui dashboard `/admin/users` — tiada SQL diperlukan.
+>
+> **Gantikan dengan:** `docs/PROMPT-6-INSTALL-USER-MANAGEMENT.md`
+> **Ujian manual:** `docs/ACTION-6-UAT-AUTH-USERS.md`
+>
+> Dokumen ini dikekalkan sebagai **rekod sejarah** Fasa 5 sahaja.
+
+---
+
 > **Salin keseluruhan bahagian "PROMPT" di bawah ke ChatGPT** (dengan web browsing
 > diaktifkan supaya ia boleh muat turun fail persona & peta kod dari GitHub).
 >
@@ -19,12 +39,12 @@
 
 > **Persona (WAJIB baca & amalkan):**
 > Baca fail persona di
-> https://raw.githubusercontent.com/SaidRazak881/masb_pms_v4/arena/01a05cd4-masb-pms-v4/docs/personas/PERSONA-SQL-ARCHITECT.md
+> https://raw.githubusercontent.com/SaidRazak881/masb_pms_v4/arena/01a06274-masb-pms-v4/docs/personas/PERSONA-SQL-ARCHITECT.md
 > dan AMALKAN persona "Arkitek SQL & Pangkalan Data TPMS" sepanjang tugasan.
 >
 > **Peta kod (WAJIB baca):**
 > Baca peta kod terkini di
-> https://raw.githubusercontent.com/SaidRazak881/masb_pms_v4/arena/01a05cd4-masb-pms-v4/docs/CODEBASE-MAP.md
+> https://raw.githubusercontent.com/SaidRazak881/masb_pms_v4/arena/01a06274-masb-pms-v4/docs/CODEBASE-MAP.md
 > sebagai konteks struktur sistem.
 >
 > **Tugas:** Sediakan pelan reset kata laluan UNTUK 19 akaun TPMS MIMOS Academy di
@@ -56,7 +76,7 @@
 > | 19 | yusuf.zolkipli@mimos.my | Muhammad Yusuf | `staff` |
 >
 > **Langkah 1 — Sahkan senarai:** Muat turun
-> https://raw.githubusercontent.com/SaidRazak881/masb_pms_v4/arena/01a05cd4-masb-pms-v4/V4%20RAW/User%20Profiles%20Mapping.xlsx
+> https://raw.githubusercontent.com/SaidRazak881/masb_pms_v4/arena/01a06274-masb-pms-v4/V4%20RAW/User%20Profiles%20Mapping.xlsx
 > (atau dokumen `docs/PROMPT-3-AUTH-STORAGE.md` dalam repo yang sama) dan pastikan
 > senarai 19 e-mel di atas padan dengan sumber rasmi. Laporkan sebarang beza.
 >

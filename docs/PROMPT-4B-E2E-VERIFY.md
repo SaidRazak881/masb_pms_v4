@@ -14,7 +14,7 @@
 ## 1. Konteks
 
 - Production URL: `https://masb-pms-v4.vercel.app` (domain tidak berubah; cuma target/branch berubah).
-- Production Branch Vercel: `arena/01a05cd4-masb-pms-v4` (commit `e8c70f3`).
+- Production Branch Vercel: `arena/01a06274-masb-pms-v4` (commit `e8c70f3`).
 - Env Vercel: `NEXT_PUBLIC_SUPABASE_URL=https://lmenmfsbjgxfhnykkgow.supabase.co` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` (anon key).
 - Supabase: projek `lmenmfsbjgxfhnykkgow` — 14 jadual, RLS aktif, seed: 12 organizer, 4 program, 6 financial docs, 2 programme costs, 4 peserta, 4 cost items; audit_logs 14 rekod `created`; 19 auth users + 19 `user_profiles`.
 - Password lalai rasmi semua akaun (dari `V4 RAW/User Profiles Mapping.xlsx`): **`masb.12345`**.

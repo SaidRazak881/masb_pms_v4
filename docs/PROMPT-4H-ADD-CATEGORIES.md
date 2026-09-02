@@ -18,7 +18,7 @@
 
 Buka Supabase Dashboard → SQL Editor → New query, salin penuh kandungan fail:
 `lib/supabase/fix-add-programme-categories.sql`
-dari GitHub: https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a05cd4-masb-pms-v4/lib/supabase/fix-add-programme-categories.sql
+dari GitHub: https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/lib/supabase/fix-add-programme-categories.sql
 (klik "Raw" → salin → jalankan). JANGAN ubah kandungan.
 
 ## 2. Pengesahan

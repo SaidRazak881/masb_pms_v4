@@ -17,6 +17,8 @@ Supabase dan bertukar kepada data sebenar sebaik sahaja env diisi.
 | Laporan | `/reports` | 8 jenis laporan + eksport **Excel (.xlsx)** |
 | Governance | dalam `/programmes/[id]` | Lock/unlock program, permohonan buka kunci, **Change Requests** (mohon ubah data program terkunci) + kelulusan Head Governance |
 | Audit | dalam `/programmes/[id]` | Audit trail bagi create, update, import, lock, change request |
+| Pengesahan | `/login`, `/register`, `/forgot-password`, `/security` | E-mel + kata laluan sahaja (**tiada MFA**); kata laluan lalai `masb.12345` dengan tuntutan wajib tukar; pendaftaran sendiri (menunggu kelulusan); set semula kata laluan |
+| Admin Pengguna | `/admin/users` | **Khas Super Admin** — lulus permohonan, sekat/nyahsekat, set semula kata laluan, tukar role, wajibkan tukar kata laluan |
 
 ## Struktur Projek
 
@@ -28,7 +30,11 @@ Supabase dan bertukar kepada data sebenar sebaik sahaja env diisi.
 │   ├── globals.css                   # Design tokens (CSS variables) + Tailwind
 │   ├── (auth)/
 │   │   ├── layout.tsx                # Layout berpusat untuk halaman auth
-│   │   └── login/page.tsx            # Halaman log masuk (mock Supabase Auth)
+│   │   ├── login/page.tsx            # Log masuk (e-mel + kata laluan sahaja)
+│   │   ├── register/page.tsx         # Pendaftaran akaun baharu → status pending
+│   │   ├── forgot-password/page.tsx  # Set semula kata laluan melalui e-mel
+│   │   ├── pending-approval/page.tsx # Status: menunggu kelulusan Super Admin
+│   │   └── account-blocked/page.tsx  # Status: akaun disekat
 │   └── (dashboard)/
 │       ├── layout.tsx                # Shell: sidebar + header
 │       ├── dashboard/page.tsx        # Dashboard KPI + aktiviti
@@ -37,7 +43,9 @@ Supabase dan bertukar kepada data sebenar sebaik sahaja env diisi.
 │       │   └── [id]/page.tsx         # Perincian program + 7 tab
 │       ├── participants/page.tsx     # Senarai peserta seluruh organisasi
 │       ├── import/page.tsx           # Muat naik Excel (tab) + Sejarah Import
-│       └── reports/page.tsx          # Report Builder & Export Excel
+│       ├── reports/page.tsx          # Report Builder & Export Excel
+│       ├── security/page.tsx         # Tukar kata laluan (wajib jika masih lalai)
+│       └── admin/users/page.tsx      # Dashboard Super Admin — pengurusan pengguna
 ├── components/
 │   ├── ui/                           # Komponen shadcn/ui
 │   │   ├── button.tsx  card.tsx  badge.tsx  input.tsx  label.tsx
@@ -64,6 +72,11 @@ Supabase dan bertukar kepada data sebenar sebaik sahaja env diisi.
 │   │   ├── change-request-history.tsx# Sejarah permohonan ubah data
 │   │   ├── governance-panel.tsx      # Panel tadbir urus gabungan
 │   │   └── index.ts                  # Barrel eksport
+│   ├── admin/
+│   │   └── user-management.tsx       # Dashboard Super Admin (KPI, kelulusan,
+│   │                                 #   sekat, role, reset kata laluan)
+│   ├── security/
+│   │   └── account-guard.tsx         # Semakan semula status akaun (sisi klien)
 │   ├── reports/                      # Modul Report Builder & Export Excel
 │   │   ├── report-builder.tsx        # Wizard laporan: jenis → filter → preview
 │   │   └── index.ts                  # Barrel eksport
@@ -74,6 +87,11 @@ Supabase dan bertukar kepada data sebenar sebaik sahaja env diisi.
 │       ├── import-history.tsx        # Sejarah batch import (kembang/tutup)
 │       └── import-types.ts           # Jenis kongsi (Summary)
 ├── lib/
+│   ├── auth.ts                       # Role, status akaun, polisi kata laluan,
+│   │                                 #   terjemahan ralat Auth (Fasa 6)
+│   ├── auth-client.ts                # Aliran log masuk bersama + routing status
+│   ├── user-management.ts            # Jenis & logik tulen pengurusan pengguna
+│   ├── actions/user-management-actions.ts # Server Actions → RPC admin_*
 │   ├── programme-mapper.ts           # Pemetaan row Supabase → type Programme
 │   ├── dashboard-data.ts             # Agregasi KPI dashboard (hibrid)
 │   ├── participants-data.ts          # Agregasi peserta seluruh organisasi
@@ -95,7 +113,9 @@ Supabase dan bertukar kepada data sebenar sebaik sahaja env diisi.
 │   │   ├── schema-import-staging.sql # Skema jadual import_staging
 │   │   ├── sync-import-transaction.sql # RPC transaksi atomic sync_import_transaction
 │   │   ├── governance-lock.sql       # Modul Governance lock/unlock
-│   │   └── change-requests.sql       # Modul Change Requests (RPC + RLS)
+│   │   ├── change-requests.sql       # Modul Change Requests (RPC + RLS)
+│   │   └── user-management.sql       # Fasa 6: super_admin, account_status,
+│   │                                 #   RPC admin_*, trigger pendaftaran
 │   ├── types.ts                      # Entiti domain (Programme, Participant, ...)
 │   ├── mock-data.ts                  # Data mock (6 program lengkap)
 │   ├── format.ts                     # formatMYR, formatDate, ...
@@ -252,6 +272,69 @@ melalui `lib/actions/import-actions.ts` (`getImportBatches`, `getStagingRows`).
 Jenis & label kongsi berada dalam `lib/import-shared.ts` (modul biasa — fail
 server actions tidak boleh mengeksport fungsi sinkron).
 
+## Pengesahan & Pengurusan Pengguna (Fasa 6)
+
+**Sistem ini menggunakan e-mel + kata laluan SAHAJA.** MFA/TOTP yang dibina
+pada Fasa 5 telah dibuang sepenuhnya (`lib/mfa.ts` dan
+`components/security/mfa-guard.tsx` dipadam).
+
+### Model pengesahan
+
+| Perkara | Nilai |
+| ------- | ----- |
+| Kaedah log masuk | E-mel + kata laluan (`signInWithPassword`) |
+| Kata laluan lalai pertama | `masb.12345` |
+| Tuntutan tukar kata laluan | `user_profiles.must_change_password` → pengguna dialih ke `/security?required=1` dan **tidak boleh** membuka modul lain sehingga kata laluan ditukar |
+| Polisi kata laluan baharu | ≥ 8 aksara, ada huruf + nombor, **tidak boleh** sama dengan kata laluan lalai |
+| Master Admin / Super Admin | `saidrazak881@gmail.com` → role `super_admin` |
+| Status akaun | `pending` (menunggu kelulusan) · `active` · `blocked` |
+| Lupa kata laluan | `/forgot-password` → e-mel pemulihan → `/security?reset=1`; alternatif: Super Admin reset ke lalai |
+
+### Pendaftaran pengguna baharu
+
+`/register` memanggil `supabase.auth.signUp()`. Oleh kerana `auth.users` tidak
+boleh dibaca melalui RLS, profil dicipta secara automatik oleh trigger
+**`on_auth_user_created`** dengan `role = 'viewer'`,
+`account_status = 'pending'` dan `must_change_password = true`. Pengguna tidak
+boleh memilih role sendiri. Selepas Super Admin meluluskan, barulah akaun boleh
+mengakses modul.
+
+### Dashboard Super Admin (`/admin/users`)
+
+KPI (jumlah, menunggu, aktif, disekat, masih guna kata laluan lalai, bilangan
+Super Admin) + tindakan:
+
+- **Luluskan** permohonan (serta role yang ditetapkan)
+- **Sekat / Nyahsekat** — sebab wajib direkod; refresh token pengguna dipadam
+  supaya semua sesi aktif tamat
+- **Tukar role** — `super_admin` tidak boleh diberi melalui UI (hanya SQL)
+- **Set semula kata laluan** ke lalai + wajibkan tukar
+- **Wajibkan / batalkan** tuntutan tukar kata laluan
+
+### Penguatkuasaan berlapis (bukan di UI sahaja)
+
+1. **Column-level GRANT** — `authenticated` hanya boleh menulis kolum profil
+   bukan sensitif (`full_name`, `phone`, `designation`, `department`,
+   `avatar_url`, `updated_at`). `role`, `account_status`,
+   `must_change_password`, `approved_*`, `blocked_*` **tidak boleh** disentuh
+   dari klien, jadi eskalasi kuasa melalui PATCH terus adalah mustahil.
+2. **RPC `SECURITY DEFINER`** — setiap tindakan pengurusan memanggil
+   `assert_can_manage_users()` dan menulis `audit_logs`.
+3. **Guard sisi pelayan** — `app/(dashboard)/layout.tsx` membaca status akaun
+   semasa render dan menolak pengguna `pending`/`blocked`; kata laluan lalai
+   mengalihkan ke `/security`.
+4. **Guard sisi klien** — `components/security/account-guard.tsx` menyemak
+   semula semasa navigasi SPA supaya sekatan yang dikenakan selepas log masuk
+   tetap berkuat kuasa.
+5. **Peraturan keselamatan dalam RPC** — tidak boleh sekat diri sendiri, tidak
+   boleh reset kata laluan sendiri, sekurang-kurangnya satu Super Admin aktif
+   mesti kekal, `super_admin` tidak boleh diberi/diturun taraf sembarangan.
+
+`public.has_role()` kini **sedar-super_admin** (memulangkan `true` untuk
+sebarang role), jadi Super Admin mewarisi semua kuasa `admin`,
+`head_governance`, `manager` dan `finance` tanpa perlu menyunting
+berpuluh-puluh polisi RLS.
+
 ## Dokumentasi
 
 | Dokumen | Kandungan |
@@ -259,6 +342,10 @@ server actions tidak boleh mengeksport fungsi sinkron).
 | `docs/SETUP-SUPABASE.md` | Pasang skema SQL mengikut urutan, cipta pengguna & peranan, storage, ujian RLS |
 | `docs/DEPLOY-VERCEL.md` | Sambung GitHub → Vercel, env variables, checklist UAT, troubleshooting |
 | `docs/GPT-ASSISTANT-PROMPTS.md` | Prompt siap-tampal untuk ChatGPT + format laporan wajib |
+| `docs/PROMPT-6-INSTALL-USER-MANAGEMENT.md` | **Fasa 6 (TERKINI)** — pasang `user-management.sql` di Supabase live, kemas kini Production Branch Vercel, verifikasi |
+| `docs/ACTION-6-UAT-AUTH-USERS.md` | Senarai semak ujian manual Fasa 6 (log masuk, wajib tukar kata laluan, pendaftaran, kelulusan, sekatan, reset) |
+| `docs/CODEBASE-MAP.md` | Peta kod ringkas untuk konteks pembantu AI (jana semula: `node scripts/codebase-map.mjs`) |
+| `docs/PROMPT-TEMPLATE-FASA.md` | Templat wajib prompt GPT: Persona + Peta Kod + Tugasan + Larangan + Format Laporan |
 
 ## Bermula
 
@@ -295,3 +382,7 @@ meneruskan tanpa pelayan Supabase).
 | `npm run build`| Binaan pengeluaran                  |
 | `npm start`    | Jalankan binaan pengeluaran         |
 | `npm run lint` | Lint ESLint                         |
+| `node scripts/test-user-management-sql.mjs` | Ujian SQL Fasa 6 (PostgreSQL sebenar via PGlite): pemasangan pada DB kosong + 12 kumpulan ujian fungsi |
+| `node scripts/test-sql-pglite.mjs` | Ujian pemasangan skema induk + idempotensi |
+| `node scripts/test-sql-functional.mjs` | Ujian fungsi RPC (import sync, lock, change request) |
+| `node scripts/codebase-map.mjs` | Jana semula `docs/CODEBASE-MAP.md` |

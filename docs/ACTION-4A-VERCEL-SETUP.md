@@ -11,12 +11,12 @@
 
 ---
 
-## Langkah 1 — Production Branch → `arena/01a05cd4-masb-pms-v4`
+## Langkah 1 — Production Branch → `arena/01a06274-masb-pms-v4`
 
 1. Buka: <https://vercel.com/saidrazak881-5747/masb-pms-v4/settings/git>
-2. **Production Branch** → tukar kepada: `arena/01a05cd4-masb-pms-v4` → **Save**.
+2. **Production Branch** → tukar kepada: `arena/01a06274-masb-pms-v4` → **Save**.
 3. Vercel akan auto-deploy branch itu sebagai **Production** (target: `production`).
-   - JANGAN merge ke `main`. Branch `arena/01a05cd4-masb-pms-v4` ialah branch rasmi fasa ini.
+   - JANGAN merge ke `main`. Branch `arena/01a06274-masb-pms-v4` ialah branch rasmi fasa ini.
 
 ## Langkah 2 — Environment Variables (3 scopes)
 
@@ -34,7 +34,7 @@
 
 ## Langkah 3 — Redeploy
 
-1. Vercel → **Deployments** → pilih deployment branch `arena/01a05cd4-masb-pms-v4` → menu ⋯ → **Redeploy**.
+1. Vercel → **Deployments** → pilih deployment branch `arena/01a06274-masb-pms-v4` → menu ⋯ → **Redeploy**.
 2. Jika ditanya environment → pilih **Production**.
 3. Status yang dikehendaki: `Target: Production` · `State: READY` · commit `e8c70f3` (atau lebih baru).
 

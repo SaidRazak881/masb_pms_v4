@@ -1,16 +1,35 @@
 "use client";
 
+/**
+ * Halaman Keselamatan — Fasa 6.
+ *
+ * TIADA MFA/TOTP. Sistem hanya menggunakan e-mel + kata laluan.
+ *
+ * Fungsi:
+ *   1. Notis WAJIB tukar kata laluan apabila `must_change_password = true`
+ *      (cth. log masuk pertama dengan kata laluan lalai `masb.12345`, atau
+ *      selepas Super Admin set semula kata laluan).
+ *   2. Borang tukar kata laluan sendiri.
+ *   3. Aliran set semula kata laluan dari pautan e-mel (`?reset=1`) —
+ *      Supabase menghantar pengguna ke sini dengan token pemulihan dalam URL.
+ *   4. Paparan maklumat akaun (role, status, tarikh tukar kata laluan).
+ *
+ * Selepas kata laluan berjaya ditukar, RPC `mark_password_changed()`
+ * memadamkan bendera wajib-tukar di pangkalan data.
+ */
+
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  CheckCircle2,
+  ArrowRight,
+  BadgeCheck,
+  Info,
   KeyRound,
   Loader2,
   Lock,
-  Shield,
   ShieldCheck,
-  ShieldOff,
-  Smartphone,
+  UserCog,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -20,714 +39,441 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import {
-  fetchRole,
-  findVerifiedTotpFactor,
-  isPrivilegedRole,
-  verifyTotpCode,
-} from "@/lib/mfa";
+  DEFAULT_PASSWORD,
+  MIN_PASSWORD_LENGTH,
+  fetchAccountSnapshot,
+  roleLabel,
+  stripErrorCode,
+  translateAuthError,
+  validateNewPassword,
+  type AccountSnapshot,
+} from "@/lib/auth";
 
 const HAS_SUPABASE = Boolean(
   process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
 );
 
-type SecurityState = {
-  status: "loading" | "ready";
-  demo: boolean;
-  role: string | null;
-  currentLevel: string | null;
-  verifiedFactor: { id: string; createdAt?: string } | null;
-};
-
-/** Data URL SVG untuk <img> — GoTrue mungkin pulangkan SVG mentah. */
-function qrSrc(qrCode: string): string {
-  if (qrCode.startsWith("data:")) return qrCode;
-  return `data:image/svg+xml;utf-8,${encodeURIComponent(qrCode)}`;
-}
+type Message = { kind: "ok" | "err"; text: string } | null;
 
 export default function SecurityPage() {
   const router = useRouter();
-  const [state, setState] = useState<SecurityState>({
-    status: "loading",
-    demo: false,
-    role: null,
-    currentLevel: null,
-    verifiedFactor: null,
-  });
 
-  const [requiredBanner, setRequiredBanner] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [snapshot, setSnapshot] = useState<AccountSnapshot | null>(null);
 
-  // Tukar kata laluan
+  // `?required=1` → notis wajib tukar; `?next=` → destinasi selepas tukar.
+  const [requiredMode, setRequiredMode] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
+  const [nextPath, setNextPath] = useState("/dashboard");
+
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [pwOtp, setPwOtp] = useState("");
-  const [pwBusy, setPwBusy] = useState(false);
-  const [pwMessage, setPwMessage] = useState<{
-    kind: "ok" | "err";
-    text: string;
-  } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<Message>(null);
 
-  // Persediaan MFA
-  const [enrolling, setEnrolling] = useState(false);
-  const [enrollFactorId, setEnrollFactorId] = useState<string | null>(null);
-  const [qr, setQr] = useState<string | null>(null);
-  const [secret, setSecret] = useState<string | null>(null);
-  const [enrollCode, setEnrollCode] = useState("");
-  const [mfaBusy, setMfaBusy] = useState(false);
-  const [mfaMessage, setMfaMessage] = useState<{
-    kind: "ok" | "err";
-    text: string;
-  } | null>(null);
-
-  // Sahkan log masuk (aal1 → aal2) & lumpuhkan MFA
-  const [confirmOtp, setConfirmOtp] = useState("");
-  const [actionBusy, setActionBusy] = useState(false);
-
-  const loadState = useCallback(async () => {
+  // -----------------------------------------------------------------------
+  // Muat status akaun
+  // -----------------------------------------------------------------------
+  const load = useCallback(async () => {
     if (!HAS_SUPABASE) {
-      setState({
-        status: "ready",
-        demo: true,
-        role: null,
-        currentLevel: null,
-        verifiedFactor: null,
+      setSnapshot({
+        id: "demo-user",
+        email: "demo@mimos.my",
+        fullName: "Pengguna Demo",
+        role: "admin",
+        accountStatus: "active",
+        mustChangePassword: true,
+        isDemo: true,
       });
+      setRequiredMode(true);
+      setLoading(false);
       return;
     }
+
     try {
       const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
       const {
         data: { session },
       } = await supabase.auth.getSession();
+
       if (!session?.user) {
         router.replace("/login");
         return;
       }
-      const role = await fetchRole(supabase, session.user.id);
-      const verifiedFactor = await findVerifiedTotpFactor(supabase);
-      const { data: aal } =
-        await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      setState({
-        status: "ready",
-        demo: false,
-        role,
-        currentLevel: aal?.currentLevel ?? null,
-        verifiedFactor,
-      });
-    } catch (err) {
-      setState((s) => ({ ...s, status: "ready" }));
-      setMfaMessage({
-        kind: "err",
-        text:
-          err instanceof Error
-            ? err.message
-            : "Gagal memuatkan status keselamatan.",
-      });
+
+      const snap = await fetchAccountSnapshot(
+        supabase,
+        session.user.id,
+        session.user.email ?? "",
+      );
+      setSnapshot({ ...snap, isDemo: false });
+      setRequiredMode(snap.mustChangePassword);
+    } catch {
+      // Jika RPC belum dipasang, jangan kunci pengguna — benarkan tukar
+      // kata laluan tanpa bendera wajib.
+      setRequiredMode(false);
+    } finally {
+      setLoading(false);
     }
   }, [router]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      setRequiredBanner(
-        new URLSearchParams(window.location.search).get("required") === "1",
-      );
-    }
-    void loadState();
-  }, [loadState]);
+    if (typeof window === "undefined") return;
+    const q = new URLSearchParams(window.location.search);
+    setRequiredMode(q.get("required") === "1");
+    setResetMode(q.get("reset") === "1");
+    const next = q.get("next");
+    if (next && next.startsWith("/") && !next.startsWith("//")) setNextPath(next);
+    void load();
+  }, [load]);
 
-  const privileged = isPrivilegedRole(state.role);
-
-  // ---------- Tukar kata laluan ----------
+  // -----------------------------------------------------------------------
+  // Tukar kata laluan
+  // -----------------------------------------------------------------------
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
-    setPwMessage(null);
-    if (newPassword.length < 8) {
-      setPwMessage({
-        kind: "err",
-        text: "Kata laluan baharu mesti sekurang-kurangnya 8 aksara.",
-      });
+    setMessage(null);
+
+    // Tangkap keadaan semasa SEBELUM sebarang kemas kini state — digunakan
+    // untuk memutuskan sama ada pengguna perlu dialihkan selepas berjaya.
+    const wasForced = requiredMode || Boolean(snapshot?.mustChangePassword);
+    const wasReset = resetMode;
+
+    // Semak kata laluan semasa (kecuali dalam aliran set semula e-mel,
+    // di mana Supabase sudah mengesahkan identiti melalui token).
+    const check = validateNewPassword(newPassword, confirmPassword);
+    if (!check.ok) {
+      setMessage({ kind: "err", text: check.message });
       return;
     }
-    if (newPassword !== confirmPassword) {
-      setPwMessage({
-        kind: "err",
-        text: "Kata laluan baharu dan pengesahan tidak sepadan.",
-      });
+
+    if (snapshot?.isDemo) {
+      setBusy(true);
+      setTimeout(() => {
+        setBusy(false);
+        setMessage({
+          kind: "ok",
+          text: "Mod Demo — kata laluan tidak benar-benar ditukar.",
+        });
+      }, 400);
       return;
     }
-    setPwBusy(true);
+
+    setBusy(true);
     try {
       const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
 
-      // Akaun ber-MFA: minta kod TOTP dahulu (naikkan sesi ke aal2).
-      if (state.verifiedFactor) {
-        if (!pwOtp.trim()) {
-          setPwMessage({
+      // Sahkan kata laluan semasa dengan log masuk semula — ini mengelakkan
+      // sesi yang ditinggalkan terbuka menukar kata laluan tanpa bukti.
+      if (!resetMode && snapshot?.email) {
+        if (!currentPassword) {
+          setMessage({
             kind: "err",
-            text: "Akaun anda menggunakan MFA — masukkan kod authenticator untuk mengesahkan.",
+            text: "Masukkan kata laluan semasa untuk pengesahan.",
           });
+          setBusy(false);
           return;
         }
-        const { error: verifyError } = await verifyTotpCode(supabase, pwOtp);
-        if (verifyError) throw new Error(verifyError);
-      }
-
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-      if (error) throw error;
-
-      setPwMessage({
-        kind: "ok",
-        text: "Kata laluan berjaya ditukar. Gunakan kata laluan baharu pada log masuk seterusnya.",
-      });
-      setNewPassword("");
-      setConfirmPassword("");
-      setPwOtp("");
-    } catch (err) {
-      setPwMessage({
-        kind: "err",
-        text:
-          err instanceof Error
-            ? err.message
-            : "Gagal menukar kata laluan. Cuba lagi.",
-      });
-    } finally {
-      setPwBusy(false);
-    }
-  }
-
-  // ---------- Enrol MFA ----------
-  async function startEnroll() {
-    setMfaMessage(null);
-    setMfaBusy(true);
-    try {
-      const { createClient } = await import("@/lib/supabase/client");
-      const supabase = createClient();
-
-      // Bersihkan faktor terdahulu yang tidak disahkan (jika ada) —
-      // usaha terbaik sahaja; ralat diabaikan.
-      const { data: factors } = await supabase.auth.mfa.listFactors();
-      for (const f of factors?.all ?? []) {
-        if (f.status === "unverified") {
-          try {
-            await supabase.auth.mfa.unenroll({ factorId: f.id });
-          } catch {
-            // abaikan — mungkin perlukan aal2
-          }
+        const { error: verifyError } = await supabase.auth.signInWithPassword({
+          email: snapshot.email,
+          password: currentPassword,
+        });
+        if (verifyError) {
+          setMessage({
+            kind: "err",
+            text: translateAuthError(
+              verifyError.message,
+              "Kata laluan semasa tidak sah.",
+            ),
+          });
+          setBusy(false);
+          return;
         }
       }
 
-      const { data, error } = await supabase.auth.mfa.enroll({
-        factorType: "totp",
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
       });
-      if (error) throw error;
-      setEnrolling(true);
-      setEnrollFactorId(data.id);
-      setQr(qrSrc(data.totp.qr_code));
-      setSecret(data.totp.secret);
-      setEnrollCode("");
-    } catch (err) {
-      setMfaMessage({
-        kind: "err",
-        text:
-          err instanceof Error
-            ? err.message
-            : "Gagal memulakan persediaan MFA.",
-      });
-    } finally {
-      setMfaBusy(false);
-    }
-  }
+      if (updateError) throw updateError;
 
-  async function confirmEnroll(e: React.FormEvent) {
-    e.preventDefault();
-    setMfaMessage(null);
-    setMfaBusy(true);
-    try {
-      const { createClient } = await import("@/lib/supabase/client");
-      const supabase = createClient();
-      if (!enrollFactorId) throw new Error("Sesi persediaan tidak sah.");
-      const { data: challenge, error: challengeError } =
-        await supabase.auth.mfa.challenge({ factorId: enrollFactorId });
-      if (challengeError) throw challengeError;
-      const { error: verifyError } = await supabase.auth.mfa.verify({
-        factorId: enrollFactorId,
-        challengeId: challenge.id,
-        code: enrollCode.trim(),
-      });
-      if (verifyError) throw verifyError;
-
-      setMfaMessage({
-        kind: "ok",
-        text: "MFA berjaya diaktifkan. Log masuk seterusnya akan meminta kod 6 digit.",
-      });
-      setEnrolling(false);
-      setQr(null);
-      setSecret(null);
-      setEnrollFactorId(null);
-      setEnrollCode("");
-      await loadState();
-    } catch (err) {
-      setMfaMessage({
-        kind: "err",
-        text:
-          err instanceof Error
-            ? err.message
-            : "Kod tidak sah. Cuba lagi.",
-      });
-    } finally {
-      setMfaBusy(false);
-    }
-  }
-
-  async function cancelEnroll() {
-    setMfaBusy(true);
-    try {
-      const { createClient } = await import("@/lib/supabase/client");
-      const supabase = createClient();
-      if (enrollFactorId) {
-        await supabase.auth.mfa.unenroll({ factorId: enrollFactorId });
+      // Padam bendera wajib-tukar di pangkalan data.
+      try {
+        await supabase.rpc("mark_password_changed");
+      } catch {
+        // Jika RPC belum dipasang, bendera kekal — pengguna akan diminta lagi.
       }
-    } catch {
-      // faktor belum disahkan — abaikan ralat pembersihan
-    } finally {
-      setEnrolling(false);
-      setQr(null);
-      setSecret(null);
-      setEnrollFactorId(null);
-      setEnrollCode("");
-      setMfaBusy(false);
-      setMfaMessage(null);
-    }
-  }
 
-  // ---------- Sahkan log masuk (aal1→aal2) / lumpuhkan MFA ----------
-  async function confirmSessionOtp() {
-    setMfaMessage(null);
-    setActionBusy(true);
-    try {
-      const { createClient } = await import("@/lib/supabase/client");
-      const supabase = createClient();
-      const { error } = await verifyTotpCode(supabase, confirmOtp);
-      if (error) throw new Error(error);
-      setConfirmOtp("");
-      setMfaMessage({
+      setSnapshot((s) => (s ? { ...s, mustChangePassword: false } : s));
+      setRequiredMode(false);
+      setResetMode(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setMessage({
         kind: "ok",
-        text: "Pengesahan berjaya — akses penuh diberikan.",
+        text: resetMode
+          ? "Kata laluan berjaya ditetapkan. Anda boleh teruskan."
+          : "Kata laluan berjaya ditukar. Gunakan kata laluan baharu pada log masuk seterusnya.",
       });
-      await loadState();
-    } catch (err) {
-      setMfaMessage({
-        kind: "err",
-        text:
-          err instanceof Error ? err.message : "Kod tidak sah. Cuba lagi.",
-      });
-    } finally {
-      setActionBusy(false);
-    }
-  }
 
-  async function disableMfa() {
-    setMfaMessage(null);
-    setActionBusy(true);
-    try {
-      const { createClient } = await import("@/lib/supabase/client");
-      const supabase = createClient();
-      if (!state.verifiedFactor) throw new Error("Tiada faktor MFA aktif.");
-      if (!confirmOtp.trim()) {
-        setMfaMessage({
-          kind: "err",
-          text: "Masukkan kod authenticator semasa untuk melumpuhkan MFA.",
-        });
-        return;
+      // Aliran set semula / wajib tukar: bawa pengguna ke destinasi asal.
+      if (wasReset || wasForced) {
+        setTimeout(() => {
+          router.push(nextPath);
+          router.refresh();
+        }, 1200);
+      } else {
+        router.refresh();
       }
-      const { error: verifyError } = await verifyTotpCode(
-        supabase,
-        confirmOtp,
-      );
-      if (verifyError) throw new Error(verifyError);
-      const { error: unenrollError } = await supabase.auth.mfa.unenroll({
-        factorId: state.verifiedFactor.id,
-      });
-      if (unenrollError) throw unenrollError;
-      setConfirmOtp("");
-      setMfaMessage({
-        kind: "ok",
-        text: "MFA dilumpuhkan. Aktifkan semula bila-bila masa dari halaman ini.",
-      });
-      await loadState();
     } catch (err) {
-      setMfaMessage({
+      const raw = err instanceof Error ? err.message : "";
+      setMessage({
         kind: "err",
-        text:
-          err instanceof Error
-            ? err.message
-            : "Gagal melumpuhkan MFA. Cuba lagi.",
+        text: stripErrorCode(translateAuthError(raw, "Gagal menukar kata laluan.")),
       });
     } finally {
-      setActionBusy(false);
+      setBusy(false);
     }
   }
 
-  // ---------- Paparan ----------
-  if (state.status === "loading") {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center py-24 text-muted-foreground">
-        <Loader2 className="h-6 w-6 animate-spin" />
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
+  const mustChange = requiredMode || Boolean(snapshot?.mustChangePassword);
+
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-4 md:p-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">Keselamatan Akaun</h1>
+    <div className="mx-auto max-w-3xl space-y-5">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Keselamatan</h1>
         <p className="text-sm text-muted-foreground">
-          Tukar kata laluan dan urus pengesahan 2-langkah (MFA).
+          Kata laluan akaun anda. Sistem ini menggunakan e-mel dan kata laluan
+          sahaja.
         </p>
       </div>
 
-      {requiredBanner && privileged && !state.verifiedFactor && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <strong>MFA wajib untuk peranan {state.role}.</strong> Sila siapkan
-          persediaan pengesahan 2-langkah di bawah sebelum meneruskan
-          penggunaan sistem.
-        </div>
+      {/* Notis wajib tukar kata laluan */}
+      {mustChange && (
+        <Card className="border-amber-300 bg-amber-50/60">
+          <CardHeader className="space-y-2">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-200 text-amber-800">
+                <KeyRound className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <CardTitle className="text-base text-amber-900">
+                  Anda wajib menukar kata laluan
+                </CardTitle>
+                <CardDescription className="text-amber-800">
+                  Akaun anda masih menggunakan kata laluan lalai{" "}
+                  <code className="rounded bg-white/70 px-1 font-mono font-semibold">
+                    {DEFAULT_PASSWORD}
+                  </code>{" "}
+                  atau kata laluan anda telah diset semula oleh Super Admin.
+                  Tukar kata laluan untuk meneruskan penggunaan sistem.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
       )}
 
-      {mfaMessage && (
-        <div
-          className={`rounded-md border px-3 py-2 text-sm ${
-            mfaMessage.kind === "ok"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-rose-200 bg-rose-50 text-rose-800"
-          }`}
-        >
-          {mfaMessage.text}
-        </div>
+      {resetMode && !mustChange && (
+        <Card className="border-sky-300 bg-sky-50/60">
+          <CardHeader>
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sky-200 text-sky-800">
+                <KeyRound className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <CardTitle className="text-base text-sky-900">
+                  Tetapkan kata laluan baharu
+                </CardTitle>
+                <CardDescription className="text-sky-800">
+                  Anda tiba dari pautan pemulihan kata laluan. Masukkan kata
+                  laluan baharu di bawah.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
       )}
 
-      {/* ---------- MFA ---------- */}
+      {/* Borang tukar kata laluan */}
       <Card>
-        <CardHeader>
+        <CardHeader className="space-y-1">
           <CardTitle className="flex items-center gap-2 text-base">
-            <Shield className="h-5 w-5 text-primary" />
-            Pengesahan 2-Langkah (MFA)
-          </CardTitle>
-          <CardDescription>
-            {privileged
-              ? "Wajib untuk peranan admin & head_governance — setiap log masuk memerlukan kod 6 digit dari aplikasi authenticator."
-              : "Dikhaskan untuk peranan admin & head_governance."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {state.demo && (
-            <p className="text-sm text-muted-foreground">
-              Mod Demo — sambungkan Supabase untuk fungsi keselamatan sebenar.
-            </p>
-          )}
-
-          {!state.demo && privileged && !state.verifiedFactor && !enrolling && (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Tiada MFA aktif untuk akaun ini. Sediakan sekarang untuk
-                melindungi akaun anda.
-              </p>
-              <Button onClick={startEnroll} disabled={mfaBusy}>
-                {mfaBusy && <Loader2 className="h-4 w-4 animate-spin" />}
-                <Smartphone className="h-4 w-4" />
-                Sediakan MFA
-              </Button>
-            </div>
-          )}
-
-          {!state.demo && privileged && enrolling && (
-            <div className="space-y-4">
-              <div className="flex flex-col items-start gap-4 sm:flex-row">
-                {qr && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={qr}
-                    alt="Kod QR MFA"
-                    className="h-44 w-44 rounded-lg border bg-white p-2"
-                  />
-                )}
-                <div className="space-y-2 text-sm">
-                  <p className="font-medium">
-                    Langkah 1 — Imbas kod QR
-                  </p>
-                  <p className="text-muted-foreground">
-                    Gunakan aplikasi authenticator (cth. Google Authenticator,
-                    Microsoft Authenticator) untuk mengimbas kod QR di
-                    sebelah kiri.
-                  </p>
-                  <p className="font-medium">Langkah 2 — Masukkan kod 6 digit</p>
-                  <p className="text-muted-foreground">
-                    Masukkan kod yang dipaparkan oleh aplikasi untuk
-                    mengesahkan persediaan.
-                  </p>
-                </div>
-              </div>
-
-              {secret && (
-                <div className="space-y-1 text-sm">
-                  <Label>Kunci rahsia (guna jika tidak dapat imbas QR)</Label>
-                  <Input
-                    readOnly
-                    value={secret}
-                    className="font-mono"
-                    onFocus={(e) => e.currentTarget.select()}
-                  />
-                </div>
-              )}
-
-              <form
-                onSubmit={confirmEnroll}
-                className="flex flex-col gap-3 sm:flex-row sm:items-end"
-              >
-                <div className="space-y-1">
-                  <Label htmlFor="enrollCode">Kod pengesahan</Label>
-                  <Input
-                    id="enrollCode"
-                    className="w-36 text-center text-lg tracking-[0.3em]"
-                    placeholder="••••••"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={enrollCode}
-                    onChange={(e) =>
-                      setEnrollCode(
-                        e.target.value.replace(/\D/g, "").slice(0, 6),
-                      )
-                    }
-                    required
-                  />
-                </div>
-                <Button type="submit" disabled={mfaBusy}>
-                  {mfaBusy && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Aktifkan MFA
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={cancelEnroll}
-                  disabled={mfaBusy}
-                >
-                  Batal
-                </Button>
-              </form>
-            </div>
-          )}
-
-          {!state.demo && privileged && state.verifiedFactor && (
-            <div className="space-y-4">
-              <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
-                <div>
-                  <p className="font-medium">MFA aktif</p>
-                  <p className="text-emerald-700">
-                    Akaun anda dilindungi pengesahan 2-langkah
-                    {state.verifiedFactor.createdAt
-                      ? ` sejak ${new Date(
-                          state.verifiedFactor.createdAt,
-                        ).toLocaleDateString("ms-MY")}`
-                      : ""}
-                    . Setiap log masuk memerlukan kod 6 digit.
-                  </p>
-                </div>
-              </div>
-
-              {state.currentLevel !== "aal2" && (
-                <div className="space-y-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
-                  <p className="text-sm text-amber-900">
-                    Sesi semasa belum disahkan MFA. Masukkan kod authenticator
-                    untuk melengkapkan pengesahan dan meneruskan.
-                  </p>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <Input
-                      className="w-36 text-center text-lg tracking-[0.3em]"
-                      placeholder="••••••"
-                      inputMode="numeric"
-                      maxLength={6}
-                      value={confirmOtp}
-                      onChange={(e) =>
-                        setConfirmOtp(
-                          e.target.value.replace(/\D/g, "").slice(0, 6),
-                        )
-                      }
-                    />
-                    <Button
-                      onClick={confirmSessionOtp}
-                      disabled={actionBusy || !confirmOtp}
-                    >
-                      {actionBusy && (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      )}
-                      <ShieldCheck className="h-4 w-4" />
-                      Sahkan & Teruskan
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {state.currentLevel === "aal2" && (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Untuk melumpuhkan MFA, masukkan kod authenticator semasa
-                    sebagai pengesahan.
-                  </p>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <Input
-                      className="w-36 text-center text-lg tracking-[0.3em]"
-                      placeholder="••••••"
-                      inputMode="numeric"
-                      maxLength={6}
-                      value={confirmOtp}
-                      onChange={(e) =>
-                        setConfirmOtp(
-                          e.target.value.replace(/\D/g, "").slice(0, 6),
-                        )
-                      }
-                    />
-                    <Button
-                      variant="destructive"
-                      onClick={disableMfa}
-                      disabled={actionBusy || !confirmOtp}
-                    >
-                      {actionBusy && (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      )}
-                      <ShieldOff className="h-4 w-4" />
-                      Lumpuhkan MFA
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Amaran: jika anda hilang akses ke aplikasi authenticator
-                    tanpa kod sandaran, anda mungkin terkunci — hubungi
-                    pentadbir sistem untuk bantuan.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {!state.demo && privileged && state.verifiedFactor && (
-            <Button variant="outline" size="sm" onClick={() => router.push("/dashboard")}>
-              Selesai — Ke Dashboard
-            </Button>
-          )}
-
-          {!state.demo && !privileged && (
-            <p className="text-sm text-muted-foreground">
-              Akaun anda tidak memerlukan MFA. Hubungi pentadbir jika anda
-              merasakan peranan anda patut dilindungi pengesahan 2-langkah.
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ---------- Tukar kata laluan ---------- */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <KeyRound className="h-5 w-5 text-primary" />
+            <Lock className="h-4 w-4 text-muted-foreground" />
             Tukar Kata Laluan
           </CardTitle>
           <CardDescription>
-            Kata laluan minimum 8 aksara. Disyorkan: gabungan huruf besar,
-            huruf kecil, nombor dan simbol.
+            Sekurang-kurangnya {MIN_PASSWORD_LENGTH} aksara, mengandungi huruf
+            dan nombor, dan bukan kata laluan lalai sistem.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          {state.demo ? (
-            <p className="text-sm text-muted-foreground">
-              Mod Demo — sambungkan Supabase untuk menukar kata laluan.
-            </p>
-          ) : (
-            <form onSubmit={handleChangePassword} className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="newPassword">Kata laluan baharu</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="newPassword"
-                      type="password"
-                      className="pl-9"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      minLength={8}
-                      required
-                      autoComplete="new-password"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Sahkan kata laluan</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      className="pl-9"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      minLength={8}
-                      required
-                      autoComplete="new-password"
-                    />
-                  </div>
-                </div>
+
+        <form onSubmit={handleChangePassword}>
+          <CardContent className="space-y-4">
+            {!resetMode && (
+              <div className="space-y-2">
+                <Label htmlFor="currentPassword">Kata Laluan Semasa</Label>
+                <Input
+                  id="currentPassword"
+                  type="password"
+                  autoComplete="current-password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required={!snapshot?.isDemo}
+                  placeholder={snapshot?.isDemo ? "Mod demo — tidak diperlukan" : ""}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Diperlukan untuk mengesahkan identiti anda sebelum kata laluan
+                  ditukar.
+                </p>
               </div>
+            )}
 
-              {state.verifiedFactor && (
-                <div className="space-y-1">
-                  <Label htmlFor="pwOtp">
-                    Kod authenticator (pengesahan MFA)
-                  </Label>
-                  <Input
-                    id="pwOtp"
-                    className="w-36 text-center text-lg tracking-[0.3em]"
-                    placeholder="••••••"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={pwOtp}
-                    onChange={(e) =>
-                      setPwOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
-                    }
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Diperlukan kerana akaun anda menggunakan MFA.
-                  </p>
-                </div>
-              )}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">Kata Laluan Baharu</Label>
+                <Input
+                  id="newPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={MIN_PASSWORD_LENGTH}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Sahkan Kata Laluan Baharu</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={MIN_PASSWORD_LENGTH}
+                />
+              </div>
+            </div>
 
-              {pwMessage && (
-                <div
-                  className={`rounded-md border px-3 py-2 text-sm ${
-                    pwMessage.kind === "ok"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                      : "border-rose-200 bg-rose-50 text-rose-800"
-                  }`}
-                >
-                  {pwMessage.text}
-                </div>
-              )}
+            {message && (
+              <div
+                className={
+                  message.kind === "ok"
+                    ? "rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+                    : "rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800"
+                }
+              >
+                {message.text}
+              </div>
+            )}
+          </CardContent>
 
-              <Button type="submit" disabled={pwBusy}>
-                {pwBusy && <Loader2 className="h-4 w-4 animate-spin" />}
-                Tukar Kata Laluan
-              </Button>
-            </form>
+          <CardFooter className="flex flex-col items-stretch gap-3">
+            <Button type="submit" disabled={busy}>
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              {mustChange ? "Tukar Kata Laluan & Teruskan" : "Tukar Kata Laluan"}
+            </Button>
+
+            {mustChange && (
+              <p className="text-xs text-muted-foreground">
+                Anda tidak boleh menggunakan modul lain sehingga kata laluan
+                ditukar.
+              </p>
+            )}
+          </CardFooter>
+        </form>
+      </Card>
+
+      {/* Maklumat akaun */}
+      <Card>
+        <CardHeader className="space-y-1">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <UserCog className="h-4 w-4 text-muted-foreground" />
+            Maklumat Akaun
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2.5 text-sm">
+          <Row label="Nama" value={snapshot?.fullName ?? "—"} />
+          <Row label="E-mel" value={snapshot?.email ?? "—"} />
+          <Row label="Peranan" value={roleLabel(snapshot?.role)} />
+          <Row
+            label="Status akaun"
+            value={
+              snapshot?.accountStatus === "active"
+                ? "Aktif"
+                : snapshot?.accountStatus === "pending"
+                  ? "Menunggu Kelulusan"
+                  : snapshot?.accountStatus === "blocked"
+                    ? "Disekat"
+                    : "—"
+            }
+          />
+          {snapshot?.isDemo && (
+            <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              Mod Demo — tiada sambungan Supabase, jadi kata laluan tidak
+              benar-benar ditukar.
+            </div>
           )}
         </CardContent>
+        <CardFooter className="flex-col items-stretch gap-2 border-t pt-4">
+          <div className="flex items-start gap-2 text-xs text-muted-foreground">
+            <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <p>
+              Terlupa kata laluan anda? Minta{" "}
+              <strong>Super Admin</strong> set semula ke kata laluan lalai
+              melalui dashboard pengurusan pengguna, atau guna{" "}
+              <Link href="/forgot-password" className="text-primary hover:underline">
+                pautan set semula melalui e-mel
+              </Link>
+              .
+            </p>
+          </div>
+          {mustChange && (
+            <Link href={nextPath} className="ml-auto">
+              <Button variant="ghost" size="sm">
+                Langkau buat masa ini
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            </Link>
+          )}
+        </CardFooter>
       </Card>
+
+      {/* Pengesahan status */}
+      {!mustChange && !snapshot?.isDemo && (
+        <div className="flex items-center gap-2 text-xs text-emerald-700">
+          <BadgeCheck className="h-4 w-4" />
+          Kata laluan anda telah dikemas kini. Tiada tindakan diperlukan.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-dashed pb-2 last:border-0">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="text-right font-medium">{value}</span>
     </div>
   );
 }

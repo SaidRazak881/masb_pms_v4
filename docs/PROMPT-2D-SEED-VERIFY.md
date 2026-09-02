@@ -73,7 +73,7 @@
 >    selain daripada apa yang dinyatakan.
 >
 > **Sumber rasmi (MESTI muat turun SEMULA dari GitHub, branch
-> `arena/01a05cd4-masb-pms-v4`, komit terkini — jangan guna cache):**
+> `arena/01a06274-masb-pms-v4`, komit terkini — jangan guna cache):**
 >
 > 1. `lib/supabase/schema-master.sql`
 > 2. `lib/supabase/schema-import-staging.sql`
