@@ -125,8 +125,14 @@ export default async function DashboardLayout({
   }
 
   // Kata laluan lalai masih dipakai → wajib tukar dahulu.
+  // `next=` dibawa bersama supaya selepas menukar kata laluan pengguna
+  // dikembalikan ke halaman yang beliau tuju, bukan sentiasa /dashboard.
   if (snapshot.mustChangePassword && !isExemptPage) {
-    redirect("/security?required=1");
+    const next =
+      pathname && pathname.startsWith("/") && !pathname.startsWith("//")
+        ? pathname
+        : "/dashboard";
+    redirect(`/security?required=1&next=${encodeURIComponent(next)}`);
   }
 
   return (

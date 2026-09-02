@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-02 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: 535fb13 Add files via upload · arena/01a06274-masb-pms-v4
+> Git: 806bf95 Fasa 6: pengesahan e-mel+kata laluan & pengurusan pengguna Super Admin · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 
@@ -189,6 +189,7 @@
 - `ACTION-4A-VERCEL-SETUP.md`
 - `ACTION-4C-MANUAL-UI.md`
 - `ACTION-4E-RETEST-UI.md`
+- `ACTION-6-UAT-AUTH-USERS.md`
 - `CODEBASE-MAP.md`
 - `DEPLOY-VERCEL.md`
 - `EVALUASI-ALAT-AI-TPMS.md`
@@ -208,6 +209,7 @@
 - `PROMPT-4G-RETEST-IMPORT-NAV.md`
 - `PROMPT-4H-ADD-CATEGORIES.md`
 - `PROMPT-5-RESET-PASSWORDS.md`
+- `PROMPT-6-INSTALL-USER-MANAGEMENT.md`
 - `PROMPT-TEMPLATE-FASA.md`
 - `SETUP-SUPABASE.md`
 

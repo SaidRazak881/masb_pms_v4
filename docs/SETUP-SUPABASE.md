@@ -277,3 +277,34 @@ Sistem menggunakan **e-mel + kata laluan sahaja** — MFA/TOTP telah dibuang.
   ```
   Jawapan yang betul: `avatar_url, department, designation, full_name, phone,
   updated_at` — **tiada** `role` atau `account_status`.
+
+### 8.1 Audit keselamatan kendiri Fasa 6 (dilaksanakan di Arena)
+
+Perkara yang telah **disemak dalam kod** dan keputusannya:
+
+| # | Perkara disemak | Keputusan |
+|---|-----------------|-----------|
+| 1 | Setiap RPC `admin_*` (8 fungsi) memanggil `assert_can_manage_users()` | ✅ 8/8 — kuasa disemak di DB, bukan di UI |
+| 2 | Column-level GRANT menghalang pengguna menaikkan `role` / `account_status` sendiri | ✅ `REVOKE UPDATE` penuh, kemudian `GRANT UPDATE` hanya 6 kolum selamat |
+| 3 | `app_settings` (tempat `default_password`) tidak boleh ditulis klien | ✅ `REVOKE INSERT, UPDATE, DELETE` dari `authenticated` & `anon` |
+| 4 | Open redirect melalui `?redirect=` / `?next=` | ✅ Kedua-duanya ditolak jika tidak bermula `/` atau bermula `//` |
+| 5 | Tukar kata laluan tanpa bukti identiti | ✅ `/security` log masuk semula dengan kata laluan semasa sebelum `updateUser` (kecuali aliran token e-mel `?reset=1`) |
+| 6 | Server Actions boleh dipanggil melangkau UI | ✅ Setiap action memanggil `can_manage_users()`; DB tetap menolak bukan Super Admin |
+| 7 | Pendaftaran sendiri memilih role sendiri | ✅ Tidak mungkin — trigger `on_auth_user_created` paksa `viewer` + `pending`; sesi dibuang serta-merta selepas daftar |
+| 8 | Pengesahan di middleware Edge sahaja | ✅ Tidak — diulang sisi pelayan di `app/(dashboard)/layout.tsx` + lapis klien `AccountGuard` |
+| 9 | `super_admin` boleh diberi melalui UI | ✅ Ditolak — tidak tersenarai dalam `ASSIGNABLE_ROLES`; DB juga `RAISE 'ROLE_NOT_ALLOWED'` |
+
+**Risiko baki yang diterima secara sedar (fail-open di lapis aplikasi):**
+
+- Jika RPC `my_account_status` / `my_password_change_required` **belum
+  dipasang** atau mengembalikan `null`, aplikasi menganggap akaun `active`
+  dan tidak memaksa tukar kata laluan. Ini sengaja supaya sistem tidak
+  terkunci semasa pemasangan separa. Penguat kuasa sebenar tetap di DB:
+  pengguna `pending`/`blocked` ditolak oleh `can_manage_users()`, RLS dan
+  RPC perniagaan. **Tindakan wajib:** pasang `user-management.sql` sepenuhnya
+  dan sahkan C1–C14 dalam `docs/PROMPT-6-INSTALL-USER-MANAGEMENT.md`.
+- Mod demo (tiada env Supabase) memintas semua pengesahan dan mengembalikan
+  "berjaya" untuk tindakan pengurusan. **Jangan** deploy Production tanpa
+  `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+- Selepas Bahagian 8c, semua 19 pengguna berkongsi `masb.12345` sehingga
+  masing-masing menukarnya. Edarkan arahan tukar kata laluan serta-merta.

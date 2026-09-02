@@ -23,13 +23,15 @@
 | # | Ujian | Jangkaan | Status |
 |---|-------|----------|--------|
 | A1 | Buka `/login` | Borang e-mel + kata laluan. **TIADA** medan "Kod Authenticator". Ada nota kata laluan lalai `masb.12345`, butang **Daftar Akaun Baharu** dan pautan **Lupa kata laluan?** | ☐ |
-| A2 | Log masuk `saidrazak881@gmail.com` / `masb.12345` | Berjaya, tetapi dialih ke `/security?required=1` dengan kad ambar **"Anda wajib menukar kata laluan"** | ☐ |
-| A3 | Cuba buka `/dashboard` secara terus (URL) | Dihalang — kekal/dialih ke `/security?required=1` | ☐ |
+| A2 | Log masuk `saidrazak881@gmail.com` / `masb.12345` | Berjaya, tetapi dialih ke `/security?required=1&next=%2Fdashboard` dengan kad ambar **"Anda wajib menukar kata laluan"** | ☐ |
+| A3 | Cuba buka `/dashboard` secara terus (URL) | Dihalang — dialih ke `/security?required=1&next=%2Fdashboard` | ☐ |
+| A3b | Selepas log keluar, buka terus `https://masb-pms-v4.vercel.app/reports` → log masuk | URL menjadi `/security?required=1&next=%2Freports`; selepas kata laluan ditukar, pengguna dihantar ke **`/reports`** (bukan `/dashboard`) | ☐ |
+| A3c | Semasa masih wajib tukar kata laluan, cuba buka `/admin/users` | **Dibenarkan** (halaman `/admin` & `/security` dikecualikan) supaya Super Admin boleh meluluskan pengguna walaupun kata laluan beliau masih lalai | ☐ |
 | A4 | Di `/security`, cuba kata laluan baharu `masb.12345` | Ditolak: "tidak boleh sama dengan kata laluan lalai sistem" | ☐ |
 | A5 | Cuba `abcdefg` (7 aksara) | Ditolak: sekurang-kurangnya 8 aksara | ☐ |
 | A6 | Cuba `abcdefghijkl` (tiada nombor) | Ditolak: mesti mengandungi nombor | ☐ |
 | A7 | Kata laluan baharu ≠ pengesahan | Ditolak: tidak sepadan | ☐ |
-| A8 | Masukkan **Kata Laluan Semasa** = `masb.12345`, kata laluan baharu sah (cth. `SayaBaru2026`) + pengesahan | Mesej hijau "Kata laluan berjaya ditukar", kemudian dialih ke destinasi asal | ☐ |
+| A8 | Masukkan **Kata Laluan Semasa** = `masb.12345`, kata laluan baharu sah (cth. `SayaBaru2026`) + pengesahan | Mesej hijau "Kata laluan berjaya ditukar", kemudian (~1.2 saat) dialih ke halaman dalam parameter `next=` | ☐ |
 | A9 | Selepas A8, buka `/dashboard` | Dashboard dibuka tanpa halangan | ☐ |
 | A10 | Log keluar → log masuk semula dengan `masb.12345` | **Ditolak** (kata laluan lama tidak sah lagi) | ☐ |
 | A11 | Log masuk dengan kata laluan baharu | Terus ke dashboard — **tiada** lagi tuntutan tukar kata laluan | ☐ |
