@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-03 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: a4e63e3 PROMPT-6G SELESAI (semua kriteria PASS) + betulkan pengesahan G1 yang rosak · arena/01a06274-masb-pms-v4
+> Git: 905a9f3 D1 Confirm email = OFF telah diset oleh pengguna (2026-09-04) · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 
@@ -197,6 +197,7 @@
 - `CODEBASE-MAP.md`
 - `DEPLOY-VERCEL.md`
 - `EVALUASI-ALAT-AI-TPMS.md`
+- `GAP-ANALYSIS-FUNGSI-BELUM-ADA.md`
 - `GPT-ASSISTANT-PROMPTS.md`
 - `PROMPT-2-RECONCILE-LIVE.md`
 - `PROMPT-2B-INSTALL-RPC.md`
