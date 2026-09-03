@@ -351,7 +351,7 @@ berpuluh-puluh polisi RLS.
 | `docs/SETUP-SUPABASE.md` | Pasang skema SQL mengikut urutan, cipta pengguna & peranan, storage, ujian RLS |
 | `docs/DEPLOY-VERCEL.md` | Sambung GitHub → Vercel, env variables, checklist UAT, troubleshooting |
 | `docs/GPT-ASSISTANT-PROMPTS.md` | Prompt siap-tampal untuk ChatGPT + format laporan wajib |
-| `docs/PROMPT-6-INSTALL-USER-MANAGEMENT.md` | **Fasa 6 (TERKINI)** — pasang `user-management.sql` di Supabase live, kemas kini Production Branch Vercel, verifikasi |
+| `docs/PROMPT-6-INSTALL-USER-MANAGEMENT.md` | **Fasa 6 — ✅ SELESAI & DISAHKAN DI PRODUCTION** (E1–E9 = 9/9, UAT A–K semua lulus). Pasang `user-management.sql` di Supabase live, kemas kini Production Branch Vercel, verifikasi |
 | `docs/PROMPT-6B-FIX-C13-HAS-ROLE.md` | **Blocker C13** — `has_role()` live tidak sedar `super_admin`; pasang `fix-rls-recursion.sql` + kriteria V1–V8 |
 | `docs/PROMPT-6C-AUDIT-LEGACY-TABLES.md` | **V3 dibetulkan** + audit READ-ONLY **3** jadual warisan (`profiles`, `programme_participants`, `user_roles`) yang tiada dalam repo — W1–W8 |
 | `docs/PROMPT-6D-AUTH-VERCEL-LEGACY.md` | **DIGANTIKAN SEBAHAGIAN** (D mustahil via alat → manual pengguna): Langkah D (Auth config) + Langkah E (Production Branch → `arena/01a06274-masb-pms-v4`) + X1–X5 read-only untuk menutup penemuan W5 (`private.has_role()` bukan ciptaan repo). **Tiada** kelulusan DROP/REVOKE |
@@ -360,7 +360,7 @@ berpuluh-puluh polisi RLS.
 | `lib/supabase/updated-at-triggers.sql` | **Fasa 6G — membetulkan kecacatan repo:** repo mencipta kolum `updated_at` pada 10 jadual rasmi tetapi **tidak pernah** mencipta trigger. Cipta `public.set_updated_at()`, alih 6 trigger pra-repo, tambah 6 trigger baharu → 12 jadual. Idempoten, tidak DROP apa-apa |
 | `docs/PROMPT-6G-UPDATED-AT-AND-REVOKE.md` | **HARD GATE (perlu kelulusan pengguna):** pasang `updated-at-triggers.sql` (G1–G3) + REVOKE privilej tulis 3 jadual warisan (H1–H3, SELECT dikekalkan) + laporan I1–I2 tentang `validate_programme_lock`. Mengandungi **pembetulan Arena**: `private.has_role()` TIDAK membolehkan escalation (WITH CHECK menolak INSERT) |
 | `docs/PROMPT-6H-E1-E9-PRECISE-CRITERIA.md` | **AKTIF:** E1–E9 dengan kriteria redirect yang TEPAT. `NextResponse.redirect` = 3xx, jadi klien yang **mengikuti** redirect melihat 200 + kandungan `/login` — itu **LULUS**, bukan gagal. Menyatakan medan bukti (`status_mentah`, `location_header`, `url_akhir`) dan apa yang **BUKAN** kriteria |
-| `docs/ACTION-6-UAT-AUTH-USERS.md` | Senarai semak ujian manual Fasa 6 (log masuk, wajib tukar kata laluan, pendaftaran, kelulusan, sekatan, reset) |
+| `docs/ACTION-6-UAT-AUTH-USERS.md` | Senarai semak ujian manual Fasa 6 (log masuk, wajib tukar kata laluan, pendaftaran, kelulusan, sekatan, reset) — **✅ LULUS semua A–K pada 2026-09-04 di Production** |
 | `docs/CODEBASE-MAP.md` | Peta kod ringkas untuk konteks pembantu AI (jana semula: `node scripts/codebase-map.mjs`) |
 | `docs/PROMPT-TEMPLATE-FASA.md` | Templat wajib prompt GPT: Persona + Peta Kod + Tugasan + Larangan + Format Laporan |
 | `docs/SKILLS.md` | Daftar Agent Skill tambahan + pemetaan kepada aliran Fasa projek dan penyesuaian khusus (pengajaran daripada blocker A7 & preflight B) |
