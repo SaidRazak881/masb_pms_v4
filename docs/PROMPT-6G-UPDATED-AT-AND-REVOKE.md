@@ -1,5 +1,10 @@
 # PROMPT 6G — Pasang `updated-at-triggers.sql` + REVOKE privilej tulis jadual warisan
 
+> **📌 STATUS:** masih **menunggu kelulusan eksplisit pengguna** (HARD GATE).
+> Belum dijalankan. Kandungan prompt tidak berubah.
+> Perkembangan terkini: **Production Branch sudah bertukar** — lihat
+> `docs/PROMPT-6H-E1-E9-PRECISE-CRITERIA.md`.
+
 > **⛔ HARD GATE — prompt ini hanya boleh dijalankan SELEPAS pengguna memberi
 > kelulusan eksplisit.** Ia mengandungi **live SQL** (DDL + REVOKE), yang
 > memerlukan kelulusan berasingan mengikut perjanjian gate proyek.

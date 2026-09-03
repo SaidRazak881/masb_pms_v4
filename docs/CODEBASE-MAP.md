@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-03 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: 88902c8 Fasa 6: PROMPT-6F disusun semula - E + baki D + Z SEMUA kerja ChatGPT · arena/01a06274-masb-pms-v4
+> Git: ac05871 Fasa 6G: betulkan kecacatan repo (trigger updated_at tiada) + PROMPT-6G · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 
@@ -220,6 +220,7 @@
 - `PROMPT-6E-VERCEL-PRODUCTION-PRIVATE-HAS-ROLE.md`
 - `PROMPT-6F-AUDIT-PRIVATE-SCHEMA-DRIFT.md`
 - `PROMPT-6G-UPDATED-AT-AND-REVOKE.md`
+- `PROMPT-6H-E1-E9-PRECISE-CRITERIA.md`
 - `PROMPT-TEMPLATE-FASA.md`
 - `SETUP-SUPABASE.md`
 - `SKILLS.md`

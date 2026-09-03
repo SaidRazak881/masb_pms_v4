@@ -57,6 +57,7 @@ dashboard **Super Admin** (`saidrazak881@gmail.com`) di `/admin/users`.
 | E diluluskan (dinyahganding dari D) + Y1–Y4 — **E=0/9, Production masih Fasa 5; Production Branch kena tukar MANUAL oleh pengguna** | `docs/PROMPT-6E-VERCEL-PRODUCTION-PRIVATE-HAS-ROLE.md` |
 | E + baki D + Z1–Z5 — **Z 🟢 selesai (governance lock SELAMAT; kecacatan repo ditemui: tiada trigger updated_at). E=0/9: ChatGPT sudah cuba 2× dan namakan operasi yang tiada → Production Branch kini tugas pengguna** | `docs/PROMPT-6F-AUDIT-PRIVATE-SCHEMA-DRIFT.md` |
 | **⛔ HARD GATE (perlu kelulusan pengguna):** pasang `updated-at-triggers.sql` + REVOKE tulis 3 jadual warisan | **`docs/PROMPT-6G-UPDATED-AT-AND-REVOKE.md`** |
+| **PROMPT AKTIF: E1–E9 kriteria tepat** — Production Branch DISAHKAN bertukar (commit `ac05871` == hujung branch). `/admin/users` 200 + kandungan `/login` ialah **LULUS** (redirect diikuti) | **`docs/PROMPT-6H-E1-E9-PRECISE-CRITERIA.md`** |
 | Senarai semak ujian manual (log masuk, pendaftaran, kelulusan, sekatan, reset, regresi) | **`docs/ACTION-6-UAT-AUTH-USERS.md`** |
 | Urutan pemasangan SQL penuh (10 fail) | `docs/SETUP-SUPABASE.md` |
 | Konteks struktur sistem untuk GPT | `docs/CODEBASE-MAP.md` (Bahagian 8) |
