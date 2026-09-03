@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-03 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: f121ac2 Betulkan kecacatan pemetaan data GAP-ANALISIS §4.1-4.4 + PROMPT-7A · arena/01a06274-masb-pms-v4
+> Git: 7dfe2f0 Tubuhkan Panel Pakar TPMS (9 ahli) + rekod DP-1 susunan kerja · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 
@@ -114,6 +114,11 @@
 - **Fungsi/RPC:** change_request_allowed_fields, submit_change_request, review_change_request, cancel_change_request
 - **Polisi RLS:** change_requests_select_authenticated
 
+### `lib/supabase/client-master.sql`
+- **Jadual:** account_manager_aliases
+- **Fungsi/RPC:** normalize_person_name, resolve_account_manager
+- **Polisi RLS:** am_aliases_read · am_aliases_write · am_aliases_update · am_aliases_delete
+
 ### `lib/supabase/fix-add-programme-categories.sql`
 
 ### `lib/supabase/fix-field-mapping.sql`
@@ -201,6 +206,7 @@
 - `EVALUASI-ALAT-AI-TPMS.md`
 - `GAP-ANALYSIS-FUNGSI-BELUM-ADA.md`
 - `GPT-ASSISTANT-PROMPTS.md`
+- `PANEL-PAKAR-TPMS.md`
 - `PROMPT-2-RECONCILE-LIVE.md`
 - `PROMPT-2B-INSTALL-RPC.md`
 - `PROMPT-2C-BLOCKER-RESOLUTION.md`
@@ -225,6 +231,7 @@
 - `PROMPT-6G-UPDATED-AT-AND-REVOKE.md`
 - `PROMPT-6H-E1-E9-PRECISE-CRITERIA.md`
 - `PROMPT-7A-FIX-FIELD-MAPPING.md`
+- `PROMPT-8A-CLIENT-MASTER.md`
 - `PROMPT-TEMPLATE-FASA.md`
 - `SETUP-SUPABASE.md`
 - `SKILLS.md`

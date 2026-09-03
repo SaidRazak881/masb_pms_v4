@@ -190,7 +190,7 @@ Ini ketetapan pengguna, di luar bidang kuasa panel:
 ### DP-1 — Susunan kerja di bawah kesuntukan masa (2026-09-04)
 
 **Isu.** Pengguna kesuntukan masa dan mahu pembinaan diteruskan hingga selesai.
-Terdapat dua lapisan kerja terbuka: (A) **pembetulan** — sahkan badan RPC 7A yang
+Terdapat dua lapisan kerja terbuka: (A) **pembetulan** — sahkan badan RPC 8A yang
 direkonstruksi, audit 6 invois + 1124 baris staging sedia ada, simpanan fail sumber;
 (B) **pembinaan** — 4 domain perniagaan yang mewakili 715 baris data aktif tanpa
 tempat. Arena mencadangkan (A) dahulu. Adakah itu betul?
@@ -199,9 +199,9 @@ tempat. Arena mencadangkan (A) dahulu. Adakah itu betul?
 
 | Fakta | Bukti |
 | --- | --- |
-| `idx_invoices_quotation_no_unique` **wujud di live** | Laporan 7A J1e (ChatGPT) |
+| `idx_invoices_quotation_no_unique` **wujud di live** | Laporan 8A J1e (ChatGPT) |
 | 7A J2–J9 🟢, J10 ⏳ | Laporan 7A |
-| Langkah 2 7A dilaksanakan sebagai **SQL rekonstruksi**, bukan fail sumber | Pendedahan ChatGPT, Seksyen 3 |
+| Langkah 2 8A dilaksanakan sebagai **SQL rekonstruksi**, bukan fail sumber | Pendedahan ChatGPT, Seksyen 3 |
 | 5 struktur kritikal RPC **tidak disahkan** di live | J6/J7 tidak merangkuminya |
 | `client_name` repo=11 vs live=9 — **kabur** | Kiraan `grep -oF` vs J6 |
 | Live ada **1124 staging / 5 batch / 6 invois / 14 program** | J1a = J4 |
@@ -221,17 +221,17 @@ kecacatan itu hilang secara struktur**, bukan ditampal. Menampal dahulu kemudian
 membina semula kemudian ialah dua kali kerja.
 
 **Arkitek SQL (§2.2).** Saya bersetuju, dan tambah: padanan **dua langkah global**
-yang saya tulis dalam 7A ialah penyelesaian yang betul *untuk model yang salah*.
+yang saya tulis dalam 8A ialah penyelesaian yang betul *untuk model yang salah*.
 Ia perlu memadankan merentas program kerana indeks itu global — tetapi dengan
 jadual `quotations` berasingan, invois dan quotation tidak lagi bersaing untuk
 satu indeks, jadi keseluruhan kelas masalah itu lenyap. **Bantahan separa:**
-blok **invois** dalam 7A (pengawal `COALESCE(...,0)` untuk 4 lajur `NOT NULL`,
+blok **invois** dalam 8A (pengawal `COALESCE(...,0)` untuk 4 lajur `NOT NULL`,
 pengisian `invoice_no`) **turut terselamat** daripada pembinaan semula dan
 **mesti tetap disahkan** — ia tidak akan ditulis semula.
 
 **Pakar Kewangan (§2.4).** Sokong kuat. Quotation ada medan yang **tidak masuk
 akal** pada invois: `Unit Price`, `No of Unit`, `Discount %`, `SST 8% Amount`,
-`Final Price`, `Prepared by`, `Project Status`. Dalam 7A saya terpaksa memuatkan
+`Final Price`, `Prepared by`, `Project Status`. Dalam 8A saya terpaksa memuatkan
 `Prepared by` ke dalam `invoices.notes` — itu **penghinaan terhadap data**.
 Kitaran sebenar ialah Quotation → PO → Invoice, tiga dokumen dengan nombor dan
 tarikh berbeza. **Veto saya kekal** ke atas sebarang imputasi nilai kewangan;
@@ -287,28 +287,28 @@ pembinaan domain quotation **sendiri** ialah pembetulan struktur bagi §4.4 dan
 
 | Fasa | Kandungan | Kenapa di sini |
 | --- | --- | --- |
-| **7A** | **Client master** (`clients`) — pisahkan pelanggan daripada `organizers`, `programmes.client_id`, label UI | Prasyarat §2.8: quotation, pipeline dan tugasan **semua** merujuk pelanggan |
-| **7B** | **Simpanan fail sumber** (bucket **peribadi**) + keupayaan **parse-semula** batch | §2.5: tanpa ini, 1124 baris lama tidak boleh dibaiki dan 299 baris quotation tidak boleh dimuatkan |
-| **7C** | **Domain Quotation berdiri sendiri** — jadual `quotations` (`programme_id` **NULL-able**), parser entity kind, routing RPC, UI, laporan | Menghapuskan §4.4 + §4.5 **secara struktur**; keputusan pengguna #1 |
-| **7D** | Audit + baiki **6 invois** dan **1124 baris staging** sedia ada | Bergantung pada 7B (parse-semula) dan 7C (destinasi betul) |
-| **7E** | **Pipeline / Funnel** (forecast, weighted, probability, sector, salesman) | 316 baris sumber; bergantung pada `clients` |
-| **7F** | **P&L / Aging / Kos Jualan / Komisen** | Bergantung pada quotations + invoices yang sudah dipisah |
-| **7G** | **Tugasan pejabat** + **`certificate_no`** | Kecil, jelas, 101 baris |
-| **7H** | Pengesahan akhir, UAT penuh, dokumentasi | Penutup |
+| **8A** | **Client master** (`clients`) — pisahkan pelanggan daripada `organizers`, `programmes.client_id`, label UI | Prasyarat §2.8: quotation, pipeline dan tugasan **semua** merujuk pelanggan |
+| **8B** | **Simpanan fail sumber** (bucket **peribadi**) + keupayaan **parse-semula** batch | §2.5: tanpa ini, 1124 baris lama tidak boleh dibaiki dan 299 baris quotation tidak boleh dimuatkan |
+| **8C** | **Domain Quotation berdiri sendiri** — jadual `quotations` (`programme_id` **NULL-able**), parser entity kind, routing RPC, UI, laporan | Menghapuskan §4.4 + §4.5 **secara struktur**; keputusan pengguna #1 |
+| **8D** | Audit + baiki **6 invois** dan **1124 baris staging** sedia ada | Bergantung pada 8B (parse-semula) dan 8C (destinasi betul) |
+| **8E** | **Pipeline / Funnel** (forecast, weighted, probability, sector, salesman) | 316 baris sumber; bergantung pada `clients` |
+| **8F** | **P&L / Aging / Kos Jualan / Komisen** | Bergantung pada quotations + invoices yang sudah dipisah |
+| **8G** | **Tugasan pejabat** + **`certificate_no`** | Kecil, jelas, 101 baris |
+| **8H** | Pengesahan akhir, UAT penuh, dokumentasi | Penutup |
 
 **Bertindak selari (tidak menyekat pembinaan):** satu prompt **baca-sahaja**
-kepada ChatGPT yang **hanya** menutup: (i) struktur blok **invois** 7A yang
+kepada ChatGPT yang **hanya** menutup: (i) struktur blok **invois** 8A yang
 terselamat daripada pembinaan semula, (ii) audit 6 invois sedia ada,
 (iii) siasatan drift `invoices.sst_amount`. **Pengesahan blok quotation
-DIGANTUNG** sehingga 7C — ia akan ditulis semula.
+DIGANTUNG** sehingga 8C — ia akan ditulis semula.
 
 **Bantahan direkodkan.** Tiada bantahan penuh. **Bantahan separa QA (§2.7)**
 diterima dan diserap: pengesahan dihadkan kepada struktur yang terselamat.
 **Amaran §2.5** (simpanan fail sumber tidak boleh ditunda) **diterima** dan
-mengubah susunan — 7B dinaikkan **sebelum** 7C, walaupun cadangan asal Arena
+mengubah susunan — 8B dinaikkan **sebelum** 8C, walaupun cadangan asal Arena
 meletakkannya di hujung.
 
-**Gate.** 7A, 7B dan 7C semuanya memerlukan **migrasi SQL live** → HARD GATE.
+**Gate.** 8A, 8B dan 8C semuanya memerlukan **migrasi SQL live** → HARD GATE.
 Arena akan menulis kod + ujian PGlite + prompt; **pengguna meluluskan**,
 ChatGPT melaksanakan.
 
@@ -316,3 +316,213 @@ ChatGPT melaksanakan.
 
 *Sila tambah rekod `DP-2`, `DP-3`, … di bawah seksyen ini bagi setiap sidang
 seterusnya. Jangan padam rekod lama — ia jejak audit keputusan.*
+
+### DP-2 — Reka bentuk induk pelanggan & pengurus akaun (2026-09-04, Fasa 8A)
+
+**Isu.** Keputusan pengguna #2 ialah **satu entiti "Pelanggan"**. Bagaimana ia
+dimodelkan: (a) `ALTER TABLE organizers RENAME TO clients`, (b) jadual `clients`
+baharu + migrasi + `organizers` jadi pandangan susulan, (c) jadual `clients`
+baharu selari, atau (d) kekalkan jadual, betulkan semantik?
+
+**Fakta yang ditetapkan (diukur).**
+
+| Fakta | Bukti |
+| --- | --- |
+| **Tiada** badan RPC merujuk jadual `public.organizers` | `grep "public.organizers\|FROM organizers\|JOIN organizers"` → hanya `schema-master.sql` (10) + `seed-v4-raw.sql` (8); **0** dalam `sync-import-transaction.sql` / `change-requests.sql` |
+| **Tiada** pertanyaan TS `.from('organizers')` | `grep` → **0** padanan |
+| Lapisan TS **sudah** bercakap "client" | `programme-mapper.ts:57` → `client: row.organizer_name`; `master-records.ts:159` → `client: p.organizer_name` |
+| `organizers` sudah ada medan induk yang betul | `name, short_name, email, phone, address, city, state, postcode, sector, industry, organization_type, is_active, notes, website` |
+| `programmes.organizer_id` **boleh NULL**; `organizer_name` **NOT NULL** | `schema-master.sql:423–424` |
+| `change_request_allowed_fields` menyimpan **teks** `'organizer_name'` | `lib/change-requests.ts:44` |
+| **12** rentetan unik `Account Manager` dalam Quotation Tracker | diukur terus daripada fail |
+| **19** staf dalam `User Profiles Mapping.xlsx` | diukur terus |
+| `Abu Said` / `Abu said` / `Abu Sa'id` = **3 varian, 1 orang** | perbandingan langsung |
+| `Fuzy / Dila`, `Fuzy / Sholihin` = **berbilang orang dalam satu sel** | perbandingan langsung |
+| `Fuzy` tiada dalam senarai staf (kemungkinan nama panggilan `Fuziah`) | perbandingan langsung |
+| `Ow Zi Qi` tiada dalam senarai staf | perbandingan langsung |
+
+**Pendirian.**
+
+**Arkitek Domain (§2.3).** `organizers` **sudah** merupakan induk pelanggan yang
+betul dari segi struktur — `sector`, `industry`, `organization_type`, medan
+hubungan, `is_active`. Masalahnya **hanya nama**. Mencipta jadual `clients`
+**selari** akan menghasilkan **DUA induk**, yang secara langsung melanggar
+keputusan pengguna #2 ("satu entiti"). Jadi (b) dan (c) **ditolak**.
+
+**Arkitek SQL (§2.2).** `ALTER TABLE … RENAME` dalam PostgreSQL **secara automatik**
+mengikut FK, indeks, polisi RLS dan grant — jadi (a) lebih selamat daripada
+yang dijangka, dan fakta bahawa **tiada badan RPC merujuk jadual itu** membuang
+risiko terbesar. **Tetapi** dua bahaya kekal: (i) `change_request_allowed_fields`
+menyimpan `'organizer_name'` sebagai **teks**, jadi menamakan semula **lajur**
+akan anak-yatimkan baris change_request sedia ada di live — dan kita **tidak
+tahu** berapa banyak kerana ia belum diaudit; (ii) `schema-master.sql` dan
+`seed-v4-raw.sql` (18 rujukan) akan menjadi **basi**, jadi sebarang pemasangan
+semula skema akan **mencipta semula** `organizers` sebagai jadual yatim.
+
+**Pengerusi.** Kedua-dua bahaya §2.2 boleh diurus, tetapi kedua-duanya
+**kosmetik di lapisan DB** manakala lapisan TS sudah betul. Di bawah kesuntukan
+masa, soalan sebenar ialah: **mana yang memberi faedah berfungsi?**
+
+**Pakar Kewangan (§2.4).** **Di sini faedah berfungsi itu berada, dan ia bukan
+pada nama jadual.** 12 rentetan → ~8 orang sebenar bermakna **setiap laporan
+"mengikut pengurus akaun" kini salah secara senyap**. `Fuzy / Dila` bukan
+satu orang. `Fuzy` mungkin `Fuziah` — tetapi **"mungkin" ialah tekaan, dan saya
+veto tekaan pada atribusi yang memacu laporan komisen.** Nota: pengurus akaun
+bukan *nilai* kewangan, jadi veto mutlak saya tidak terpakai; tetapi prinsip
+"jangan reka" kekal.
+
+**QA (§2.7).** Saya boleh uji penyelesaian nama terhadap **12 nilai sebenar vs
+19 staf sebenar** dalam PGlite. Itu kriteria bernombor yang kuat. **Syarat:**
+fungsi penyelesai mesti **mengembalikan NULL bila kabur**, bukan memilih yang
+terdekat. `Fuzy` → **NULL**, bukan `Fuziah`.
+
+**Penyemak Keselamatan (§2.8).** `account_manager_id` yang merujuk
+`user_profiles` mencipta **pautan antara data kewangan dan identiti staf**.
+Ia mesti mewarisi RLS `user_profiles` dan **tidak** boleh mendedahkan peranan
+atau status akaun staf kepada pengguna yang hanya boleh lihat invois.
+**Veto** jika pautan itu didedahkan tanpa semakan peranan.
+
+**Arkitek Aplikasi (§2.6).** Setuju tangguhkan rename. Nota: `programme-actions.ts:123`
+menapis `p.client` menggunakan `query.organizer` — **percampuran nama dalam satu
+baris**. Saya akan betulkan penamaan dalaman TS (kosmetik, tiada risiko live)
+supaya hutang itu tidak merebak ke modul quotation.
+
+**BA & Pelaporan (§2.9).** Sokong kuat penumpuan pada pengurus akaun. Tanpa
+penyelesaian itu, tiga laporan yang 8C/8E/8F akan hasilkan — untung mengikut
+pelanggan, pipeline mengikut pengurus, komisen — **semuanya akan mewarisi
+ralat 12→8**. Baiki **sebelum** laporan dibina, bukan selepas.
+
+**Kata putus (Pengerusi).**
+
+1. **(a) RENAME jadual DITANGGUHKAN ke Fasa 8H** (tetingkap UAT penuh). Sebab:
+   faedah berfungsi sifar (TS sudah berkata "client"), dan ia memerlukan
+   audit `change_request_allowed_fields` di live + penyelarasan 18 rujukan
+   dalam 2 fail skema. **Hutang penamaan DIREKODKAN, tidak dilupakan.**
+2. **(b)/(c) DITOLAK** — dua induk melanggar keputusan pengguna #2.
+3. **8A dilaksanakan sebagai ADDITIF:**
+   - Medan induk pelanggan yang **diperlukan oleh quotation/invois** tetapi
+     tiada: `client_code`, `sst_registration_no`, `billing_address`,
+     `payment_terms_days`
+   - **Penyelesaian pengurus akaun**: kekalkan `account_manager` TEXT (nilai
+     mentah, untuk audit) **+** tambah `account_manager_id` (pautan selesai)
+   - **Jadual alias yang disahkan manusia** `account_manager_aliases` —
+     kerana `Fuzy`→`Fuziah` ialah pengetahuan manusia, bukan sesuatu yang
+     boleh dikira. Sistem **mengingat** keputusan manusia; ia tidak **meneka**.
+   - `COMMENT ON TABLE` yang menyatakan `organizers` **ialah** induk pelanggan
+4. **Penyelesai mesti NULL bila kabur.** Sel berbilang orang (`/`, `,`) → NULL.
+   Tiada padanan → NULL. **Tiada padanan kabur "terdekat".**
+5. **Veto §2.8 diterima:** pautan `account_manager_id` tidak boleh mendedahkan
+   peranan/status staf melalui laluan invois.
+
+**Bantahan direkodkan.** Tiada. **Hutang teknikal direkodkan:** rename
+`organizers`→`clients` + `organizer_name`→`client_name` di Fasa 8H, tertakluk
+kepada audit `change_request_allowed_fields` di live.
+
+**Gate.** Migrasi 8A = **SQL live** → HARD GATE. Arena tulis kod + ujian
+PGlite + prompt; pengguna meluluskan; ChatGPT melaksanakan.
+
+---
+
+## DP-2a — Peraturan padanan token pertama (2026-09-04, semasa pelaksanaan Fasa 8A)
+
+**Isu timbul semasa ujian, bukan semasa reka bentuk.** `scripts/test-client-master.mjs`
+menemui bahawa `'Nur'` MENYELESAI ke `Nur Aleeya`, sedangkan jangkaan asal ialah NULL.
+
+**Fakta diukur:**
+- Dalam 18 staf sebenar, HANYA SATU staf mempunyai token pertama `nur`
+  (`Ainur Najwa` bermula dengan `ainur`, bukan `nur`).
+- Peraturan token-pertama yang sama inilah yang menyelesaikan `'Abu Said'` →
+  `Abu Sa'id` (4 baris) dan `'Zalina'` → `Zalina Sayuti` (7 baris) dalam data sebenar.
+- Menggugurkan peraturan ini menurunkan liputan automatik **8/12 → 6/12**.
+
+**Kedudukan:**
+- *QA (§2.7):* menentang — "Nur" ialah serpihan nama, menyelesaikannya ialah tekaan.
+- *BA (§2.9):* menyokong — padanan token pertama yang TEPAT dan UNIK bukan tekaan;
+  ia satu-satunya tafsiran yang mungkin dalam senarai staf semasa.
+- *SQL Architect (§2.2):* sifat keselamatan yang sebenar ialah **SYARAT KEUNIKAN**,
+  dan ia boleh diuji secara langsung.
+
+**KATA PUTUS:** Peraturan token-pertama **DIPERTAHANKAN**. Jangkaan ujian yang
+salah, bukan kod. Sifat keselamatan sebenar diuji secara eksplisit:
+- `'Nur'` → `Nur Aleeya` (unik) ✅
+- selepas staf kedua `Nur Batrisyia` ditambah → `'Nur'` → **NULL** ✅
+- `'arah'` (2 staf mengandungi substring) → **NULL** ✅
+- `'Ain'` (3 aksara) → **NULL** — had panjang minimum 4 menghalang padanan serpihan ✅
+
+**Tindakan:** tiada perubahan kod; ujian diperbetulkan + 3 kes keunikan ditambah.
+
+---
+
+## DP-3 — Penomboran semula roadmap: 7A–7H → 8A–8H (2026-09-04)
+
+**Fakta:** `docs/PROMPT-7A-FIX-FIELD-MAPPING.md` SUDAH wujud, SUDAH 🟢 DILULUSKAN,
+dan SUDAH dilaksanakan di live (J2–J9 🟢). Roadmap DP-1 menggunakan label "7A"
+untuk *client master* — perlanggaran penamaan yang Arena sendiri cipta.
+
+**KATA PUTUS:** Roadmap DP-1 **dinomborkan semula kepada 8A–8H**. Label 7A
+KEKAL merujuk `PROMPT-7A-FIX-FIELD-MAPPING` yang sudah dilaksanakan — sejarah
+tidak ditulis semula. 31 rujukan dalam dokumen ini dikemas kini; 1 rujukan
+sejarah (`| 7A J2–J9 🟢, J10 ⏳ | Laporan 7A |`) sengaja dikekalkan.
+
+| Lama | Baharu | Skop |
+|---|---|---|
+| 7A | **8A** | Induk pelanggan + penyelesaian pengurus akaun |
+| 7B | **8B** | Simpanan fail sumber + parse-semula |
+| 7C | **8C** | Domain quotation berdiri sendiri |
+| 7D | **8D** | Audit + baiki 6 invois & 1124 baris staging |
+| 7E | **8E** | Pipeline / Funnel |
+| 7F | **8F** | P&L / Aging / Kos Jualan / Komisen |
+| 7G | **8G** | Tugasan pejabat + `certificate_no` |
+| 7H | **8H** | Rename `organizers`→`clients`, cleanup, UAT penuh |
+
+---
+
+## DP-4 — Regresi allowlist W1 dikesan oleh ujian sedia ada (2026-09-04)
+
+**Fakta:** `scripts/test-preflight-b-sql.mjs` §8 mengira inventori jadual rasmi
+repo dan membandingkannya dengan allowlist `W1_public_tables` dalam
+`docs/PROMPT-6C-AUDIT-LEGACY-TABLES.md`. Menambah `account_manager_aliases`
+(8A) menjadikan inventori **16** jadual, tetapi allowlist masih **15** → ujian
+GAGAL dengan tepat.
+
+**Kata putus:** allowlist W1 dikemas kini kepada 16, dengan anotasi bahawa
+PROMPT-6C sudah dijalankan sebelum ini (laporan lama mengira 15) dan bahawa
+jangkaan W1 SEMULA selepas 8A dipasang = **16 rasmi + 3 warisan = 19**.
+
+**Pengajaran direkodkan:** menambah jadual baharu WAJIB menyemak allowlist
+dokumen sedia ada. Ujian §8 wujud tepat untuk menangkap kesilapan ini —
+ia berfungsi seperti direka.
+
+---
+
+## DP-5 — Fungsi `STABLE` tidak nampak baris daripada kenyataan yang sama (2026-09-04)
+
+**Diuji di PGlite, bukan dijangka** (pelajaran #4 templat prompt).
+
+Dakwaan asal dalam draf ujian Fasa 8A: alias boleh diuji dengan
+`INSERT ... RETURNING (SELECT resolve_account_manager(...))` dalam satu kenyataan.
+
+**Keputusan PGlite:** mengembalikan **NULL**, bukan `user_id`.
+
+**Punca:** `resolve_account_manager` diisytiharkan `STABLE`. Fungsi `STABLE`
+menggunakan **snapshot yang sama** dengan kenyataan pemanggilnya, jadi ia tidak
+nampak baris yang dimasukkan oleh kenyataan itu sendiri. Baris itu hanya kelihatan
+pada kenyataan **seterusnya**.
+
+**Kata putus:** ujian alias di live MESTI memisahkan `INSERT` dan `SELECT` kepada
+dua kenyataan dalam transaksi yang sama, kemudian `ROLLBACK`:
+
+```sql
+BEGIN;
+INSERT INTO public.account_manager_aliases (raw_text, user_id, confirmed_by, notes)
+VALUES ('Fuzy', '<uuid_fuziah>', auth.uid(), 'ujian — akan dibatalkan');
+SELECT public.resolve_account_manager('Fuzy');   -- kenyataan BERASINGAN
+ROLLBACK;
+```
+
+**Kenapa ia penting:** tanpa nota ini, ChatGPT akan melaporkan kriteria J6 GAGAL
+di live walaupun kod betul — blocker palsu, iaitu tepat perkara yang templat
+prompt ini wujud untuk elakkan.
+
+**Tindakan:** seksyen [L] dalam `scripts/test-client-master.mjs` membuktikan
+kedua-dua bentuk; nota amaran dimasukkan ke dalam `docs/PROMPT-8A-CLIENT-MASTER.md`.

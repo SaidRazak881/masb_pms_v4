@@ -107,3 +107,7 @@
 - [ ] **Query "keadaan SEBELUM" mesti diarahkan secara eksplisit: jalankan DAN laporkan
       DAHULU, sebelum sebarang tindakan.** Menyenaraikannya sebagai H1 sebelum H2 tidak
       mencukupi. *(#10 — H1 terlepas dalam pelaksanaan 6G)*
+- [ ] **Fungsi `STABLE`/`IMMUTABLE` tidak nampak baris yang ditulis oleh kenyataan
+      SQL yang sama.** Jangan uji kesan `INSERT` dalam klausa `RETURNING` bagi
+      fungsi `STABLE` — snapshot dikongsi. Pisahkan kepada dua kenyataan dalam satu
+      transaksi. *(kesilapan #11 — dibuktikan di PGlite, Fasa 8A/DP-5)*
