@@ -805,3 +805,240 @@ Reset sandbox #7 berlaku semasa kerja DP-9 (`node_modules` dikosongkan, git
 terpusing ke `535fb13`). Semua fail kerja terselamat; dipulihkan dengan
 `git fetch` + `git reset --mixed` ke `b79769e` kemudian `npm install`.
 Tiada kerja hilang.
+
+---
+
+## DP-10 — Keputusan J1 live: tiga penemuan yang mengubah rancangan pemasangan (2026-09-04)
+
+**Sumber:** laporan ChatGPT untuk `docs/PROMPT-8A-J1-READONLY.md`, dijalankan
+terhadap pangkalan data live. Semua nilai di bawah adalah **bukti verbatim daripada live**,
+bukan andaian.
+
+### 10.1 🔴 Ref projek dalam dua fail Arena adalah SALAH (typo Arena)
+
+| | Nilai | Panjang |
+|---|---|---|
+| Ditulis oleh Arena dalam 2 fail 8A | `lmenmfsbjgxcfhnykkgow` | **21** aksara |
+| Ref live yang sah | `lmenmfsbjgxfhnykkgow` | **20** aksara |
+
+ChatGPT menerima `ZodError ... ref must be exactly 20 characters long`,
+kemudian menyambung dengan ref yang betul.
+
+**Semakan repo membuktikan ini salah Arena, bukan salah dokumentasi lama:**
+SEMUA prompt terdahulu (2E, 3, 4, 4B, 6, 6B, 6G, …) sudah menggunakan ref
+20-aksara yang **betul**. Hanya `PROMPT-8A-CLIENT-MASTER.md` dan
+`PROMPT-8A-J1-READONLY.md` — kedua-duanya dicipta dalam sesi ini — mengandungi
+varian 21-aksara.
+
+**Tindakan:** kedua-dua fail dibetulkan; imbasan seluruh repo mengesahkan
+**sifar** baki. Ref 21-aksara itu berasal daripada konteks sesi Arena yang
+rosak, bukan daripada repo.
+
+### 10.2 🟢 DP-7 DITUTUP — bukan kecacatan live (drift live→repo)
+
+| Bukti live | Nilai |
+|---|---|
+| `import_staging.updated_at` | **WUJUD**, `timestamp with time zone`, `NOT NULL`, default `now()` |
+| trigger pada `import_staging` | `bilangan_trigger = 1`, `ada_lajur_updated_at = true` → 🟢 OK |
+| 11 jadual lain dalam `targets` | semua 🟢 OK |
+
+**Kesimpulan:** live **TIDAK** rosak. Import Excel berfungsi.
+
+**Tetapi pembaikan repo Arena tetap BETUL dan tetap diperlukan** — kerana
+`schema-import-staging.sql` **tidak** mentakrifkan lajur itu, sedangkan live
+ada. Itu ialah drift **live→repo**: pemasangan baharu daripada repo akan
+menghasilkan pangkalan data yang **rosak** (DP-7), walaupun live semasa sihat.
+Repo kini sepadan live.
+
+**`fix-import-staging-updated-at.sql` TIDAK perlu dijalankan di live** — ia
+akan menjadi no-op (`ADD COLUMN IF NOT EXISTS`). Panel memutuskan untuk
+**MENGECUALIKANNA** daripada prompt pemasangan: menjalankan SQL yang tidak
+diperlukan pada produksi ialah risiko yang boleh dielakkan.
+
+### 10.3 🟠 Live mempunyai SIFAR nilai `Account Manager`
+
+**J1f mengembalikan `[]`** — tiada nilai `account_manager` yang bukan-null dan
+bukan-kosong dalam **`invoices` (6 baris)** mahupun **`import_staging` (1124 baris)**.
+
+Ini **mengubah jangkaan pelaksanaan** secara material:
+
+| Fungsi | Jangkaan SEMULA |
+|---|---|
+| `am_backfill_account_manager()` | akan mengisi **0 baris** — bukan kegagalan |
+| `am_backfill_preview()` | `akan_diisi = 0`, `kekal_null = 0` |
+| `am_unresolved_values()` | **0 baris** — tiada apa untuk diputuskan |
+| seed DP-8/DP-9 | masih **BERNILAI**: ia pra-daftar keputusan supaya apabila Quotation Tracker **diimport kelak**, 12 nilai itu selesai dengan serta-merta |
+
+**Ini mengesahkan urutan yang betul:** seed alias **SEBELUM** import Quotation
+Tracker, bukan selepas.
+
+12 nilai `Account Manager` yang diukur (DP-2) wujud **hanya dalam fail Excel
+sumber**, bukan dalam pangkalan data live. Itu selaras dengan DP-1 Fasa 8B
+(simpanan fail sumber + parse-semula) — Quotation Tracker belum pernah
+dimuatkan ke live.
+
+### 10.4 🟠 `user_profiles` = 20 baris, bukan 18
+
+Ujian PGlite Arena menyemai **18 staf bernama** daripada
+`User Profiles Mapping.xlsx`. Live ada **20** profil.
+
+**Yang belum diketahui:** nama sebenar 20 profil itu. J1 tidak memintanya.
+Ini penting kerana `resolve_account_manager()` bergantung kepada **syarat
+keunikan** — jika live mengandungi dua staf yang berkongsi token pertama atau
+substring, beberapa nilai yang dijangka selesai akan kembali **NULL**.
+
+ChatGPT **enggan mereka-reka** perbandingan ini dan menandanya
+`⏳ MENUNGGU PENGGUNA` — tingkah laku yang betul.
+
+**Tindakan:** query **J0** ditambah kepada prompt pemasangan untuk
+menyenaraikan 20 nama live + bentuk ternormal + analisis keunikan, **sebelum**
+pemasangan. Dengan itu J6 boleh ditafsir berdasarkan realiti live, bukan
+andaian 18 nama.
+
+### 10.5 🟠 Kecacatan query J1j Arena — positif palsu (ChatGPT mengesannya)
+
+CASE dalam J1j tidak membezakan **"jadual tidak wujud"** daripada
+**"jadual wujud + trigger ada + lajur tiada"**. `account_manager_aliases`
+memang belum wujud (selaras J1b), jadi `bilangan_trigger = 0` — tetapi query
+melabelnya 🔴.
+
+ChatGPT **menolak tafsiran itu dengan betul** dan tidak mengubah skema.
+
+**Tindakan:** J1j ditulis semula menggunakan `to_regclass()` dengan **empat**
+keadaan berbeza (⚪ tidak wujud / 🔴 DP-7 sebenar / 🟢 lajur wujud / ⚪ tiada
+trigger tiada lajur). `scripts/test-prompt-8a-j1-queries.mjs` kini mengandungi
+regression test yang memastikan positif palsu ini **tidak boleh berulang**.
+
+### 10.6 Baseline live yang direkodkan (untuk J7 — pengesahan tiada perubahan data)
+
+| Jadual | Baris |
+|---|---|
+| `audit_logs` | 44 |
+| `import_staging` | 1124 |
+| `invoices` | 6 |
+| `organizers` | 12 |
+| `programmes` | 14 |
+| `user_profiles` | 20 |
+| **jadual `public`** | **18** (15 rasmi + 3 warisan) |
+
+Selepas pemasangan 8A + 8A-2 + DP-9: **18 → 20** jadual public
+(`account_manager_aliases` + `external_account_managers`), iaitu
+**17 rasmi + 3 warisan**.
+
+`audit_logs` akan **bertambah** (seed DP-8/DP-9 menulis jejak audit) — itu
+dijangka dan mesti dilaporkan, bukan disembunyikan.
+
+### 10.7 Pengajaran direkodkan
+
+1. **Jangan percaya konteks sesi sendiri untuk pengecam infrastruktur.**
+   Ref projek mesti disalin daripada repo, bukan daripada ingatan.
+2. **Query diagnostik mesti membezakan "tidak wujud" daripada "rosak".**
+   Guna `to_regclass()`.
+3. **Drift boleh ke dua arah.** DP-7 ialah drift **live→repo** (live sihat,
+   repo akan menghasilkan DB rosak). DP-6 ialah drift **repo→live** yang
+   sengaja (Fasa 6 menambah nilai enum). Kedua-duanya memerlukan bukti,
+   bukan andaian.
+4. **Ukur data live SEBELUM meramalkan kesan pelaksanaan.** Jangkaan
+   "backfill akan mengisi 262 baris" adalah **salah** — live ada sifar nilai.
+
+### 10.8 🔴 Dua kecacatan ditemui semasa mengesahkan PROMPT-8A3 (bukan oleh ChatGPT)
+
+Kedua-duanya dikesan oleh `scripts/test-prompt-8a3-install.mjs` (103 ujian)
+sebelum prompt dihantar kepada ChatGPT. Kedua-duanya akan menyebabkan
+pemasangan live **gagal atau mengelirukan**.
+
+**(a) Penghampiran inline J0 tidak membuang gelaran → perlanggaran PALSU**
+
+Query J0 mengira nama ternormal secara inline kerana
+`normalize_person_name()` belum dipasang. Versi asal hanya melakukan tiga
+langkah (lower, gantikan tanda baca, runtuhkan ruang) dan **tertinggal
+langkah keempat** — pembuangan gelaran.
+
+Kesan yang diukur dalam PGlite dengan set 18 staf Excel:
+
+| Profil | token pertama (inline lama) | token pertama (fungsi sebenar) |
+|---|---|---|
+| Dr. Ahmad Nizar | `dr` | `ahmad` |
+| Dr. Afiq | `dr` | `afiq` |
+
+J0c melaporkan **1 perlanggaran token pertama** yang tidak wujud dalam
+penyelesai sebenar. Di live, ChatGPT akan melaporkan "🔴 perlanggaran" dan
+panel akan menghabiskan masa menyiasat masalah hantu — atau lebih buruk,
+K6 akan dilaraskan berdasarkan ramalan yang salah.
+
+**Pembetulan:** blok J0 kini mengandungi salinan **setia** empat langkah
+`normalize_person_name()`, termasuk regexp gelaran
+`^(dr|pn|en|ms|mr|mrs|puan|encik|tuan|datuk|datin|hajah|haji|prof|ir|ar|sr|tun|tan sri|puan sri)\s+`.
+Selepas pembetulan: J0c = 0 perlanggaran, seperti yang dijangka.
+
+**(b) `set_config('request.jwt.claims', '', …)` memecahkan `::jsonb`**
+
+`seed-account-manager-aliases.sql` kini menetapkan identiti Super Admin di
+permulaan (lihat 10.9). Blok pembersihan asalnya menetapkan semula kepada
+**rentetan kosong**. Tetapi `auth.uid()` dan
+`can_resolve_account_managers()` membaca:
+
+```sql
+current_setting('request.jwt.claims', true)::jsonb ->> 'sub'
+```
+
+Tetapan yang telah DISET kepada `''` masih **wujud** dalam sesi, jadi
+`current_setting(..., true)` mengembalikan `''` dan bukan NULL — dan
+`''::jsonb` gagal dengan `invalid input syntax for type json`. Setiap
+panggilan selepas seed akan terhenti.
+
+**Pembetulan (dua bahagian):**
+
+1. Guna `'{}'` dan bukannya `''` — JSON sah yang menghasilkan
+   `auth.uid() = NULL`, iaitu keadaan asal di SQL Editor.
+2. Blok pembersihan kini **memulihkan** identiti asal pemanggil (disimpan
+   dalam `tpms.seed_prev_jwt_claims` semasa blok identiti), bukan
+   mengosongkannya. Skrip tidak berhak memadam identiti yang ditetapkan
+   oleh pemanggil yang sah — ia hanya **meminjam** identiti Super Admin
+   untuk tempoh seed.
+
+Nota: bug `''` yang sama turut wujud dalam harness ujian
+(`test-account-manager-resolution.mjs` baris 218). Ia tidak menghalang
+ujian kerana laluan yang memerlukan `auth.uid()` sentiasa menetapkan id
+sebenar, tetapi ia kekal sebagai perangkap untuk sesiapa yang menyalinnya.
+
+### 10.9 🔴 Blok identiti dalam seed — keperluan yang terlepas pandang
+
+`am_confirm_alias()` dan `am_confirm_external()` memanggil
+`can_resolve_account_managers()`, yang memerlukan `auth.uid()` bukan NULL.
+Supabase SQL Editor melaksanakan skrip sebagai **pemilik pangkalan data
+tanpa JWT**, jadi `auth.uid()` = NULL dan setiap INSERT gagal dengan
+`42501 tiada kuasa`.
+
+Tanpa pembetulan ini, pemasangan yang telah **diluluskan pengguna** akan
+gagal pada Langkah 4 dengan ralat kuasa yang kelihatan seperti penolakan
+RLS — dan ChatGPT mungkin "memperbaikinya" dengan melonggarkan RLS, yang
+melanggar larangan tetap.
+
+**Penyelesaian dalam seed:** satu blok `DO` di permulaan yang
+1. mencari Super Admin (`role = 'super_admin'`, jatuh balik kepada
+   `saidrazak881@gmail.com`),
+2. `RAISE EXCEPTION 'P0002'` jika tiada — seed **dibatalkan**, bukan
+   dipaksa dengan NULL,
+3. menetapkan `request.jwt.claims` kepada `{"sub": <id>, "role": "authenticated"}`,
+4. mengesahkan `can_resolve_account_managers()` benar-benar true selepas itu.
+
+Kesan sampingan yang **diingini**: `audit_logs.user_id` kini merekodkan
+Super Admin sebenar sebagai pengesah keputusan DP-8/DP-9, bukannya NULL —
+asal-usul (provenance) yang boleh diaudit.
+
+### 10.10 Pengajaran direkodkan (sambungan daripada 10.7)
+
+5. **Query pra-penerbangan mesti SETIA kepada fungsi yang akan dipasangnya.**
+   Sebarang penghampiran inline yang kurang satu langkah akan menghasilkan
+   ramalan palsu — dan ramalan palsu lebih berbahaya daripada tiada ramalan,
+   kerana ia dilihat sebagai bukti.
+6. **`set_config` kepada rentetan kosong ≠ tidak ditetapkan.** Untuk GUC
+   yang dibaca sebagai `::jsonb`, guna `'{}'`.
+7. **Skrip yang meminjam identiti mesti memulihkannya.** Jangan biarkan
+   skrip utiliti memadam keadaan sesi pemanggilnya.
+8. **Ujian yang mengesahkan PROMPT (bukan hanya SQL) menangkap kecacatan
+   yang tiada ujian lain akan nampak.** `test-prompt-8a3-install.mjs`
+   menjalankan setiap query J0 dan K1–K12 sebenar daripada dokumen prompt
+   terhadap PGlite — ia menemui (a) dan (b) di atas, kedua-duanya dalam
+   artefak yang akan dihantar kepada ChatGPT.

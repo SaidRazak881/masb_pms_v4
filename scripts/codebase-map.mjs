@@ -109,7 +109,12 @@ try {
 }
 
 /* ---------- Tulis dokumen ---------- */
-const now = new Date().toISOString().slice(0, 10);
+// Tarikh MESTI dalam zon waktu pengguna (Asia/Kuala_Lumpur, UTC+8), bukan UTC.
+// toISOString() memberi tarikh UTC, jadi penjanaan selepas 16:00 MYT akan
+// merakamkan tarikh SEMALAM pada semua dokumen — tidak konsisten dengan
+// tarikh yang ditulis tangan dalam docs/ (semuanya MYT).
+const now = new Date().toLocaleDateString('en-CA',
+  { timeZone: 'Asia/Kuala_Lumpur' });   // en-CA => format YYYY-MM-DD
 const lines = [];
 lines.push("# CODEBASE MAP — TPMS MIMOS Academy");
 lines.push("");

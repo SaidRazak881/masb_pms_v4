@@ -241,6 +241,22 @@ eq(rosak.length, 0,
 const stg = j1j.find((r) => r.jadual === 'import_staging');
 eq(stg?.ada_lajur_updated_at, true, 'J1j: import_staging ada lajur updated_at');
 
+// PEMBETULAN ARENA selepas laporan J1: versi asal J1j menandakan
+// `account_manager_aliases` sebagai 🔴 walaupun jadual itu TIDAK WUJUD
+// (positif palsu). ChatGPT mengesan dan menolaknya dengan betul.
+// Ujian ini memastikan positif palsu itu tidak boleh berulang: jadual yang
+// tidak wujud MESTI dilaporkan ⚪, bukan 🔴.
+const alias = j1j.find((r) => r.jadual === 'account_manager_aliases');
+if (alias) {
+  alias.keadaan.startsWith('🔴')
+    ? bad('J1j: positif palsu — jadual tidak wujud ditandai 🔴 DP-7')
+    : ok(`J1j: jadual tidak wujud ditandai '${alias.keadaan.slice(0, 2)}' (bukan 🔴)`);
+  eq(alias.jadual_wujud, false, 'J1j: jadual_wujud = false direkodkan secara eksplisit');
+}
+// tiada baris 🔴 langsung dalam bootstrap ujian ini
+const merah = j1j.filter((r) => String(r.keadaan).startsWith('🔴'));
+eq(merah.length, 0, 'J1j: sifar baris 🔴 (tiada positif palsu)');
+
 console.log('\n[4] J1 TIDAK MENGUBAH DATA — jalankan dua kali, bandingkan');
 const before = {};
 for (const t of ['organizers', 'invoices', 'import_staging', 'user_profiles',

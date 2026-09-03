@@ -3,7 +3,7 @@
 > ## 🔴 HARD GATE — JANGAN JALANKAN SEBELUM PENGGUNA MELULUSKAN
 >
 > Prompt ini mengandungi **SQL yang mengubah skema pangkalan data LIVE**
-> (`lmenmfsbjgxcfhnykkgow`). Ia menambah 6 lajur, 1 jadual baharu, 3 indeks,
+> (`lmenmfsbjgxfhnykkgow`). Ia menambah 6 lajur, 1 jadual baharu, 3 indeks,
 > 2 fungsi dan 4 polisi RLS.
 >
 > **Sebab gate ini wujud:** perubahan skema pada pangkalan data produksi tidak
@@ -518,7 +518,7 @@ Laporkan nilai verbatim.
 ## 8. FORMAT LAPORAN (6 seksyen)
 
 ### Seksyen 1 — Konteks & Status
-Nama projek, pangkalan data (`lmenmfsbjgxcfhnykkgow`), branch yang failnya
+Nama projek, pangkalan data (`lmenmfsbjgxfhnykkgow`), branch yang failnya
 diambil, SHA-256 fail yang anda sahkan, dan sama ada pengguna sudah meluluskan
 TUGASAN 2.
 

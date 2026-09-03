@@ -43,6 +43,75 @@
 --    `am_backfill_account_manager()`, di bawah HARD GATE berasingan
 -- =====================================================================
 
+-- ---------------------------------------------------------------------
+-- 0. TETAPKAN IDENTITI — WAJIB SEBELUM SEBARANG TULISAN
+-- ---------------------------------------------------------------------
+-- 🔴 MASALAH OPERASI YANG DIBETULKAN DI SINI (dikesan oleh
+--    scripts/test-prompt-8a3-install.mjs):
+--
+-- `am_confirm_alias()` dan `am_confirm_external()` memanggil
+-- `can_resolve_account_managers()`, yang bergantung kepada `auth.uid()`.
+-- Tetapi **Supabase SQL Editor / connector menjalankan SQL sebagai PEMILIK
+-- pangkalan data TANPA JWT**, jadi `auth.uid()` = NULL dan kedua-dua fungsi
+-- menaikkan:
+--     tiada kuasa: ... memerlukan peranan admin, head_governance atau finance
+--
+-- Tanpa bahagian ini, seed akan GAGAL di live walaupun fail 8A/8A-2/DP-9
+-- dipasang dengan betul — iaitu blocker palsu pada pemasangan yang SUDAH
+-- diluluskan pengguna.
+--
+-- Penyelesaian: tetapkan `request.jwt.claims` kepada Super Admin SEBELUM
+-- menulis. Ini juga memberikan `audit_logs.user_id` provenans yang sebenar
+-- (bukannya NULL), jadi jejak audit menunjukkan SIAPA yang merekodkan
+-- keputusan DP-8/DP-9.
+
+DO $$
+DECLARE
+  v_admin uuid;
+  v_prev  text;
+BEGIN
+  -- Simpan identiti sesi SEMASA supaya ia boleh dipulihkan di hujung skrip.
+  -- Skrip ini tidak boleh memadam identiti yang telah ditetapkan oleh
+  -- pemanggil (contohnya harness ujian atau sesi admin yang sah) — ia hanya
+  -- meminjam identiti Super Admin untuk tempoh seed ini sahaja.
+  v_prev := current_setting('request.jwt.claims', true);
+  PERFORM set_config('tpms.seed_prev_jwt_claims', coalesce(v_prev, ''), false);
+
+  SELECT up.id INTO v_admin
+    FROM public.user_profiles up
+   WHERE up.role::text = 'super_admin'
+   ORDER BY up.created_at
+   LIMIT 1;
+
+  IF v_admin IS NULL THEN
+    SELECT up.id INTO v_admin
+      FROM public.user_profiles up
+     WHERE lower(btrim(up.email)) = 'saidrazak881@gmail.com'
+     LIMIT 1;
+  END IF;
+
+  IF v_admin IS NULL THEN
+    RAISE EXCEPTION 'seed DP-8/DP-9: tiada akaun Super Admin ditemui (role=super_admin atau saidrazak881@gmail.com). Seed dibatalkan kerana identiti pengesah tidak boleh ditentukan — JANGAN paksa dengan menulis NULL.'
+      USING ERRCODE = 'P0002';
+  END IF;
+
+  PERFORM set_config('request.jwt.claims',
+                     jsonb_build_object('sub', v_admin, 'role', 'authenticated')::text,
+                     false);
+
+  IF NOT public.can_resolve_account_managers() THEN
+    RAISE EXCEPTION 'seed DP-8/DP-9: identiti Super Admin ditetapkan tetapi can_resolve_account_managers() masih false. Periksa has_role() dan peranan profil %.', v_admin
+      USING ERRCODE = '42501';
+  END IF;
+
+  RAISE NOTICE 'seed DP-8/DP-9: identiti ditetapkan kepada Super Admin %', v_admin;
+END
+$$;
+
+-- =====================================================================
+-- BAHAGIAN 1 — DP-8: 'Fuzy', 'Fuzy / Dila', 'Fuzy / Sholihin' -> Fuziah
+-- =====================================================================
+
 DO $$
 DECLARE
   v_fuziah uuid;
@@ -182,3 +251,33 @@ $$;
 --   FROM public.am_unresolved_values() GROUP BY kategori ORDER BY kategori;
 -- Jangkaan: SELESAI = 11 nilai (262 baris), LUAR = 1 nilai (4 baris),
 --           TIADA_PADANAN = 0, BERBILANG_ORANG = 0, PERLU_PENGESAHAN = 0
+
+-- ---------------------------------------------------------------------
+-- PULIHKAN identiti sesi supaya tiada kenyataan kemudian dalam sesi yang
+-- sama secara tidak sengaja mewarisi kuasa Super Admin, dan supaya identiti
+-- asal pemanggil (jika ada) tidak terpadam.
+-- ---------------------------------------------------------------------
+-- ⚠️ MESTI '{}' dan BUKAN rentetan kosong ''.
+-- auth.uid() dan can_resolve_account_managers() membaca
+--     current_setting('request.jwt.claims', true)::jsonb
+-- Tetapan yang telah DISET kepada '' masih "wujud" dalam sesi, jadi cast
+-- ::jsonb ke atas rentetan kosong gagal dengan
+--     "invalid input syntax for type json" dan memecahkan SETIAP panggilan
+-- selepas ini. '{}' ialah JSON sah yang menghasilkan auth.uid() = NULL,
+-- iaitu keadaan asal sebelum skrip ini.
+-- (Dikesan oleh scripts/test-account-manager-resolution.mjs.)
+DO $$
+DECLARE
+  v_prev text;
+BEGIN
+  v_prev := current_setting('tpms.seed_prev_jwt_claims', true);
+  IF v_prev IS NOT NULL AND btrim(v_prev) <> '' THEN
+    -- Pulihkan identiti asal pemanggil SEBAGAIMANA ADANYA.
+    PERFORM set_config('request.jwt.claims', v_prev, false);
+  ELSE
+    -- Tiada identiti sebelum skrip ini (keadaan biasa di SQL Editor Supabase).
+    -- Guna '{}' dan BUKAN '' — lihat amaran di atas.
+    PERFORM set_config('request.jwt.claims', '{}', false);
+  END IF;
+  PERFORM set_config('tpms.seed_prev_jwt_claims', '', false);
+END $$;

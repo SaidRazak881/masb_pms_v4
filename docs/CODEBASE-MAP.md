@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
-> Dijana: 2026-09-03 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: b79769e DP-8 DILAKSANAKAN: keputusan pengguna — Fuzy/Fuzy-Dila/Fuzy-Sholihin -> Fuziah · arena/01a06274-masb-pms-v4
+> Dijana: 2026-09-04 · Arahan kemaskini: `node scripts/codebase-map.mjs`
+> Git: 1128fe2 DP-9: Ow Zi Qi = orang luar; semua 12 nilai kini ada keputusan manusia · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 
@@ -246,6 +246,7 @@
 - `PROMPT-7A-FIX-FIELD-MAPPING.md`
 - `PROMPT-8A-CLIENT-MASTER.md`
 - `PROMPT-8A-J1-READONLY.md`
+- `PROMPT-8A3-INSTALL.md`
 - `PROMPT-TEMPLATE-FASA.md`
 - `SETUP-SUPABASE.md`
 - `SKILLS.md`

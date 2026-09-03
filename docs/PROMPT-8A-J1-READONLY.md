@@ -4,7 +4,7 @@
 >
 > Prompt ini **READ-ONLY SEPENUHNYA**. Ia mengandungi **lapan query SELECT sahaja** —
 > tiada `INSERT`, `UPDATE`, `DELETE`, `DDL`, `GRANT` atau `REVOKE`. Ia **tidak
-> mengubah apa-apa** di pangkalan data `lmenmfsbjgxcfhnykkgow`.
+> mengubah apa-apa** di pangkalan data `lmenmfsbjgxfhnykkgow`.
 >
 > **Ia TIDAK memasang apa-apa.** `client-master.sql` **TIDAK** diluluskan oleh
 > prompt ini dan **MESTI TIDAK** dijalankan. Prompt ini hanya mengumpul
@@ -187,8 +187,14 @@ SELECT 'J1i_staging_updated_at' AS check_name,
 
 -- J1j: adakah trigger set_updated_at DIPASANG pada import_staging?
 --      (dan pada jadual lain yang mungkin tiada lajur updated_at)
+-- ⚠️ PEMBETULAN ARENA (selepas laporan J1): versi asal query ini menghasilkan
+-- 🔴 PALSU untuk `account_manager_aliases` kerana CASE-nya tidak membezakan
+-- "jadual tidak wujud" daripada "jadual wujud + trigger ada + lajur tiada".
+-- ChatGPT mengesan ini dan menolaknya dengan betul (bilangan_trigger=0).
+-- Kini `to_regclass()` digunakan untuk membezakan empat keadaan.
 SELECT 'J1j_trigger_vs_column' AS check_name,
        t.tbl AS jadual,
+       (to_regclass('public.' || t.tbl) IS NOT NULL) AS jadual_wujud,
        (SELECT count(*) FROM pg_trigger tg
           JOIN pg_class cc ON cc.oid = tg.tgrelid
           JOIN pg_namespace nn ON nn.oid = cc.relnamespace
@@ -200,18 +206,31 @@ SELECT 'J1j_trigger_vs_column' AS check_name,
                 WHERE c.table_schema='public' AND c.table_name = t.tbl
                   AND c.column_name='updated_at') AS ada_lajur_updated_at,
        CASE
+         WHEN to_regclass('public.' || t.tbl) IS NULL
+           THEN '⚪ JADUAL TIDAK WUJUD — bukan DP-7 (tiada apa hendak dicetus)'
+         WHEN NOT EXISTS (SELECT 1 FROM information_schema.columns c
+                           WHERE c.table_schema='public' AND c.table_name = t.tbl
+                             AND c.column_name='updated_at')
+              AND EXISTS (SELECT 1 FROM pg_trigger tg
+                            JOIN pg_class cc ON cc.oid = tg.tgrelid
+                            JOIN pg_namespace nn ON nn.oid = cc.relnamespace
+                           WHERE nn.nspname='public' AND cc.relname = t.tbl
+                             AND NOT tg.tgisinternal
+                             AND tg.tgname IN ('set_updated_at',
+                                               'trg_' || t.tbl || '_updated_at'))
+           THEN '🔴 DP-7: TRIGGER DIPASANG TETAPI LAJUR TIADA — sebarang kemas kini akan gagal'
          WHEN EXISTS (SELECT 1 FROM information_schema.columns c
                        WHERE c.table_schema='public' AND c.table_name = t.tbl
                          AND c.column_name='updated_at')
-           THEN '🟢 OK'
-         ELSE '🔴 TRIGGER DIPASANG TETAPI LAJUR TIADA — sebarang kemas kini akan gagal'
+           THEN '🟢 OK — lajur updated_at wujud'
+         ELSE '⚪ tiada trigger dan tiada lajur — tidak berisiko DP-7'
        END AS keadaan
   FROM (VALUES ('import_staging'),('invoices'),('participants'),
                ('programme_costs'),('programmes'),('app_settings'),
                ('cost_items'),('financial_docs'),('organizers'),
                ('programme_documents'),('user_profiles'),
                ('account_manager_aliases')) AS t(tbl)
- ORDER BY keadaan DESC, t.tbl;
+ ORDER BY keadaan, t.tbl;
 ```
 
 
@@ -223,7 +242,7 @@ SELECT 'J1j_trigger_vs_column' AS check_name,
 Jangan cadangkan SQL untuk dijalankan. Laporkan sahaja.
 
 ### Seksyen 1 — Konteks & Status
-Pangkalan data (`lmenmfsbjgxcfhnykkgow`), cara anda menyambung, dan pengesahan
+Pangkalan data (`lmenmfsbjgxfhnykkgow`), cara anda menyambung, dan pengesahan
 bahawa **hanya SELECT** dijalankan.
 
 ### Seksyen 2 — Keputusan J1 (jadual)
