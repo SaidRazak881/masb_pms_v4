@@ -7,9 +7,15 @@
 > mana-mana alat**. ChatGPT berhenti dengan betul dan enggan mereka nilai.
 > 
 > Akibatnya:
-> - **Langkah D** → dipindahkan kepada **pengguna** (manual, Supabase Dashboard).
->   Senarai semak ada dalam PROMPT-6E §3 dan nota akhirnya.
-> - **Langkah E** → **dinyahganding** dari D dan diluluskan dalam **PROMPT-6E**.
+> - **Langkah D** → pada mulanya dipindahkan kepada **pengguna** (manual).
+>   **PEMINDAHAN ITU DIBATALKAN.** Pengguna mengesahkan ChatGPT mempunyai
+>   **capaian penuh** terhadap Supabase dan Vercel; had yang dilaporkan ialah
+>   sifat **sesi itu**, bukan sempadan keupayaan kekal. D dikembalikan kepada
+>   ChatGPT dalam **`docs/PROMPT-6F-AUDIT-PRIVATE-SCHEMA-DRIFT.md` §2**.
+> - **Langkah E** → **dinyahganding** dari D dan diluluskan dalam **PROMPT-6E**,
+>   kemudian **dikembalikan kepada ChatGPT** dalam **PROMPT-6F §1** selepas
+>   pembetulan yang sama (Arena tersilap menganggap penukaran Production Branch
+>   ialah kerja manual pengguna).
 >   Gate "D sebelum E" Arena ialah kesilapan proses: ia menyekat pemulihan
 >   produksi kerana sebab yang tidak berkaitan.
 > - **X1–X5** → X4/X5 berjaya (bukti digunakan dalam PROMPT-6E §6). X1 tidak

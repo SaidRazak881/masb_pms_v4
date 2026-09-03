@@ -1,60 +1,129 @@
-# PROMPT 6F — Z1–Z5: adakah `private.*` pra-repo masih memegang governance lock & audit log?
+# PROMPT 6F — E (Production Branch) + baki D + Z1–Z5 (audit `private.*` pra-repo)
 
 > **Persona kamu:** Jurutera pangkalan data yang teliti dan berhati-hati
 > (`docs/personas/PERSONA-SQL-ARCHITECT.md`).
 >
-> **Keadaan:** PROMPT-6E dijalankan. **E = 0/9 PASS** dan anda membuktikan
-> dengan bukti live bahawa Production masih Fasa 5 (`MfaGuard` masih dimuatkan,
-> `/register` `/forgot-password` `/admin/users` = 404). **Y1–Y4 selesai.**
-> Anda berhenti dengan betul apabila connector tiada operasi untuk menukar
-> Vercel Production Branch.
+> **Keadaan:** PROMPT-6E dijalankan. **E = 0/9 PASS** dengan bukti live bahawa
+> Production masih **Fasa 5** (`MfaGuard` masih dimuatkan; `/register`,
+> `/forgot-password`, `/admin/users` = 404). **Y1–Y4 selesai.** D2 sudah dibuat
+> oleh pengguna.
 >
-> **Arena menerima laporan anda tanpa pengecualian.** Anda tidak mereka apa-apa,
-> dan anda mengesahkan empat fail Fasa 6 wujud pada branch sasaran melalui SHA
-> blob — itu pengesahan kandungan, bukan andaian.
+> **Semua diluluskan dalam prompt ini:**
+> 1. 🟢 **LANGKAH E** — tukar Production Branch + sahkan env vars + **E1–E9**.
+> 2. 🟢 **BAKI LANGKAH D** — D2 (sahkan), D1, D3, D4.
+> 3. 🟢 **Z1–Z5 (READ-ONLY)** — audit 4 fungsi `private.*` pra-repo.
+> 4. ⛔ **TIADA** kelulusan DROP / REVOKE / ALTER / CREATE pada skema.
 >
-> **Keputusan Arena:**
-> 1. 🔴 **E masih blocked.** Penukaran Production Branch ialah **kerja manual
->    pengguna di Vercel Dashboard** — bukan kerja Arena, dan bukan kerja anda.
->    Lihat §1.
-> 2. 🟢 **Z1–Z5 DILULUSKAN (READ-ONLY).** Y2 anda mendedahkan sesuatu yang lebih
->    besar daripada `private.has_role()`. Lihat §2 — ini sebab prompt ini wujud.
-> 3. ⛔ **TIADA kelulusan DROP / REVOKE / ALTER / CREATE.** Termasuk kelima-lima
->    fungsi `private`.
-> 4. ✅ **D2 sudah selesai** — pengguna telah menambah
->    `https://masb-pms-v4.vercel.app/security**` ke Redirect URLs.
+> **Baca §0 dahulu — ia membatalkan arahan yang Arena berikan dalam PROMPT-6E.**
 
 ---
 
-## 1. Blocker E — siapa buat apa
+## 0. PEMBETULAN ARAHAN — baca sebelum buat apa-apa
 
-Anda menulis: *"Arena perlu buat satu perkara sahaja untuk meneruskan E: tukar
-Vercel → Settings → Git → Production Branch."*
+Dalam PROMPT-6E, Arena menulis bahawa penukaran Production Branch ialah "kerja
+manual pengguna" dan bahawa Langkah D "dipindahkan kepada pengguna" serta
+"anda tidak perlu cuba lagi".
 
-**Pembetulan penting tentang pembahagian kerja:** Arena **tidak pernah**
-mempunyai capaian kepada Vercel atau Supabase. Arena hanya menulis kod/SQL dalam
-repo GitHub dan menyediakan prompt. **Semua kerja Vercel dan Supabase ialah
-tanggungjawab anda dan pengguna** — itu perjanjian operasi projek ini.
+**Kedua-dua arahan itu DIBATALKAN.**
 
-Oleh kerana connector anda tiada operasi mutation untuk Git settings, tugas itu
-jatuh kepada **pengguna, secara manual**:
+**Punca kesilapan Arena:** dalam sesi PROMPT-6D/6E, anda melaporkan bahawa
+connector yang tersedia dalam **sesi itu** tiada operasi untuk Supabase Auth
+configuration dan Vercel Git settings. Arena **membuat kesimpulan bahawa had itu
+kekal**, lalu memindahkan tugas kepada pengguna dan menulis semula prompt
+berdasarkan andaian tersebut.
 
-```
-Vercel Dashboard → projek masb-pms-v4
-  → Settings → Git → Production Branch
-  → tukar kepada: arena/01a06274-masb-pms-v4
-  → Save
-```
+**Fakta sebenar (disahkan oleh pengguna):** ChatGPT mempunyai **capaian penuh**
+terhadap Vercel dan Supabase, dan boleh melakukan semuanya **melainkan ChatGPT
+sendiri memaklumkan bahawa ia tidak boleh** dalam kes tertentu.
 
-**Selepas pengguna melakukannya, anda jalankan semula E1–E9.** Jangan jalankan
-E1–E9 sebelum pengguna mengesahkan penukaran itu — ia akan gagal semula dengan
-cara yang sama dan membazir satu pusingan.
+**Jadi:** had yang anda laporkan ialah sifat **sesi/operasi tertentu**, bukan
+sempadan keupayaan yang kekal. Arena sepatutnya **bertanya operasi mana yang
+tiada** dan mencuba laluan lain, bukan menyerah dan memindahkan tugas.
 
-**Yang anda boleh buat sekarang tanpa menunggu: Z1–Z5.**
+**Peraturan proses baharu (direkodkan sebagai kesilapan Arena #5):**
+> Apabila pembantu melaporkan "alat saya tidak boleh buat X", jawapan pertama
+> ialah **"operasi spesifik mana yang tiada, dan adakah laluan lain?"** —
+> bukan pemindahan tugas kepada manusia. Memindahkan tugas berdasarkan had alat
+> dalam **satu** sesi ialah kesimpulan yang tidak disokong oleh bukti.
+
+**Apa yang kekal betul daripada PROMPT-6E:** pembahagian kerja asal — **Arena
+tidak pernah mempunyai capaian kepada Vercel atau Supabase**; Arena hanya menulis
+kod/SQL dalam repo dan menyediakan prompt. Yang salah ialah kesimpulan bahawa
+kerana ChatGPT (pada satu sesi) tidak dapat, maka **pengguna** yang mesti buat.
+
+**Nota tentang D2:** pengguna **sudah** menambah
+`https://masb-pms-v4.vercel.app/security**` ke Redirect URLs. Anda hanya perlu
+**mengesahkannya** (D2 di bawah), bukan membuatnya semula.
 
 ---
 
-## 2. Kenapa Z wujud — penemuan Arena daripada Y2 anda
+## 1. LANGKAH E — DILULUSKAN, anda jalankan 🟢
+
+### E-1. Tukar Production Branch
+
+1. Vercel Dashboard → projek `masb-pms-v4` → **Settings → Git → Production
+   Branch** → tukar kepada **`arena/01a06274-masb-pms-v4`** → Save.
+2. **Laporkan nilai SEMASA dahulu** (jangkaan: `arena/01a05cd4-masb-pms-v4`)
+   supaya boleh dipulangkan jika perlu.
+3. Sahkan deployment mencapai **READY** dengan **`Target: Production`**. Anda
+   sudah melaporkan deployment branch ini READY tetapi `target=null` — selepas
+   penukaran, `target` **mesti** menjadi `production`.
+4. **Kriteria hash (kalis kendiri — jangan guna hash tetap):** jalankan
+   `git ls-remote origin arena/01a06274-masb-pms-v4` dan bandingkan dengan hash
+   deployment. Keduanya **mesti sama**. Jika berbeza atau lebih lama, laporkan
+   sebagai isu.
+5. Sahkan **Environment Variables** `NEXT_PUBLIC_SUPABASE_URL` dan
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY` wujud untuk **Production dan Preview**.
+   **JANGAN papar nilai** — sahkan kewujudan sahaja. Dalam PROMPT-6E anda
+   melaporkan ini "tidak dapat disahkan melalui connector"; sila cuba lagi, dan
+   jika masih tidak boleh, **namakan operasi spesifik** yang tiada.
+6. Nyatakan sama ada redeploy manual diperlukan selepas tukar branch.
+
+> **Jika anda benar-benar tidak dapat menukar Production Branch**, jangan
+> berhenti senyap: laporkan **nama operasi/API yang anda cuba** dan **ralat
+> penuhnya**. Itu membezakan "alat tiada" daripada "saya tidak cuba cara lain".
+
+### E-2. Pengesahan tanpa log masuk (E1–E9)
+
+Jalankan **selepas** Production Branch ditukar dan deployment READY.
+
+| # | URL | Jangkaan |
+|---|-----|----------|
+| E1 | `/programmes` | redirect ke `/login?redirect=%2Fprogrammes` |
+| E2 | `/admin/users` | redirect ke `/login?redirect=%2Fadmin%2Fusers` |
+| E3 | `/login` | 200; mengandungi `masb.12345`, `Daftar Akaun Baharu`, `Lupa kata laluan?` |
+| E4 | `/register` | 200; mengandungi `Daftar Akaun Baharu`, `Menunggu Kelulusan` |
+| E5 | `/forgot-password` | 200; mengandungi `Lupa Kata Laluan` |
+| E6 | `/pending-approval` | 200; mengandungi `Menunggu Kelulusan` |
+| E7 | `/account-blocked` | 200; mengandungi `Akaun Disekat` |
+| E8 | `/security` | redirect ke `/login` |
+| E9 | mana-mana halaman | **TIADA** teks `authenticator`, `Pengesahan 2-Langkah`, `kod 6 digit`, `TOTP`, `MFA`, `MfaGuard` |
+
+**E9 ialah bukti MFA benar-benar dibuang dari produksi.** Anda sudah membuktikan
+dalam PROMPT-6E bahawa E9 **gagal** selagi Production masih Fasa 5 — jadi E9
+ialah penentu bahawa penukaran branch benar-benar berkesan.
+
+> **Nota E5:** halaman `/forgot-password` dijangka 200 dan memaparkan borang.
+> Pautan dalam e-mel pula bergantung kepada D2 (sudah dibuat oleh pengguna) —
+> sila **sahkan** D2 dalam §2.
+
+---
+
+## 2. BAKI LANGKAH D — DILULUSKAN, anda jalankan 🟢
+
+| # | Menu Supabase | Tindakan | Status |
+|---|---------------|----------|--------|
+| **D2** | **Authentication → URL Configuration** | **SAHKAN** `Site URL` = `https://masb-pms-v4.vercel.app` dan `Redirect URLs` mengandungi `https://masb-pms-v4.vercel.app/security**`. Pengguna melaporkan sudah menambahnya — **sahkan dan laporkan nilai sebenar**. Jika tiada, tambah. | 🔴 wajib untuk `/forgot-password` |
+| **D1** | **Authentication → Providers → Email** | Pastikan **Enable Email provider = ON**. Laporkan nilai semasa **`Confirm email`**. **Cadangan Arena + ChatGPT (dari PROMPT-6E): OFF** untuk rollout pertama — 19/19 akaun sedia ada sudah `email_confirmed_at IS NOT NULL`, dan `app/(auth)/register/page.tsx` mengendalikan kedua-dua kes. **Tetapi JANGAN tukar tanpa melaporkannya dahulu** — keputusan akhir milik pengguna. | sederhana |
+| **D3** | **Authentication → Email Templates → Reset Password** | Sahkan template mengandungi `{ .ConfirmationURL }`. Laporkan subjek + sama ada ia Bahasa Melayu atau Inggeris. Jika organisasi mahu Bahasa Melayu, **sediakan teks cadangan** (subjek + badan) dalam laporan — **jangan tukar template** tanpa kelulusan. | rendah |
+| **D4** | **Authentication → Rate Limits** | Laporkan nilai semasa. Nyatakan sama ada perubahan diperlukan untuk 19 pengguna. **JANGAN cadangkan melumpuhkan sebarang perlindungan.** | rendah |
+
+**Untuk setiap D: laporkan NILAI SEMASA → NILAI BAHARU**, supaya sebarang
+perubahan boleh dipulangkan.
+
+---
+
+## 3. Kenapa Z wujud — penemuan Arena daripada Y2 anda
 
 Y2 anda menyenaraikan **5 fungsi** dalam skema `private`:
 
@@ -129,15 +198,21 @@ Y1 anda melaporkan `private.has_role` ialah **`SECURITY DEFINER = true`**,
 
 ---
 
-## 3. Z1–Z5 — READ-ONLY, katalog dahulu
+---
 
-**Reka bentuk:** anda membuktikan dalam PROMPT-6E bahawa connector anda boleh
-baca `pg_proc` metadata (Y1/Y2 berjaya) tetapi **`pg_proc.prosrc` tidak
-tersedia** (X2 gagal). Jadi **Z1–Z4 menggunakan katalog sahaja** dan **Z5 ialah
-percubaan terakhir** untuk `prosrc` — jika dihalang, laporkan ralat dan
-**teruskan**.
+## 4. Z1–Z5 — READ-ONLY 🟢
 
-**Tiada DDL/DML/GRANT/REVOKE. Tiada pelaksanaan fungsi.**
+**Reka bentuk (DIKEMAS KINIKAN selepas pembetulan §0):** Z1–Z4 asalnya direka
+untuk menggunakan **katalog sahaja** kerana dalam sesi PROMPT-6E anda
+melaporkan `pg_proc.prosrc` tidak tersedia. Memandangkan anda mempunyai capaian
+penuh Supabase, **Z5 kini bukti UTAMA** — badan sebenar kelima-lima fungsi
+`private.*` ialah satu-satunya cara mengetahui apa yang
+`validate_programme_lock` dan `write_audit_log` **lakukan**.
+
+Z1–Z4 tetap berguna sebagai **struktur dan kebergantungan** (siapa pemilik,
+trigger mana terikat, polisi mana merujuk). Jalankan **kesemuanya**.
+
+**Tiada DDL/DML/GRANT/REVOKE. Tiada pelaksanaan fungsi `private.*`.**
 
 ```sql
 -- Z1. Kelima-lima fungsi private: signature, PEMILIK, dan sama ada
@@ -298,7 +373,7 @@ SELECT 'Z5_private_function_source' AS check_name,
 | **Z2** | **Trigger mana memanggil `private.*`?** | ⭐ **Jika `programmes_enforce_lock` → `private.validate_programme_lock()`, governance lock sedang dikuatkuasakan oleh kod pra-repo.** Itu penemuan keselamatan, bukan kosmetik |
 | Z3 | Polisi mana merujuk `private.*` selain `has_role`? | Menentukan skop penuh kebergantungan sebelum sebarang REVOKE/DROP |
 | Z4 | `updated_at_origin` bagi setiap jadual ber-`updated_at`: 🔴 private / 🟢 bukan private / ⚪ tiada trigger | Drift senyap jenis kedua — kolum yang tidak pernah dikemas kini. **Klasifikasi ini khusus kepada trigger `updated_at`, bukan semua trigger pada jadual** |
-| Z5 | Badan sebenar kelima-lima fungsi | Jawapan muktamad. Jika dihalang, Z1–Z4 tetap mencukupi untuk merancang |
+| **Z5** | **Badan sebenar (`prosrc`) kelima-lima fungsi `private.*`** | ⭐ **Bukti UTAMA, bukan cubaan terakhir.** Ini satu-satunya cara mengetahui apa yang `validate_programme_lock` dan `write_audit_log` **sebenarnya** lakukan. Anda mempunyai capaian penuh Supabase, jadi ini patut boleh dibaca. Jika gagal, namakan **operasi spesifik** yang anda cuba dan ralatnya |
 
 **Jika mana-mana Z gagal dengan ralat kebenaran, tampal ralat PENUH**
 (ERROR / DETAIL / HINT / CONTEXT / SQLSTATE) dan **teruskan ke Z seterusnya**.
@@ -311,7 +386,18 @@ connector**, bukan sintaks.
 
 ---
 
-## 4. Rancangan Arena selepas Z (BELUM diluluskan)
+**Jika mana-mana Z gagal, tampal ralat PENUH** (ERROR / DETAIL / HINT /
+CONTEXT / SQLSTATE) **dan namakan operasi yang anda cuba**, kemudian **teruskan
+ke Z seterusnya**. Jangan hentikan keseluruhan laporan.
+
+**Semua query Z telah diuji oleh Arena terhadap PGlite** dalam
+`scripts/test-prompt-6f-z-queries.mjs` (26/26 lulus: sintaks sah, read-only,
+tidak melaksanakan fungsi, dan Z2 terbukti mendedahkan Senario A). Jika ada yang
+gagal di live, puncanya ialah **kebenaran**, bukan sintaks.
+
+---
+
+## 5. Rancangan Arena selepas Z (BELUM diluluskan)
 
 Bergantung kepada Z2:
 
@@ -340,7 +426,7 @@ itu, kerana Y3 membuktikan `pg_depend` menjejak polisi → `DROP FUNCTION` tanpa
 
 ---
 
-## 5. Status 3 jadual warisan (kekal TANGGUH)
+## 6. Status 3 jadual warisan (kekal TANGGUH)
 
 Bukti anda setakat ini:
 
@@ -355,123 +441,137 @@ diputuskan. Z2/Z3 mungkin mendedahkan kebergantungan tambahan.
 
 ---
 
-## 6. Larangan (kekal)
+---
+
+## 7. Larangan
 
 1. JANGAN ubah logik perniagaan dalam SQL.
-2. JANGAN jalankan sebarang DDL/DML/GRANT/REVOKE. **Z1–Z5 read-only sepenuhnya.**
+2. JANGAN jalankan sebarang DDL/DML/GRANT/REVOKE pada Supabase.
+   **Z1–Z5 read-only sepenuhnya.** Langkah D dan E ialah **konfigurasi melalui
+   UI/API** (Auth settings, Production Branch) — itu sahaja yang diluluskan.
 3. JANGAN `DROP`/`TRUNCATE`/`DELETE`/`ALTER` jadual warisan **atau** mana-mana
    fungsi `private.*`.
 4. JANGAN guna `service_role`.
 5. JANGAN panggil RPC perniagaan atau `admin_*`.
 6. JANGAN merge ke `main`.
-7. JANGAN tukar Production Branch (ia kerja manual pengguna; dan jika connector
-   anda dapat keupayaan itu kelak, **jangan** guna tanpa Arahan baharu).
-8. JANGAN tampal anon key / secret penuh.
-9. JANGAN cetak PII, `default_password`, atau kolum sensitif. **Anda sudah
-   melakukan ini dengan betul dalam Y4 — teruskan.**
-10. JANGAN reka bukti — terutamanya E1–E9 dan Z1–Z5.
-11. JANGAN anggap Mod Demo tempatan sebagai produksi.
-12. JANGAN guna hash komit tetap sebagai kriteria.
-13. JANGAN cuba menjalankan D.
-14. **JANGAN melaksanakan mana-mana fungsi `private.*`** — Z hanya baca katalog.
-15. **JANGAN jalankan semula E1–E9 sehingga pengguna mengesahkan Production
-    Branch telah ditukar.**
+7. JANGAN tukar Production Branch ke branch selain
+   **`arena/01a06274-masb-pms-v4`**.
+8. JANGAN tukar **`Confirm email`** (D1) tanpa melaporkannya dahulu — keputusan
+   milik pengguna.
+9. JANGAN tukar **Email Templates** (D3) tanpa kelulusan — sediakan cadangan
+   teks sahaja.
+10. JANGAN lumpuhkan sebarang **Rate Limit** atau perlindungan Auth (D4).
+11. JANGAN tampal anon key / secret penuh.
+12. JANGAN cetak PII, `default_password`, atau kolum sensitif. **Anda sudah
+    melakukan ini dengan betul dalam Y4 — teruskan.**
+13. JANGAN reka bukti — terutamanya E1–E9 dan Z1–Z5.
+14. JANGAN anggap Mod Demo tempatan sebagai produksi.
+15. JANGAN guna hash komit tetap sebagai kriteria.
+16. **JANGAN melaksanakan mana-mana fungsi `private.*`** — Z hanya **membaca**
+    badan fungsi, tidak memanggilnya.
+17. **JANGAN berhenti senyap apabila alat gagal.** Namakan operasi yang dicuba
+    dan ralat penuhnya, kemudian teruskan bahagian lain.
 
 ---
 
-## 7. FORMAT LAPORAN (6 seksyen)
+## 8. FORMAT LAPORAN (6 seksyen)
 
 ```
-📋 LAPORAN PROMPT-6F — Z1–Z5 (DRIFT PRA-REPO)
-==============================================
+📋 LAPORAN PROMPT-6F — E + BAKI D + Z1–Z5
+==========================================
 
 1. CONTEXT & STATUS
    - Status keseluruhan: 🟢 / 🟡 / 🔴
-   - Z1-Z5: mana selesai, mana dihalang connector?
-   - Production Branch sudah ditukar oleh pengguna? (ya/tidak)
-   - Pengesahan: E1-E9 TIDAK diulang jika branch belum ditukar
+   - E siap? E1-E9 berapa lulus? (jangkaan 9/9 selepas branch ditukar)
+   - D1-D4 siap?
+   - Z1-Z5 siap? Mana yang gagal, dan operasi apa yang dicuba?
+   - Pengesahan: §0 dibaca — arahan "kerja manual pengguna" DIBATALKAN
 
 2. ACTIONS TAKEN
-   - Query Z yang dijalankan
+   - E: Production Branch SEMASA → BAHARU; hash deployment vs git ls-remote;
+        target deployment; env vars (wujud/tidak, TANPA nilai); redeploy?
+   - D: setiap tetapan — nilai SEMASA → BAHARU
+   - Z: query yang dijalankan
 
 3. VERIFICATION TABLE
-   a) Z1 | fungsi | owner | bypassrls | search_path terkunci? | ACL |
-   b) Z2 | jadual | trigger | executes | origin (private/public) |
+   a) E1-E9 | URL | Jangkaan | Keputusan sebenar | Status ✅/❌ |
+   b) D1-D4 | Tetapan | Nilai semasa | Nilai baharu | Status |
+   c) Z1 | fungsi | owner | bypassrls | search_path terkunci? | ACL |
+   d) Z2 | jadual | trigger | executes | origin (private/public) |
       ⭐ NYATAKAN SECARA EKSPLISIT: adakah mana-mana trigger memanggil
          private.validate_programme_lock() atau private.write_audit_log()?
-   c) Z3 | jadual | polisi | ungkapan | fungsi private yang dirujuk |
-   d) Z4 | jadual | trigger_count | ada private? |
-   e) Z5 | fungsi | source (atau ralat penuh jika dihalang) |
+   e) Z3 | jadual | polisi | ungkapan | fungsi private yang dirujuk |
+   f) Z4 | jadual | updated_at_origin | semua_trigger_count |
+   g) Z5 | fungsi | BADAN PENUH (prosrc) |
 
 4. ISSUES / BLOCKERS
-   - ⭐ Jawapan Z2: governance lock & audit log dikuatkuasakan oleh kod mana?
+   - ⭐ Jawapan Z2 + Z5: governance lock & audit log dikuatkuasakan oleh kod
+     mana, dan apa yang kod itu SEBENARNYA lakukan?
    - Z1: fungsi mana SECURITY DEFINER + owner bypassrls + TIADA search_path?
-   - Z5: jika dihalang, ralat penuh (ERROR/DETAIL/HINT/CONTEXT/SQLSTATE)
-   - Adakah Z2/Z3 mendedahkan kebergantungan private.* yang BAHARU
-     (selain has_role)?
+   - E1-E9 yang gagal (dengan respons sebenar)
+   - Sebarang operasi yang anda tidak dapat lakukan: NAMA operasi + ralat penuh
+     (ERROR/DETAIL/HINT/CONTEXT/SQLSTATE)
 
 5. COMPLIANCE CHECKLIST
-   - 15 larangan: 🟢/🔴 setiap satu
-   - Pengesahan eksplisit: TIADA DROP/TRUNCATE/DELETE/ALTER/GRANT/REVOKE,
-     dan TIADA fungsi private.* dilaksanakan
+   - 17 larangan: 🟢/🔴 setiap satu
+   - Pengesahan eksplisit: TIADA DROP/TRUNCATE/DELETE/ALTER/GRANT/REVOKE, dan
+     TIADA fungsi private.* dilaksanakan (hanya dibaca)
 
 6. CONCLUSION & NEXT STEP
-   - Senario A atau Senario B (§4)? Berikan bukti Z2 sebagai asas.
-   - Adakah terdapat risiko keselamatan aktif, atau hanya sisa yatim?
+   - Adakah produksi kini Fasa 6? (E1-E9, terutama E9)
+   - Senario A atau Senario B (§5)? Berikan bukti Z2 + Z5 sebagai asas.
+   - Adakah terdapat risiko keselamatan AKTIF, atau hanya sisa yatim?
+   - Status D1: cadangan OFF/ON dan keputusan yang anda perlukan dari pengguna
    - Apa yang Arena perlu tulis seterusnya?
-   - Status E: apa yang masih menghalang?
 ```
 
 ---
 
 ## Nota untuk Arena (bukan untuk ChatGPT)
 
-### Tindakan pengguna — dua perkara
+### Urutan yang Arena cadangkan kepada pengguna
 
-**1. Tukar Production Branch di Vercel (ini mengunblock E):**
+**Semua langkah di bawah ialah kerja ChatGPT, melainkan yang ditandai 👤.**
 
-```
-https://vercel.com  → projek masb-pms-v4
-  → Settings → Git → Production Branch
-  → arena/01a06274-masb-pms-v4
-  → Save
-```
+1. **Hantar PROMPT-6F kepada ChatGPT.** Ia mengandungi E + baki D + Z dalam
+   satu pusingan — tiada lagi pemindahan tugas kepada pengguna.
+2. Selepas E1–E9 hijau (terutama **E9**): 👤 log masuk
+   `saidrazak881@gmail.com` / `masb.12345` → akan diarah ke
+   `/security?required=1` → tukar kata laluan.
+3. 👤 Jalankan `docs/ACTION-6-UAT-AUTH-USERS.md` (A–K, termasuk A3b/A3c).
+4. 👤 Edarkan arahan kepada 19 pengguna: semua kata laluan kini `masb.12345`,
+   wajib ditukar pada log masuk pertama.
+5. Selepas Z2 + Z5 dilaporkan: Arena tulis **PROMPT-6G** mengikut Senario A
+   (ikat semula trigger) atau Senario B (REVOKE → DROP TABLE → DROP FUNCTION).
 
-Sambil berada di **Settings → Environment Variables**, sahkan sendiri
-(kerana ChatGPT tidak dapat mengesahkannya melalui connector):
-`NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_ANON_KEY` wujud untuk
-**Production** dan **Preview**. Jangan kongsi nilainya dengan sesiapa.
+**D1 (`Confirm email`) memerlukan keputusan pengguna** — ChatGPT diarahkan
+melaporkan nilai semasa + cadangan, **bukan** menukarnya.
 
-**2. Hantar PROMPT-6F kepada ChatGPT** — Z1–Z5 boleh dijalankan **serta-merta**,
-tidak perlu menunggu penukaran branch.
-
-**Selepas branch ditukar:** beritahu ChatGPT, dan ia akan jalankan semula
-E1–E9. Kemudian log masuk `saidrazak881@gmail.com` / `masb.12345` →
-`/security?required=1` → tukar kata laluan → `docs/ACTION-6-UAT-AUTH-USERS.md`.
-
-### Rekod pengajaran Fasa 6 (kini 4 kesilapan Arena)
+### Rekod pengajaran Fasa 6 (kini 5 kesilapan Arena)
 
 | # | Kesilapan | Punca | Dikesan oleh |
 |---|-----------|------|--------------|
 | 1 | V3 `policy_count = 9` | Angka dari satu fail; query mengira seluruh skema | ChatGPT |
 | 2 | W1 allowlist 13 jadual | `grep "CREATE TABLE"` peka huruf besar | ChatGPT |
 | 3 | Gate "D sebelum E" | Gate tanpa sebab tertulis → sekatan membuta tuli | ChatGPT (berhenti dengan betul) |
-| 4 | Nota Y3 "`pg_depend` tidak jejak polisi RLS" | Dakwaan tingkah laku Postgres **tanpa diuji** | **Arena sendiri**, melalui `test-prompt-6e-y-queries.mjs` sebelum prompt dihantar |
+| 4 | Nota Y3 "`pg_depend` tidak jejak polisi RLS" | Dakwaan tingkah laku Postgres **tanpa diuji** | **Arena sendiri**, melalui `test-prompt-6e-y-queries.mjs` |
+| 5 | "D kerja manual pengguna" + "Production Branch kerja manual pengguna" | **Membuat kesimpulan bahawa had alat dalam SATU sesi ialah sempadan keupayaan yang kekal**, lalu memindahkan tugas kepada manusia | **Pengguna** |
 
-### Pengajaran baharu daripada PROMPT-6E (bukan kesilapan Arena, tetapi jurang proses)
+### Jurang proses (bukan kesilapan kriteria)
 
-**Jurang 5 — Arena hanya mengaudit objek yang repo cipta, bukan objek yang live
-mempunyai.** Semua audit Fasa 1–6 bermula daripada fail SQL repo. Empat fungsi
-`private.*` tidak pernah muncul dalam mana-mana fail, jadi ia **tidak pernah
-diaudit** — sehingga Y2 ChatGPT tersenarai skema `private` sepenuhnya.
+**Jurang 5 — Arena hanya mengaudit objek yang repo cipta.** Semua audit Fasa 1–6
+bermula daripada fail SQL repo. Empat fungsi `private.*` tidak pernah muncul
+dalam mana-mana fail, jadi ia **tidak pernah diaudit** — sehingga Y2 ChatGPT
+tersenarai skema `private` sepenuhnya. **Peraturan:** audit mesti bermula dari
+**live**, bukan repo.
 
-**Peraturan baharu:** audit mesti bermula dari **live** (`\df private.*`,
-`information_schema.triggers`), bukan dari repo. Repo memberitahu apa yang
-**kami** cipta; live memberitahu apa yang **sebenar** ada. Jurang antara
-keduanya ialah tempat drift sembunyi.
+**Jurang 6 — `CREATE OR REPLACE` tidak melindungi apabila nama berbeza.** C13
+berlaku kerana signature **sepadan** tetapi fail lama tidak dijalankan semula.
+Drift ini lebih senyap: signature **tidak sepadan** (`private.*` vs `public.*`),
+jadi pemasangan repo **langsung tidak menyentuh** fungsi lama, dan tiada ralat
+yang akan memberitahu kami.
 
-**Jurang 6 — `CREATE OR REPLACE` tidak melindungi kami apabila nama berbeza.**
-C13 berlaku kerana signature **sepadan** tetapi fail lama tidak dijalankan
-semula. Drift ini lebih senyap: signature **tidak sepadan** (`private.*` vs
-`public.*`), jadi pemasangan repo **langsung tidak menyentuh** fungsi lama, dan
-tiada ralat yang akan memberitahu kami.
+**Jurang 7 — "alat tidak boleh" ≠ "manusia mesti buat".** Apabila pembantu
+melaporkan had alat, soalan pertama ialah **operasi mana** dan **adakah laluan
+lain**, bukan pemindahan tugas. Pemindahan yang tidak disokong bukti membuang
+masa manusia dan menyembunyikan punca sebenar.

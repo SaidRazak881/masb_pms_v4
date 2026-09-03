@@ -1,15 +1,26 @@
 # PROMPT 6E — E DILULUSKAN SEKARANG (dinyahganding dari D) + kenal pasti `private.has_role()` (Y1–Y4)
 
+> **⛔ JANGAN GUNAKAN DOKUMEN INI. Ia sudah dijalankan dan sebahagian
+> arahannya DIBATALKAN. Prompt yang AKTIF ialah
+> `docs/PROMPT-6F-AUDIT-PRIVATE-SCHEMA-DRIFT.md`** — ia mengandungi E + baki D
+> + Z1–Z5 dalam satu pusingan, dengan pembetulan tanggungjawab di §0.
+> Dokumen ini dikekalkan sebagai **rekod** sahaja.
+
 > **📌 STATUS SELEPAS DIJALANKAN:** **E = 0/9 PASS.** ChatGPT membuktikan dengan
 > bukti live bahawa Production masih **Fasa 5** (`MfaGuard` masih dimuatkan;
 > `/register`, `/forgot-password`, `/admin/users` = 404). Puncanya **bukan** kod
 > Fasa 6 — connector ChatGPT tiada operasi mutation untuk Vercel Git settings,
-> jadi **Production Branch belum ditukar**. Ia kini **kerja manual pengguna**.
+> jadi **Production Branch belum ditukar**.
+> **PEMBETULAN:** Arena tersilap menyimpulkan bahawa Production Branch ialah
+> "kerja manual pengguna". Pengguna mengesahkan ChatGPT mempunyai **capaian
+> penuh** Vercel — had itu sifat sesi tersebut. E **dikembalikan kepada ChatGPT**
+> dalam `docs/PROMPT-6F-AUDIT-PRIVATE-SCHEMA-DRIFT.md` §1.
 > **Y1–Y4 selesai**, dan mendedahkan penemuan yang lebih besar daripada
 > `private.has_role()`: **5 fungsi** dalam skema `private`, empat daripadanya
 > tidak wujud dalam mana-mana komit git. Siasatan itu diteruskan dalam
 > **`docs/PROMPT-6F-AUDIT-PRIVATE-SCHEMA-DRIFT.md`**.
-> **Jangan jalankan semula E1–E9 sehingga pengguna mengesahkan penukaran branch.**
+> **Jangan jalankan semula E1–E9 sehingga Production Branch ditukar** — dan
+> penukaran itu ialah **tugas ChatGPT sendiri** (PROMPT-6F §1), bukan pengguna.
 
 > **Persona kamu:** Jurutera pangkalan data yang teliti dan berhati-hati
 > (`docs/personas/PERSONA-SQL-ARCHITECT.md`).
@@ -25,8 +36,9 @@
 >    **mustahil** dijalankan oleh mana-mana alat. Menyekat pemulihan produksi
 >    kerana sebab yang tidak berkaitan ialah kesilapan saya. Lihat §1.
 > 2. 🟢 **LANGKAH E DILULUSKAN — jalankan SEKARANG.**
-> 3. 🟡 **LANGKAH D dipindahkan kepada PENGGUNA (manual, melalui Supabase
->    Dashboard).** Anda tidak perlu cuba lagi. Lihat §3.
+> 3. ~~🟡 **LANGKAH D dipindahkan kepada PENGGUNA (manual, melalui Supabase
+>    Dashboard).** Anda tidak perlu cuba lagi.~~ **DIBATALKAN** — D dikembalikan
+>    kepada ChatGPT dalam **PROMPT-6F §2**. Lihat §3.
 > 4. 🔎 **Y1–Y4 DILULUSKAN (READ-ONLY)** — kenal pasti `private.has_role()`
 >    menggunakan **panduan katalog sahaja**, kerana anda sudah membuktikan
 >    connector anda boleh baca `pg_policies` (W5) tetapi mungkin tidak boleh
@@ -130,7 +142,14 @@ tetapi **tidak** menghalang E.
 
 ---
 
-## 3. LANGKAH D — dipindahkan kepada PENGGUNA (anda tidak perlu cuba lagi)
+## 3. LANGKAH D — ~~dipindahkan kepada PENGGUNA~~ **DIBATALKAN: dikembalikan kepada anda**
+
+> **⚠️ PEMBETULAN (§0 dalam PROMPT-6F):** seksyen ini asalnya memindahkan D
+> kepada pengguna dan mengarahkan anda "tidak perlu cuba lagi". **Arahan itu
+> dibatalkan.** Pengguna mengesahkan ChatGPT mempunyai capaian penuh Supabase;
+> had yang anda laporkan ialah sifat **sesi itu**. Baki D (D1, D3, D4 + sahkan
+> D2) kini **tugas anda** — lihat **PROMPT-6F §2**. Seksyen di bawah dikekalkan
+> sebagai rekod sahaja.
 
 Oleh kerana tiada alat dalam sesi anda boleh membaca atau mengubah Supabase Auth
 configuration, **Arena memindahkan D kepada pengguna** sebagai kerja manual
@@ -401,7 +420,8 @@ Ia patut ditutup, tetapi **REVOKE bukan kecemasan** kerana:
 10. JANGAN reka bukti — terutamanya E1–E9 dan Y1–Y4. Jika tidak boleh, katakan.
 11. JANGAN anggap Mod Demo tempatan sebagai produksi.
 12. JANGAN guna hash komit tetap sebagai kriteria — guna `git ls-remote`.
-13. JANGAN cuba menjalankan D lagi. D kini kerja manual pengguna.
+13. ~~JANGAN cuba menjalankan D lagi.~~ **DIBATALKAN** — D dikembalikan kepada
+    anda dalam PROMPT-6F §2.
 14. **JANGAN melaksanakan `private.has_role()`** — Y hanya baca katalog.
 
 ---
@@ -416,7 +436,7 @@ Ia patut ditutup, tetapi **REVOKE bukan kecemasan** kerana:
    - Status keseluruhan: 🟢 / 🟡 / 🔴
    - E siap? E1-E9 berapa lulus?
    - Y1-Y4 siap? Mana yang dihalang oleh connector?
-   - Pengesahan: D TIDAK dicuba semula (kini kerja manual pengguna)
+   - Pengesahan: D TIDAK dicuba semula (arahan ini telah DIBATALKAN — lihat PROMPT-6F §2)
 
 2. ACTIONS TAKEN
    - Production Branch: nilai SEMASA → BAHARU
@@ -457,7 +477,11 @@ Ia patut ditutup, tetapi **REVOKE bukan kecemasan** kerana:
 
 ## Nota untuk Arena (bukan untuk ChatGPT)
 
-### Senarai semak D untuk pengguna (manual, Supabase Dashboard)
+### Senarai semak D — **KEMASKINI: ini tugas ChatGPT, bukan pengguna**
+
+> **⚠️ Pembetulan:** senarai di bawah asalnya ditulis untuk pengguna lakukan
+> secara manual. Ia kini **tugas ChatGPT** (PROMPT-6F §2). Kandungan teknikalnya
+> kekal betul dan digunakan semula dalam PROMPT-6F.
 
 Buka `https://supabase.com/dashboard/project/lmenmfsbjgxfhnykkgow/auth`
 
@@ -473,11 +497,17 @@ hala ke URL lalai (kemungkinan `http://localhost:3000`) dan pautan akan gagal.
 Halaman `/forgot-password` sendiri **tetap memaparkan borang** — yang rosak
 ialah pautan **selepas** penghantaran.
 
-### Urutan yang Arena cadangkan kepada pengguna
+### Urutan yang Arena cadangkan — **KEMASKINI: D2 sudah dibuat, dan E ialah tugas ChatGPT**
 
-1. **Hantar PROMPT-6E kepada ChatGPT sekarang** → produksi dipulihkan (E).
-2. **Sementara menunggu**, pengguna lakukan **D2** sahaja (2 minit) — itu
-   satu-satunya yang menghalang fungsi.
+> **⚠️ Pembetulan:** langkah 1–2 di bawah mengandaikan pengguna perlu menukar
+> Production Branch dan melakukan D2 secara manual. **D2 sudah dibuat oleh
+> pengguna.** Production Branch pula ialah **tugas ChatGPT** (PROMPT-6F §1),
+> bukan pengguna — Arena tersilap memindahkannya.
+
+1. ~~**Hantar PROMPT-6E kepada ChatGPT sekarang** → produksi dipulihkan (E).~~
+   **Digantikan oleh PROMPT-6F** (E + baki D + Z dalam satu pusingan).
+2. ~~**Sementara menunggu**, pengguna lakukan **D2** sahaja (2 minit).~~
+   **Sudah selesai oleh pengguna.** ChatGPT hanya perlu **mengesahkannya**.
 3. Selepas E1–E9 hijau: log masuk `saidrazak881@gmail.com` / `masb.12345`
    → akan diarah ke `/security?required=1` → tukar kata laluan.
 4. Jalankan `docs/ACTION-6-UAT-AUTH-USERS.md` (A–K, termasuk A3b/A3c).
@@ -485,7 +515,7 @@ ialah pautan **selepas** penghantaran.
    wajib ditukar pada log masuk pertama.
 6. D1/D3/D4 bila-bila masa.
 
-### Rekod pengajaran Fasa 6 (kini 3 kesilapan kriteria Arena)
+### Rekod pengajaran Fasa 6 (kini 3 kesilapan — **rekod penuh 5 kesilapan ada dalam PROMPT-6F**)
 
 | # | Kesilapan | Punca | Dikesan oleh | Pembetulan kekal |
 |---|-----------|------|--------------|------------------|

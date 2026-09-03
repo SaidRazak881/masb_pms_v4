@@ -44,11 +44,16 @@
    `lock_programme`, `unlock_programme`, `request_programme_unlock`,
    `submit_change_request`, `review_change_request`) — ujian tulis melalui UI pengguna.
 4. JANGAN reset/ubah password mana-mana akaun (Fasa 5 khas, dengan prompt berasingan).
-5. JANGAN merge ke `main` / tukar Production Branch Vercel (`arena/01a06274-masb-pms-v4`).
+5. JANGAN merge ke `main`. **Production Branch Vercel hanya boleh ditukar apabila
+   prompt itu meluluskannya secara EKSPLISIT** dan hanya kepada branch sesi
+   (`arena/01a06274-masb-pms-v4`). Tanpa kelulusan bertulis dalam prompt,
+   ia dilarang.
 6. JANGAN tampal anon key penuh / rahsia dalam laporan.
 7. JANGAN mereka-reka bukti — setiap LULUS mesti ada bukti verbatim; jika tidak dapat uji,
    tulis `⏳ MENUNGGU PENGGUNA`.
 8. JANGAN layan preview local (Mod Demo) sebagai production.
+9. JANGAN **berhenti senyap** apabila alat gagal. Namakan **operasi spesifik** yang
+   dicuba dan tampal ralat penuhnya, kemudian teruskan bahagian lain yang boleh.
 
 ## BLOK 5 — FORMAT LAPORAN (standard 6 seksyen)
 
@@ -69,3 +74,26 @@
 - [ ] Larangan lengkap
 - [ ] FORMAT LAPORAN 6 seksyen disertakan
 - [ ] Pengesahan kelulusan pengguna untuk sebarang perubahan DB/keselamatan
+
+### Peraturan yang ditambah selepas 5 kesilapan kriteria Fasa 6
+
+- [ ] **"Alat tidak boleh" ≠ "manusia mesti buat".** Apabila pembantu melaporkan had
+      alat, soalan pertama ialah **operasi mana yang tiada** dan **adakah laluan
+      lain** — bukan memindahkan tugas kepada pengguna. Had dalam **satu** sesi
+      bukan sempadan keupayaan yang kekal. *(kesilapan #5)*
+- [ ] **Setiap kriteria penerimaan diterbitkan daripada ujian automatik**, bukan
+      kiraan manual. Nyatakan **skop** kriteria secara eksplisit (satu fail vs
+      seluruh skema). *(kesilapan #1: V3 `policy_count=9`)*
+- [ ] **`grep -i`** wajib untuk mengira objek SQL — fail dalam repo ini menulis
+      `create table` dalam huruf kecil **dan** besar. *(kesilapan #2: allowlist
+      13 jadual, sepatutnya 15)*
+- [ ] **Setiap gate mesti menyatakan SEBAB ia wujud**, supaya ia boleh dibatalkan
+      dengan selamat apabila sebab itu tidak lagi terpakai. *(kesilapan #3: gate
+      "D sebelum E" menyekat pemulihan produksi)*
+- [ ] **Setiap dakwaan tentang tingkah laku PostgreSQL dalam prompt mesti diuji
+      terhadap PGlite dahulu** (`scripts/test-prompt-*.mjs`) sebelum prompt
+      dihantar. *(kesilapan #4: "pg_depend tidak menjejak polisi RLS" — salah)*
+- [ ] **Audit bermula dari LIVE, bukan dari repo.** Repo memberitahu apa yang kami
+      cipta; live memberitahu apa yang sebenar ada. Jurang antara keduanya ialah
+      tempat drift sembunyi — 4 fungsi `private.*` tidak pernah diaudit kerana
+      ia tiada dalam mana-mana fail repo.

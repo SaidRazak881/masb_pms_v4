@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-03 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: b697ae3 Fasa 6: nyahgading E dari D (PROMPT-6E) + kesan private.has_role() pra-repo · arena/01a06274-masb-pms-v4
+> Git: 9f353f4 Fasa 6: PROMPT-6F (Z1-Z5) - 4 fungsi private.* pra-repo tidak pernah diaudit · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 
