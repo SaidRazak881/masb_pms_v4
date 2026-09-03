@@ -138,24 +138,44 @@ COMMIT;
 -- ---------------------------------------------------------------------
 -- PENGESAHAN (read-only — jalankan selepas pemasangan)
 -- ---------------------------------------------------------------------
--- Jangkaan: 12 baris, SEMUA origin = 'public.set_updated_at()',
---           dan TIADA baris 'private.set_updated_at()'.
+-- ⚠️ JANGAN guna information_schema.triggers.action_statement untuk
+--    mengesahkan skema fungsi. Postgres hanya MENGKUALIFIKASIKAN nama fungsi
+--    apabila ia BUKAN dalam search_path lalai:
 --
--- SELECT t.event_object_table AS table_name,
---        t.trigger_name,
---        t.action_statement   AS executes,
---        CASE WHEN t.action_statement ILIKE '%private.%' THEN '🔴 PRA-REPO'
---             WHEN t.action_statement ILIKE '%public.%'  THEN '🟢 repo'
---             ELSE '⚪ tidak dikualifikasi' END AS origin
---   FROM information_schema.triggers t
---  WHERE t.trigger_schema = 'public'
---    AND t.action_statement ILIKE '%set_updated_at%'
---  ORDER BY origin DESC, t.event_object_table;
+--       private.set_updated_at()  → "EXECUTE FUNCTION private.set_updated_at()"
+--       public.set_updated_at()   → "EXECUTE FUNCTION set_updated_at()"  ← TANPA skema
 --
--- Dan sahkan tiada trigger updated_at yang merujuk private.*:
+--    Jadi SELEPAS migrasi ini, pengelasan berasaskan action_statement akan
+--    memulangkan "tidak dikualifikasi" untuk kesemua 12 trigger dan GAGAL
+--    mengesahkan kejayaan — walaupun kerja itu betul. (Dikesan semasa
+--    pelaksanaan PROMPT-6G pada 2026-09-04; ChatGPT yang menangkapnya.)
 --
--- SELECT count(*)::int AS baki_private
---   FROM information_schema.triggers
---  WHERE trigger_schema = 'public'
---    AND action_statement ILIKE '%private.set_updated_at%';
+--    Query di bawah menggunakan pg_trigger + pg_proc + pg_namespace, yang
+--    memberi skema fungsi secara SAH. Diuji dalam
+--    scripts/test-updated-at-triggers.mjs.
+--
+-- Jangkaan: 12 baris, SEMUA function_schema = 'public'.
+--
+-- SELECT 'pengesahan_trigger' AS check_name,
+--        n.nspname AS function_schema,
+--        p.proname AS function_name,
+--        c.relname AS table_name,
+--        tg.tgname AS trigger_name
+--   FROM pg_trigger tg
+--   JOIN pg_class c     ON c.oid = tg.tgrelid
+--   JOIN pg_proc p      ON p.oid = tg.tgfoid
+--   JOIN pg_namespace n ON n.oid = p.pronamespace
+--  WHERE NOT tg.tgisinternal
+--    AND c.relnamespace = 'public'::regnamespace
+--    AND p.proname = 'set_updated_at'
+--  ORDER BY n.nspname DESC, c.relname;
+--
+-- Dan sahkan tiada trigger terikat kepada private.set_updated_at():
+--
+-- SELECT 'baki_private' AS check_name, count(*)::int AS baki
+--   FROM pg_trigger tg
+--   JOIN pg_proc p      ON p.oid = tg.tgfoid
+--   JOIN pg_namespace n ON n.oid = p.pronamespace
+--  WHERE NOT tg.tgisinternal AND n.nspname = 'private'
+--    AND p.proname = 'set_updated_at';
 -- -- Jangkaan: 0

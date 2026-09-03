@@ -1,17 +1,50 @@
 # PROMPT 6G — Pasang `updated-at-triggers.sql` + REVOKE privilej tulis jadual warisan
 
-> ## 🟢 STATUS: **DILULUSKAN oleh pengguna (2026-09-04)** — SILA JALANKAN
+> ## ✅ STATUS: **SELESAI — dilaksanakan 2026-09-04, SEMUA kriteria PASS**
 >
 > Fasa 6 telah **SELESAI dan disahkan di Production** (E1–E9 = 9/9 PASS,
 > UAT A–K semua lulus). Prompt ini pada mulanya **ditangguhkan** oleh pengguna,
 > kemudian **DILULUSKAN** pada tarikh yang sama. **HARD GATE sudah dibuka —
 > §2 dan §3 boleh dijalankan sekarang.**
 >
-> **Pengesahan kandungan masih sah:** blob SHA
-> `lib/supabase/updated-at-triggers.sql` = `5254fd84cdaba647495e9ef60fe41b06b8348d50`
-> — **tidak berubah** sejak ia diuji (`scripts/test-updated-at-triggers.mjs`
-> 13/13, `scripts/test-prompt-6g-revoke.mjs` 8/8). Tiada suntingan kandungan
-> dibuat semasa pengaktifan semula ini; hanya banner status.
+> ### Keputusan (laporan ChatGPT, 2026-09-04)
+>
+> | Kriteria | Keputusan |
+> | -------- | --------- |
+> | **G1** | 🟢 **12/12** trigger → `public.set_updated_at()` |
+> | **G2** | 🟢 `baki_rujukan private.set_updated_at()` = **0** |
+> | **G3** | 🟢 `user_profiles.updated_at` `2026-09-02 17:05:46` → `2026-09-03 17:28:54` (ROLLBACK) |
+> | **H1** | ⏳ **tidak dapat direkodkan** — ChatGPT menjalankan §2 dahulu, jadi snapshot sebelum-REVOKE terlepas. **Tidak direka** (tindakan yang betul) |
+> | **H3** | 🟢 **6/6** = hanya `SELECT` |
+> | **I1** | 🟢 ketiga-tiga kolum wujud: `governance_lock_status` (text, NOT NULL), `is_locked` (boolean, NOT NULL), `unlock_expires_at` (timestamptz, nullable) |
+> | **I2** | 🟢 **0** trigger memanggil `validate_programme_lock()` |
+> | Runtime | 🟢 `No runtime errors found` (Vercel, 2 jam) |
+>
+> **Blob SHA yang dipasang:** `5254fd84cdaba647495e9ef60fe41b06b8348d50` —
+> **tepat sama** dengan yang diuji. Kandungan SQL tidak diubah.
+>
+> ### ⚠️ Dua pembetulan ChatGPT terhadap prompt ini (Arena menerima kedua-duanya)
+>
+> **1. Larangan 3 ("JANGAN DROP apa-apa") TERLALU LUAS — kesilapan Arena.**
+> Fail `updated-at-triggers.sql` **sendiri** mengandungi `DROP TRIGGER IF EXISTS`
+> (diperlukan untuk mengikat semula trigger). ChatGPT enggan mendakwa "zero DROP
+> statement executed" kerana itu tidak benar, dan membezakan dengan tepat: tiada
+> `DROP TABLE` / `DROP FUNCTION` / `DROP POLICY` / pemadaman data — hanya
+> `DROP TRIGGER` sebagai sebahagian penggantian yang diluluskan. Larangan itu
+> sepatutnya berbunyi "JANGAN DROP **objek yang tidak diluluskan dalam prompt ini**".
+>
+> **2. Query G1 asal ROSAK — kesilapan Arena.** Ia mengelaskan skema fungsi
+> daripada `information_schema.triggers.action_statement`, tetapi Postgres **hanya
+> mengkualifikasikan** nama fungsi apabila ia bukan dalam `search_path` lalai. Jadi
+> `public.set_updated_at()` dipaparkan sebagai `EXECUTE FUNCTION set_updated_at()`
+> **tanpa skema**, dan pengelasan asal memulangkan `⚪ tidak dikualifikasi` untuk
+> kesemua 12 trigger — kriteria "semua 🟢 repo" akan **GAGAL walaupun kerja
+> itu betul**. ChatGPT menangkap ini dan mengesahkan identiti fungsi melalui katalog
+> PostgreSQL. **G1 dalam dokumen ini sudah diganti** dengan query `pg_trigger` +
+> `pg_proc` + `pg_namespace` yang sah, dan `scripts/test-updated-at-triggers.mjs`
+> kini membuktikan kecacatan itu (`12/12 tanpa skema`) serta pembetulannya
+> (semua `function_schema = public`). **Nota: G2 asal masih sah** — fungsi
+> `private` memang dikualifikasikan dalam `action_statement`.
 >
 > **Keputusan pengguna yang berkaitan (2026-09-04):**
 > | Perkara | Keputusan |
@@ -151,19 +184,40 @@ trigger.
    (komen `PENGESAHAN (read-only)`), dan **query G1–G3 di bawah**.
 
 ```sql
--- G1. Setiap jadual ber-updated_at: trigger mana, fungsi mana?
+-- G1 (VERSI BETUL). Skema fungsi setiap trigger updated_at.
+--
+-- ⚠️ G1 asal Arena menggunakan information_schema.triggers.action_statement
+--    dan mengelaskan mengikut sama ada teks itu mengandungi 'private.' atau
+--    'public.'. ITU ROSAK: Postgres hanya mengkualifikasikan nama fungsi
+--    apabila ia BUKAN dalam search_path lalai, jadi
+--    `public.set_updated_at()` dipaparkan TANPA skema. Selepas migrasi,
+--    pengelasan asal memulangkan "⚪ tidak dikualifikasi" untuk kesemua 12
+--    trigger dan kriteria "semua 🟢 repo" GAGAL walaupun kerja itu betul.
+--    ChatGPT yang menangkap ini semasa pelaksanaan dan mengesahkan melalui
+--    katalog. Query di bawah ialah pembetulan sah.
 SELECT 'G1_updated_at_triggers' AS check_name,
-       t.event_object_table AS table_name,
-       t.trigger_name,
-       t.action_statement   AS executes,
-       CASE WHEN t.action_statement ILIKE '%private.%' THEN '🔴 PRA-REPO'
-            WHEN t.action_statement ILIKE '%public.%'  THEN '🟢 repo'
-            ELSE '⚪ tidak dikualifikasi' END AS origin
-  FROM information_schema.triggers t
- WHERE t.trigger_schema = 'public'
-   AND t.action_statement ILIKE '%set_updated_at%'
- ORDER BY origin DESC, t.event_object_table;
+       n.nspname AS function_schema,
+       p.proname AS function_name,
+       c.relname AS table_name,
+       tg.tgname AS trigger_name,
+       CASE WHEN n.nspname = 'private' THEN '🔴 PRA-REPO'
+            WHEN n.nspname = 'public'  THEN '🟢 repo'
+            ELSE '⚪ ' || n.nspname END AS origin
+  FROM pg_trigger tg
+  JOIN pg_class c     ON c.oid = tg.tgrelid
+  JOIN pg_proc p      ON p.oid = tg.tgfoid
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+ WHERE NOT tg.tgisinternal
+   AND c.relnamespace = 'public'::regnamespace
+   AND p.proname = 'set_updated_at'
+ ORDER BY origin DESC, c.relname;
 ```
+
+> **Nota G2:** G2 asal (`information_schema.triggers ... ILIKE
+> '%private.set_updated_at%'`) **masih sah** — kerana fungsi `private`
+> **memang** dikualifikasikan dalam `action_statement`. Yang rosak hanya
+> pengelasan positif (`public`). Jangkaan G2 = `0` tidak berubah.
+
 
 ```sql
 -- G2. Baki rujukan kepada private.set_updated_at() — JANGKAAN: 0
@@ -198,7 +252,7 @@ ROLLBACK;
 
 | # | Jangkaan | Jika tidak |
 |---|----------|-----------|
-| G1 | **12 baris**, semua `origin = 🟢 repo` | 🔴 laporkan jadual mana yang masih 🔴 |
+| G1 | **12 baris**, semua `function_schema = public` / `origin = 🟢 repo` | 🔴 laporkan jadual mana yang masih 🔴 |
 | G2 | `baki_rujukan = 0` | 🔴 pengalihan tidak lengkap |
 | G3 | `updated_at_selepas` **lebih baharu** daripada `updated_at_sebelum` | 🔴 trigger tidak berfungsi |
 

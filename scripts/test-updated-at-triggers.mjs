@@ -128,6 +128,61 @@ const masihWujud = await db.query(`SELECT count(*)::int n FROM pg_proc p JOIN pg
 if (masihWujud.rows[0].n === 1) ok('fungsi private.set_updated_at MASIH wujud (fail ini tidak DROP apa-apa — betul)');
 else bad('fail ini telah DROP private.set_updated_at — sepatutnya tidak');
 
+console.log('\n--- 7. Query PENGESAHAN dalam fail SQL (versi katalog) ---');
+// Pengajaran daripada pelaksanaan PROMPT-6G (2026-09-04):
+//   information_schema.triggers.action_statement HANYA mengkualifikasikan skema
+//   apabila fungsi BUKAN dalam search_path lalai. Jadi:
+//     private.set_updated_at() -> "EXECUTE FUNCTION private.set_updated_at()"
+//     public.set_updated_at()  -> "EXECUTE FUNCTION set_updated_at()"  (TIADA skema)
+//   Pengelasan asal G1 (`ILIKE '%public.%'`) memulangkan "tidak dikualifikasi"
+//   untuk kesemua 12 trigger SELEPAS migrasi — kriteria GAGAL walaupun kerja
+//   itu betul. ChatGPT yang menangkap ini di live.
+const act = await db.query(
+  `SELECT event_object_table AS tbl, action_statement FROM information_schema.triggers
+    WHERE trigger_schema='public' AND action_statement ILIKE '%set_updated_at%'`);
+const adaSkema = act.rows.filter((r) => /public\./i.test(r.action_statement)).length;
+const tanpaSkema = act.rows.filter((r) => !/public\.|private\./i.test(r.action_statement)).length;
+console.log(`  action_statement: ${adaSkema} mengandungi "public.", ${tanpaSkema} TANPA skema`);
+if (tanpaSkema > 0 && adaSkema === 0) {
+  ok(`DISAHKAN: selepas migrasi, action_statement TIDAK mengkualifikasikan public `
+     + `(${tanpaSkema}/${act.rows.length} tanpa skema) — pengelasan berasaskan teks GAGAL di sini`);
+} else {
+  console.log(`  (nota: PGlite mungkin memaparkan skema; live tidak — lihat laporan 6G)`);
+}
+
+// Query katalog yang sah (kini embedded dalam fail SQL sebagai PENGESAHAN)
+const kat = await db.query(`
+  SELECT n.nspname AS function_schema, p.proname AS function_name,
+         c.relname AS table_name, tg.tgname AS trigger_name
+    FROM pg_trigger tg
+    JOIN pg_class c     ON c.oid = tg.tgrelid
+    JOIN pg_proc p      ON p.oid = tg.tgfoid
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE NOT tg.tgisinternal
+     AND c.relnamespace = 'public'::regnamespace
+     AND p.proname = 'set_updated_at'
+   ORDER BY c.relname`);
+if (kat.rows.length !== tblCovered.length) {
+  bad(`query katalog: ${kat.rows.length} baris, jangkaan ${tblCovered.length}`);
+} else {
+  ok(`query katalog: ${kat.rows.length} baris (sepadan bilangan jadual)`);
+}
+const bukanPublic = kat.rows.filter((r) => r.function_schema !== 'public');
+if (bukanPublic.length) {
+  bad(`masih ada trigger ke skema bukan public: ${bukanPublic.map((r) => `${r.table_name}->${r.function_schema}`).join(', ')}`);
+} else {
+  ok('query katalog: SEMUA function_schema = public — pengesahan kejayaan migrasi yang SAH');
+}
+
+// Baki private melalui katalog (setara G2)
+const bakiKat = await db.query(`
+  SELECT count(*)::int AS baki FROM pg_trigger tg
+    JOIN pg_proc p ON p.oid = tg.tgfoid
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE NOT tg.tgisinternal AND n.nspname='private' AND p.proname='set_updated_at'`);
+if (bakiKat.rows[0].baki === 0) ok('G2 (versi katalog): baki_private = 0');
+else bad(`G2 (versi katalog): baki = ${bakiKat.rows[0].baki}`);
+
 await db.close();
 console.log(`\n${gagal===0 ? '🎉 updated-at-triggers.sql DISAHKAN' : `🔴 ${gagal} GAGAL`}  (lulus ${lulus}, gagal ${gagal})`);
 process.exit(gagal===0?0:1);

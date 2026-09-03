@@ -97,3 +97,13 @@
       cipta; live memberitahu apa yang sebenar ada. Jurang antara keduanya ialah
       tempat drift sembunyi — 4 fungsi `private.*` tidak pernah diaudit kerana
       ia tiada dalam mana-mana fail repo.
+- [ ] **`information_schema.triggers.action_statement` TIDAK boleh digunakan untuk
+      mengetahui skema fungsi.** Postgres hanya mengkualifikasikan nama fungsi apabila
+      ia bukan dalam `search_path` lalai, jadi fungsi `public.*` dipaparkan **tanpa**
+      skema. Gunakan `pg_trigger` + `pg_proc` + `pg_namespace`. *(kesilapan #8)*
+- [ ] **Larangan mesti menyatakan SKOP objek, bukan kata kerja mutlak.** "JANGAN DROP
+      apa-apa" bercanggah dengan fail SQL yang mengandungi `DROP TRIGGER IF EXISTS`.
+      Tulis "JANGAN DROP objek yang tidak diluluskan dalam prompt ini". *(#9)*
+- [ ] **Query "keadaan SEBELUM" mesti diarahkan secara eksplisit: jalankan DAN laporkan
+      DAHULU, sebelum sebarang tindakan.** Menyenaraikannya sebagai H1 sebelum H2 tidak
+      mencukupi. *(#10 — H1 terlepas dalam pelaksanaan 6G)*

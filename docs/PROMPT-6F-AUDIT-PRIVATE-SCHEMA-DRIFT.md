@@ -547,7 +547,7 @@ diputuskan. Z2/Z3 mungkin mendedahkan kebergantungan tambahan.
 **D1 (`Confirm email`) memerlukan keputusan pengguna** — ChatGPT diarahkan
 melaporkan nilai semasa + cadangan, **bukan** menukarnya.
 
-### Rekod pengajaran Fasa 6 (kini 5 kesilapan Arena)
+### Rekod pengajaran Fasa 6 — REKOD INDUK (kini 10 kesilapan Arena)
 
 | # | Kesilapan | Punca | Dikesan oleh |
 |---|-----------|------|--------------|
@@ -556,6 +556,19 @@ melaporkan nilai semasa + cadangan, **bukan** menukarnya.
 | 3 | Gate "D sebelum E" | Gate tanpa sebab tertulis → sekatan membuta tuli | ChatGPT (berhenti dengan betul) |
 | 4 | Nota Y3 "`pg_depend` tidak jejak polisi RLS" | Dakwaan tingkah laku Postgres **tanpa diuji** | **Arena sendiri**, melalui `test-prompt-6e-y-queries.mjs` |
 | 5 | "D kerja manual pengguna" + "Production Branch kerja manual pengguna" | **Membuat kesimpulan bahawa had alat dalam SATU sesi ialah sempadan keupayaan yang kekal**, lalu memindahkan tugas kepada manusia | **Pengguna** |
+| 6 | Kriteria | "`private.has_role()` boleh escalate melalui INSERT ke `user_roles`" — **salah**: `WITH CHECK` yang gagal **menolak** INSERT bukan-admin | **Arena sendiri**, sebelum PROMPT-6G dihantar |
+| 7 | Kriteria | E1–E9 "redirect ke" tidak menyatakan sama ada redirect **dikuti**, dan tidak menyatakan ia semakan **tanpa log masuk** — ChatGPT menahan PASS yang sepatutnya lulus | **ChatGPT** (menahan dengan betul) |
+| 8 | Kriteria | Pengelasan `origin` Z2/G1 guna `information_schema.triggers.action_statement`. Postgres **tidak** mengkualifikasikan fungsi dalam `search_path` lalai, jadi selepas migrasi semua trigger kelihatan "tidak dikualifikasi" dan kriteria **GAGAL walaupun kerja betul** | **ChatGPT** (di live, semasa melaksanakan 6G) |
+| 9 | Larangan | "JANGAN DROP apa-apa" terlalu luas — fail SQL yang diluluskan **sendiri** mengandungi `DROP TRIGGER IF EXISTS`. ChatGPT enggan mendakwa pematuhan literal kerana ia tidak benar | **ChatGPT** |
+| 10 | Proses | H1 (snapshot SEBELUM) disenaraikan sebelum H2 tetapi prompt tidak mengarahkan ia **dijalankan dan dilapor dahulu**. ChatGPT menjalankan §2 dahulu, jadi bukti sebelum-REVOKE hilang | **ChatGPT** (melaporkannya sendiri, tidak merekanya) |
+
+**Corak:** 7 daripada 10 ialah **kriteria yang tidak tepat**, bukan kod yang salah.
+Kod dan SQL Fasa 6 berfungsi; yang berulang kali gagal ialah **cara Arena
+menyatakan apa yang dikira lulus**. Hanya #4, #6 dan #8 yang Arena kesan sendiri,
+dan #4 serta #6 hanya kerana Arena mula **menguji kriteria sebelum menghantar
+prompt** — amalan yang kini wajib (lihat `docs/PROMPT-TEMPLATE-FASA.md`).
+#8 dikesan oleh ChatGPT **di live**, iaitu tempat yang tidak boleh dicapai oleh
+ujian PGlite: perbezaan tingkah laku antara PGlite dan Postgres sebenar.
 
 ### Jurang proses (bukan kesilapan kriteria)
 
