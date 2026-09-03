@@ -100,8 +100,10 @@ Jalankan **Langkah E** tepat seperti tertulis dalam
    - **Laporkan nilai SEMASA dahulu** (jangkaan: branch Fasa 5
      `arena/01a05cd4-masb-pms-v4`) supaya boleh dipulangkan jika perlu.
 2. Sahkan deployment baharu mencapai **READY** dengan `Target: Production`.
-   Laporkan **hash komit** yang di-deploy. Jangkaan: `4ef4449` atau lebih
-   baharu. Jika hash berbeza, laporkan — jangan anggap betul.
+   Laporkan **hash komit** yang di-deploy. Jangkaan: **`88f8283`** atau lebih
+   baharu (hujung branch `arena/01a06274-masb-pms-v4` semasa prompt ini
+   ditulis). Jika hash berbeza atau lebih lama, **laporkan — jangan anggap
+   betul**, kerana ia bermakna Vercel menarik komit yang salah.
 3. Sahkan **Environment Variables** `NEXT_PUBLIC_SUPABASE_URL` dan
    `NEXT_PUBLIC_SUPABASE_ANON_KEY` wujud untuk **Production dan Preview**.
    **JANGAN papar nilai** — sahkan kewujudan sahaja.
