@@ -100,10 +100,19 @@ Jalankan **Langkah E** tepat seperti tertulis dalam
    - **Laporkan nilai SEMASA dahulu** (jangkaan: branch Fasa 5
      `arena/01a05cd4-masb-pms-v4`) supaya boleh dipulangkan jika perlu.
 2. Sahkan deployment baharu mencapai **READY** dengan `Target: Production`.
-   Laporkan **hash komit** yang di-deploy. Jangkaan: **`88f8283`** atau lebih
-   baharu (hujung branch `arena/01a06274-masb-pms-v4` semasa prompt ini
-   ditulis). Jika hash berbeza atau lebih lama, **laporkan — jangan anggap
-   betul**, kerana ia bermakna Vercel menarik komit yang salah.
+   Laporkan **hash komit** yang di-deploy.
+   **Kriteria (kalis kendiri — jangan guna hash tetap):** jalankan
+   `git ls-remote origin arena/01a06274-masb-pms-v4` dan bandingkan.
+   Hash deployment **mesti sama** dengan hujung branch itu. Jika berbeza
+   atau lebih lama, **laporkan sebagai isu** — ia bermakna Vercel menarik
+   komit yang salah atau deployment belum selesai.
+   *(Semasa prompt ini ditulis hujung branch ialah `c51b39d`, tetapi angka
+   ini akan bergerak; gunakan `git ls-remote` sebagai sumber benar.)*
+   **Pengesahan kandungan yang lebih penting daripada hash:** deployment
+   mesti mengandungi `lib/auth.ts`, `app/(auth)/register/page.tsx`,
+   `app/(dashboard)/admin/users/page.tsx` dan
+   `components/admin/user-management.tsx`. Jika E3/E4 gagal, semak
+   keberadaan fail ini dahulu.
 3. Sahkan **Environment Variables** `NEXT_PUBLIC_SUPABASE_URL` dan
    `NEXT_PUBLIC_SUPABASE_ANON_KEY` wujud untuk **Production dan Preview**.
    **JANGAN papar nilai** — sahkan kewujudan sahaja.
