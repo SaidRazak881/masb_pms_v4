@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-03 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: 0f83953 Fasa 8A-J1: prompt read-only pisahan + ujian query (48/48) · arena/01a06274-masb-pms-v4
+> Git: 00a8d38 🔴 DP-7: betulkan kecacatan pengeluaran import_staging.updated_at + bina Fasa 8A-2 · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 
@@ -153,6 +153,8 @@
 - **Fungsi/RPC:** current_user_id, current_user_role, current_role_name, has_role, log_audit, programmes_audit_trigger, participants_audit_trigger, financial_docs_audit_trigger
 - **Polisi RLS:** (badan LANGUAGE sql dihurai serta-merta). · Pengguna boleh lihat profil sendiri · Pengguna boleh kemaskini profil sendiri · Admin boleh lihat semua profil · Pengguna terauth boleh lihat organizers · Pengguna terauth boleh tambah organizers · Pengguna terauth boleh kemaskini organizers · Pengguna terauth boleh lihat programmes · Pengguna terauth boleh tambah programmes · Pengguna boleh kemaskini programmes jika tidak dikunci · Pengguna boleh padam programmes sendiri jika draf · Pengguna terauth boleh lihat participants · Pengguna terauth boleh tambah participants · Pengguna boleh kemaskini participants jika program tidak dikunci · Pengguna boleh padam participants jika program draf · Pengguna terauth boleh lihat financial_docs · Pengguna terauth boleh tambah financial_docs · Pengguna boleh kemaskini financial_docs jika program tidak dikunci · Pengguna terauth boleh lihat invoices · Pengguna terauth boleh tambah invoices · Pengguna boleh kemaskini invoices jika program tidak dikunci · Pengguna terauth boleh lihat programme_costs · Pengguna terauth boleh tambah programme_costs · Pengguna boleh kemaskini programme_costs jika program tidak dikunci · Pengguna terauth boleh lihat cost_items · Pengguna terauth boleh tambah cost_items · Pengguna boleh kemaskini cost_items jika program tidak dikunci · Pengguna terauth boleh lihat programme_documents · Pengguna terauth boleh tambah programme_documents · Pengguna boleh kemaskini programme_documents jika program tidak dikunci · Pengguna terauth boleh lihat audit_logs
 - **Trigger:** programmes_audit_trigger, participants_audit_trigger, financial_docs_audit_trigger
+
+### `lib/supabase/seed-account-manager-aliases.sql`
 
 ### `lib/supabase/seed-v4-raw.sql`
 - **Jadual:** organizers, programmes, participants, financial_docs, programme_costs, cost_items, programme_documents, audit_logs

@@ -406,12 +406,27 @@ GRANT ALL ON ALL TABLES IN SCHEMA auth TO authenticated;`);
   eq(auditChange.rows[0].new_data?.user_id, ids['Adilah'],
      'audit new_data merekodkan keputusan BAHARU');
 
-  // veto §2.4: sel berbilang orang MESTI ditolak walaupun oleh admin
+  // PANEL DP-8 (keputusan pengguna 2026-09-04): sel berbilang orang KINI
+  // BOLEH diputuskan oleh manusia. Jangkaan asal (ditolak 22023) DIBALIKKAN.
+  // Veto §2.4 masih berkuat kuasa untuk SISTEM: tanpa alias, nilai ini NULL.
   for (const raw of ['Fuzy / Dila', 'Fuzy / Sholihin', 'A dan B', 'X & Y', 'P, Q']) {
-    const r = await db.query(`SELECT * FROM public.am_confirm_alias($1,$2,'cubaan')`,
-      [raw, ids['Fuziah']]).then(() => 'tiada ralat').catch((e) => e.code);
-    eq(r, '22023', `'${raw}' DITOLAK (veto Kewangan §2.4)`);
+    const r = await db.query(`SELECT * FROM public.am_confirm_alias($1,$2,'DP-8')`,
+      [raw, ids['Fuziah']]).then((x) => x.rows[0].full_name).catch((e) => 'RALAT:' + e.code);
+    eq(r, 'Fuziah', `DP-8: '${raw}' diterima (keputusan manusia)`);
   }
+  // jejak audit mesti merekodkan bahawa ini sel berbilang orang
+  const audMulti = await db.query(`
+    SELECT count(*)::int n FROM public.audit_logs
+     WHERE table_name='account_manager_aliases'
+       AND metadata->>'sel_berbilang_orang' = 'true'`);
+  eq(audMulti.rows[0].n >= 5, true,
+     `audit merekodkan sel_berbilang_orang=true (${audMulti.rows[0].n} baris)`);
+  const audAsas = await db.query(`
+    SELECT metadata->>'asas' AS asas FROM public.audit_logs
+     WHERE table_name='account_manager_aliases'
+       AND metadata->>'sel_berbilang_orang' = 'true' LIMIT 1`);
+  eq(audAsas.rows[0].asas, 'Panel DP-8: keputusan pengguna 2026-09-04',
+     'audit merekodkan ASAS keputusan (boleh diaudit untuk komisen 8F)');
   // input tidak sah
   eq(await db.query(`SELECT * FROM public.am_confirm_alias('  ',$1,'x')`, [ids['Fuziah']])
        .then(() => 'tiada ralat').catch((e) => e.code), '22023',
@@ -452,9 +467,12 @@ GRANT ALL ON ALL TABLES IN SCHEMA auth TO authenticated;`);
   eq(Number(prevInv.jumlah_baris), 265, 'preview: 265 baris invois');
   eq(Number(prevInv.sudah_dipautkan), 0, 'preview: belum ada yang dipautkan');
   eq(Number(prevInv.akan_diisi) > 0, true, 'preview: ada baris akan diisi');
-  // 9 baris kekal NULL: 'Fuzy / Dila' (4) + 'Fuzy / Sholihin ' (2) + 'Ow Zi Qi' (3).
-  // 'Fuzy' (8) TIDAK dikira kerana aliasnya disahkan di atas -> ia boleh diisi.
-  eq(Number(prevInv.kekal_null), 9, 'preview: 9 baris kekal NULL (sistem enggan meneka)');
+  // Selepas [J] mengesahkan alias DP-8 untuk 'Fuzy / Dila' (4) dan
+  // 'Fuzy / Sholihin' (2), dan [L] mengesahkan 'Fuzy' (8), hanya
+  // 'Ow Zi Qi' (3) kekal tanpa penyelesaian -- nama itu tiada dalam
+  // senarai 18 staf.
+  eq(Number(prevInv.kekal_null), 3, "preview: 3 baris kekal NULL ('Ow Zi Qi' sahaja)");
+  eq(Number(prevInv.akan_diisi), 262, 'preview: 262 baris akan diisi (265 - 3)');
   const p2 = await db.query(
     `SELECT count(*)::int n FROM public.invoices WHERE account_manager_id IS NOT NULL`);
   eq(p2.rows[0].n, 0, 'pratonton TIDAK menulis apa-apa');
@@ -464,7 +482,7 @@ GRANT ALL ON ALL TABLES IN SCHEMA auth TO authenticated;`);
   const fillInv = fill.rows.find((r) => r.jadual === 'invoices');
   eq(Number(fillInv.baris_diisi), Number(prevInv.akan_diisi),
      'baris diisi = pratonton (tiada kejutan)');
-  eq(Number(fillInv.baris_kekal_null), 9, '9 baris invois kekal NULL (sistem enggan meneka)');
+  eq(Number(fillInv.baris_kekal_null), 3, '3 baris invois kekal NULL (Ow Zi Qi)');
 
   // pengisian mesti betul pada setiap nilai
   const check = await db.query(`
@@ -475,7 +493,9 @@ GRANT ALL ON ALL TABLES IN SCHEMA auth TO authenticated;`);
     'Adilah': ids['Adilah'], 'Farrah': ids['Farrah'], 'Fuziah': ids['Fuziah'],
     'Fuzy': ids['Fuziah'], 'Omar': ids['Omar'], 'Sholihin': ids['Sholihin'],
     'Zalina': ids['Zalina Sayuti'],
-    'Fuzy / Dila': null, 'Fuzy / Sholihin ': null, 'Ow Zi Qi': null,
+    // DP-8: keputusan pengguna -- kedua-dua sel berbilang orang -> Fuziah
+    'Fuzy / Dila': ids['Fuziah'], 'Fuzy / Sholihin ': ids['Fuziah'],
+    'Ow Zi Qi': null,
   };
   for (const r of check.rows) {
     const j = diharapkan[r.account_manager];
@@ -520,6 +540,60 @@ GRANT ALL ON ALL TABLES IN SCHEMA auth TO authenticated;`);
   ok('baris staging kosong/NULL tidak dipautkan');
   const stgFuzy = stg.rows.find((r) => r.am === 'Fuzy');
   eq(stgFuzy.dipautkan, true, "staging 'Fuzy' dipautkan selepas alias disahkan");
+
+  console.log('\n[P] SEED DP-8 — keputusan pengguna direkodkan sebagai data');
+  // lib/supabase/seed-account-manager-aliases.sql merekodkan keputusan
+  // pengguna 2026-09-04. Diuji: idempoten, menyelesaikan ketiga-tiga nilai
+  // (termasuk varian ruang hujung & huruf besar/kecil), dan tidak rosak
+  // bila nama staf kabur.
+  const seedSql = fs.readFileSync('lib/supabase/seed-account-manager-aliases.sql', 'utf8');
+  await asUser(SUPER_ADMIN);
+  // buang alias 'Fuzy' dahulu supaya seed benar-benar membuatnya
+  await db.query(`DELETE FROM public.account_manager_aliases WHERE raw_text='Fuzy'`);
+  try { await db.exec(seedSql); ok('seed DP-8 larian pertama berjaya'); }
+  catch (e) { bad(`seed DP-8 GAGAL: ${e.message}`); }
+  try { await db.exec(seedSql); ok('seed DP-8 IDEMPOTEN (larian kedua berjaya)'); }
+  catch (e) { bad(`seed DP-8 larian kedua GAGAL: ${e.message}`); }
+
+  const s1 = await db.query(`
+    SELECT al.raw_text, up.full_name FROM public.account_manager_aliases al
+      JOIN public.user_profiles up ON up.id = al.user_id
+     WHERE al.raw_text IN ('Fuzy','Fuzy / Dila','Fuzy / Sholihin')
+     ORDER BY al.raw_text`);
+  eq(s1.rows.length, 3, 'S1: 3 alias DP-8 direkodkan');
+  s1.rows.every((r) => r.full_name === 'Fuziah')
+    ? ok('S1: ketiga-tiganya menunjuk Fuziah')
+    : bad('S1: ada yang tidak menunjuk Fuziah — ' + JSON.stringify(s1.rows));
+
+  for (const v of ['Fuzy', 'Fuzy / Dila', 'Fuzy / Sholihin',
+                   'Fuzy / Sholihin ', '  FUZY  ']) {
+    const r = await db.query(`
+      SELECT up.full_name AS n FROM public.user_profiles up
+       WHERE up.id = public.resolve_account_manager($1)`, [v]);
+    eq(r.rows[0]?.n ?? null, 'Fuziah', `S2: '${v}' -> Fuziah`);
+  }
+
+  const s3 = await db.query(`
+    SELECT kategori, count(*)::int AS bilangan, sum(jumlah_baris)::bigint AS baris
+      FROM public.am_unresolved_values() GROUP BY kategori ORDER BY kategori`);
+  const kat = Object.fromEntries(s3.rows.map((r) => [r.kategori, Number(r.bilangan)]));
+  eq(kat['SELESAI'] ?? 0, 11, 'S3: 11 nilai SELESAI');
+  eq(kat['TIADA_PADANAN'] ?? 0, 1, "S3: 1 nilai TIADA_PADANAN ('Ow Zi Qi')");
+  eq(kat['BERBILANG_ORANG'] ?? 0, 0,
+     'S3: tiada lagi nilai BERBILANG_ORANG (semua diputuskan DP-8)');
+  const owBaris = s3.rows.find((r) => r.kategori === 'TIADA_PADANAN');
+  // 4 baris = 3 invois + 1 staging (staging juga disemai dengan 'Ow Zi Qi')
+  eq(Number(owBaris?.baris), 4,
+     "S3: 'Ow Zi Qi' = 4 baris kekal tanpa agihan (3 invois + 1 staging)");
+
+  // backfill selepas seed: 3 baris Ow Zi Qi sahaja yang kekal NULL
+  const fill3 = await db.query(`SELECT * FROM public.am_backfill_account_manager()`);
+  const inv3 = fill3.rows.find((r) => r.jadual === 'invoices');
+  eq(Number(inv3.baris_kekal_null), 3, 'selepas seed: 3 baris invois kekal NULL');
+  const owCheck = await db.query(`
+    SELECT count(*)::int n FROM public.invoices
+     WHERE account_manager = 'Ow Zi Qi' AND account_manager_id IS NOT NULL`);
+  eq(owCheck.rows[0].n, 0, "'Ow Zi Qi' TIDAK diagih kepada sesiapa (tiada tekaan)");
 
   await asUser(null);
   await db.close();

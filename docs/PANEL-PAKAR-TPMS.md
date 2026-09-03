@@ -634,22 +634,81 @@ pengeluaran** yang hanya muncul apabila dua fail berinteraksi. Set penuh wajib.
 
 ---
 
-## DP-8 — SOALAN TERBUKA: bagaimana sel berbilang orang patut diagih? (belum diputuskan)
+## DP-8 — KATA PUTUS: sel berbilang orang diagih kepada Fuziah (2026-09-04)
 
+**Status: ✅ DIPUTUSKAN OLEH PENGGUNA** (sebelumnya TERBUKA)
+
+### Soalan asal
 `'Fuzy / Dila'` (4 baris) dan `'Fuzy / Sholihin '` (2 baris) masing-masing
-mengandungi **dua orang**. Veto Kewangan §2.4 melarang sistem memilih seorang,
-dan Fasa 8A-2 **menolak secara aktif** sebarang percubaan manusia untuk
-memetakannya kepada seorang (`am_confirm_alias` menaikkan 22023).
+mengandungi **dua orang**. Veto Kewangan §2.4 melarang **sistem** memilih
+seorang, jadi 6 baris itu tidak akan pernah diagih kepada sesiapa — termasuk
+untuk laporan komisen Fasa 8F.
 
-**Tetapi ini bermakna 6 baris tidak akan pernah diagih kepada sesiapa** —
-termasuk untuk laporan komisen (Fasa 8F).
+### Keputusan pengguna (verbatim)
+> "Untuk dp8, dua dua tu masukkan Fuzy aka Fuziah"
 
-**Soalan untuk panel (perlu input perniagaan, bukan teknikal):**
-- Patutkah baris berbilang-orang diagih **50/50** kepada kedua-duanya?
-- Atau kepada **seorang sahaja** yang dipilih manusia, dengan catatan?
-- Atau **dikecualikan** daripada komisen dan dilaporkan berasingan?
-- Adakah `/` sentiasa bermaksud "dua orang", atau kadangkala "atau"?
+### Tafsiran yang dilaksanakan
+| Nilai mentah | Baris | Diagih kepada |
+|---|---|---|
+| `Fuzy` | 8 invois + 1 staging | **Fuziah** (pengesahan nama panggilan) |
+| `Fuzy / Dila` | 4 | **Fuziah** |
+| `Fuzy / Sholihin ` | 2 | **Fuziah** |
 
-**Status:** ⏳ **TERBUKA**. Tidak menghalang 8A atau 8A-2 (keduanya selamat:
-6 baris kekal NULL dan kelihatan dalam UI sebagai `BERBILANG_ORANG`).
-Mesti diputuskan **sebelum Fasa 8F** (komisen).
+Keputusan ini **turut menyelesaikan** nilai `Fuzy` yang sebelum ini kabur —
+pengguna secara eksplit menyatakan "Fuzy **aka** Fuziah".
+
+### Kesan yang direkodkan (tidak disembunyikan)
+* **Dila (Adilah) tidak menerima kredit** untuk 4 baris `Fuzy / Dila`.
+* **Sholihin tidak menerima kredit** untuk 2 baris `Fuzy / Sholihin `.
+* Ini akan mempengaruhi laporan komisen Fasa 8F.
+* `Ow Zi Qi` (3 baris invois + 1 staging) **KEKAL tanpa agihan** — nama itu
+  tiada dalam senarai 18 staf, dan pengguna **tidak** membuat keputusan
+  mengenainya. ⏳ masih terbuka.
+
+**Liputan selepas DP-8: 11 daripada 12 nilai selesai.** Hanya `Ow Zi Qi` kekal.
+
+### Kedudukan pakar
+* **Kewangan (§2.4):** membantah pengagihan penuh kepada seorang — Dila dan
+  Sholihin kehilangan kredit untuk kerja yang mereka turut lakukan. **Bantahan
+  DIREKODKAN.** Namun veto ini terpakai kepada **sistem**, dan pengguna ialah
+  pihak berkuasa tertinggi untuk keputusan perniagaan.
+* **BA (§2.9):** menyokong — lebih baik diagih kepada seorang yang dikenal
+  pasti daripada tidak diagih langsung; 6 baris kini boleh dilaporkan.
+* **QA (§2.7):** menerima, dengan syarat keputusan itu **boleh diaudit dan
+  boleh dibatalkan**. Syarat dipenuhi.
+* **SQL Architect (§2.2):** melaksanakan dengan menukar **susunan** logik,
+  bukan dengan melemahkan mana-mana peraturan.
+
+### Kata putus pelaksanaan
+1. **`resolve_account_manager()` ditukar susunan:** alias yang disahkan manusia
+   kini diperiksa **SEBELUM** penolakan berbilang-orang (langkah 2, bukan 3).
+   Alasan: peraturan berbilang-orang wujud untuk menghalang **sistem** meneka.
+   Ia bukan untuk menghalang **manusia** memutuskan. Tanpa susunan ini,
+   keputusan pengguna tidak boleh dilaksanakan sama sekali.
+2. **Veto §2.4 KEKAL berkuat kuasa untuk semua nilai yang belum disahkan
+   manusia.** Dibuktikan oleh ujian: `'Faiz / Siti'` (tiada alias) → NULL.
+3. **`am_confirm_alias()` TIDAK LAGI menolak** sel berbilang orang (ralat 22023
+   dibuang). Sebagai gantinya ia merekodkan `sel_berbilang_orang = true` dan
+   `asas = 'Panel DP-8: keputusan pengguna 2026-09-04'` dalam jejak audit,
+   supaya keputusan ini boleh diaudit atau dibatalkan kemudian melalui
+   `am_revoke_alias()`.
+4. **`am_unresolved_values()` ditukar susunan kategori:** `SELESAI` kini
+   didahulukan, jadi sel berbilang orang yang sudah diputuskan manusia
+   dilaporkan sebagai `SELESAI`, bukan `BERBILANG_ORANG`.
+5. **Keputusan direkodkan sebagai DATA, bukan kod:**
+   `lib/supabase/seed-account-manager-aliases.sql` — idempoten, menyelesaikan
+   Fuziah melalui **nama** (bukan UUID keras), dan **berhenti dengan ralat
+   yang jelas** jika nama itu kabur atau tiada.
+
+### Pengesahan
+* `scripts/test-client-master.mjs`: **85/85** — termasuk bukti bahawa
+  `'Faiz / Siti'` tanpa alias **kekal NULL** (veto §2.4 masih hidup)
+* `scripts/test-account-manager-resolution.mjs`: **142/142** — termasuk
+  seksyen [P] yang menjalankan seed DP-8 dua kali (idempoten) dan mengesahkan
+  kelima-lima varian (`Fuzy`, `Fuzy / Dila`, `Fuzy / Sholihin`,
+  `Fuzy / Sholihin ` dengan ruang hujung, `  FUZY  `) menyelesaikan ke Fuziah
+
+### Yang masih terbuka
+⏳ **`Ow Zi Qi`** — 3 baris invois + 1 baris staging, tiada padanan staf.
+Perlu keputusan pengguna: staf baharu yang belum didaftarkan, orang luar
+(bukan staf MIMOS Academy), atau ejaan berbeza bagi staf sedia ada?

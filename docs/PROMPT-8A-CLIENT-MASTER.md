@@ -90,8 +90,18 @@ Oleh itu Panel DP-1 meletakkannya sebagai **prasyarat 8A**.
 - Bila kabur → **NULL**. Tiada padanan "terdekat".
 - `Fuzy` → **NULL**, bukan `Fuziah`. Hanya selepas manusia mengesahkannya ia
   masuk `account_manager_aliases`, dan selepas itu ia selesai secara konsisten.
-- Sel berbilang orang (`Fuzy / Dila`) → **NULL** selamanya. Sistem tidak akan
-  memilih seorang daripada dua (veto Pakar Kewangan §2.4).
+- Sel berbilang orang (`Fuzy / Dila`) → **NULL** selagi tiada manusia
+  memutuskannya. **Sistem** tidak akan memilih seorang daripada dua (veto
+  Pakar Kewangan §2.4, masih berkuat kuasa).
+- **KEMASKINI DP-8 (keputusan pengguna 2026-09-04):** pengguna memutuskan
+  `'Fuzy'`, `'Fuzy / Dila'` dan `'Fuzy / Sholihin '` **ketiga-tiganya** diagih
+  kepada **Fuziah**. Jadi alias manusia kini mempunyai keutamaan TERTINGGI
+  dalam `resolve_account_manager()` — ia diperiksa **SEBELUM** penolakan
+  berbilang-orang. Veto §2.4 kekal hidup untuk semua nilai yang belum
+  diputuskan manusia (dibuktikan: `'Faiz / Siti'` tanpa alias → NULL).
+  Keputusan ini direkodkan sebagai DATA oleh
+  `lib/supabase/seed-account-manager-aliases.sql` (prompt 8A-3 berasingan).
+  **Liputan kini 11/12 nilai**; hanya `'Ow Zi Qi'` (3 baris) kekal terbuka.
 
 ### 3.4 Apa yang Arena sudah bina dan uji dalam repo
 
@@ -222,7 +232,7 @@ https://github.com/SaidRazak881/masb-pms-v4/blob/arena/01a06274-masb-pms-v4/lib/
 **Sahkan SHA-256 fail yang anda ambil SEPADAN:**
 
 ```
-be64c6e2e44212bcb4a4c27ea9543570fa90e0c17878e8382661b0321a22722a
+d394398dc075f92c61db13077be568e907fb77989ef1175146682ce251418542
 ```
 
 Jika **tidak sepadan**: JANGAN jalankan. Laporkan SHA yang anda dapat dan berhenti.
@@ -367,6 +377,13 @@ SELECT 'J6' AS j,
 ```
 
 **Jangkaan:** 12 baris, **SEMUA `SEPADAN`** — iaitu **8 selesai**, **4 NULL**.
+
+> **NOTA DP-8:** jangkaan di atas mengandaikan `account_manager_aliases`
+> **KOSONG** (keadaan sebaik sahaja 8A dipasang). Selepas seed DP-8
+> (`seed-account-manager-aliases.sql`, prompt 8A-3 berasingan) dijalankan,
+> `Fuzy`, `Fuzy / Dila` dan `Fuzy / Sholihin ` akan menyelesaikan kepada
+> **Fuziah** → liputan menjadi **11/12**. Jika J6 dijalankan **selepas** seed
+> itu, jangkaannya berbeza; laporkan yang mana satu berlaku.
 
 > ⚠️ **NULL DI SINI IALAH JAWAPAN YANG BETUL, BUKAN KEGAGALAN.**
 > `Fuzy`, `Fuzy / Dila`, `Fuzy / Sholihin ` dan `Ow Zi Qi` **mesti** NULL.

@@ -54,7 +54,13 @@ Senarai staf sebenar (18 orang bernama) diambil daripada
 
 **Kenapa ini penting untuk J1:** lajur ini kini TEXT mentah. `Abu Said` dan
 `Abu said` dikira sebagai **dua orang berbeza**; `Fuzy / Dila` (dua orang)
-diagih kepada seorang atau tiada siapa. Fasa 8A menambah pautan UUID yang
+diagih kepada seorang atau tiada siapa.
+
+> **KEMASKINI DP-8 (keputusan pengguna 2026-09-04):** `'Fuzy'`,
+> `'Fuzy / Dila'` dan `'Fuzy / Sholihin '` **ketiga-tiganya** diputuskan
+> pengguna untuk diagih kepada **Fuziah**. Ini **belum** dipasang di live —
+> jadi J1f masih akan menunjukkan nilai mentah asal. Hanya **`Ow Zi Qi`**
+> (3 baris) yang masih tiada keputusan. Fasa 8A menambah pautan UUID yang
 **selesai** supaya laporan boleh mengagih dengan betul — tanpa membuang nilai
 mentah (jejak audit).
 

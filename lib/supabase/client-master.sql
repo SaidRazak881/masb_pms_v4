@@ -217,10 +217,10 @@ COMMENT ON FUNCTION public.normalize_person_name(text) IS
 -- ---------------------------------------------------------------------
 -- 5. Penyelesai pengurus akaun
 -- ---------------------------------------------------------------------
--- Keturutan penyelesaian:
+-- Keturutan penyelesaian (dikemas kini oleh Panel DP-8, 2026-09-04):
 --   1. NULL / kosong                       -> NULL
---   2. Berbilang orang ('/' atau ',')      -> NULL   (JANGAN pilih seorang)
---   3. Alias disahkan manusia              -> user_id
+--   2. Alias disahkan manusia              -> user_id  (KEUTAMAAN TERTINGGI)
+--   3. Berbilang orang ('/' atau ',')      -> NULL   (SISTEM jangan pilih seorang)
 --   4. Padanan tepat nama penuh normal     -> user_id (jika TEPAT satu)
 --   5. Padanan token pertama, tepat satu   -> user_id
 --   6. Padanan substring, TEPAT SATU staf  -> user_id
@@ -231,8 +231,13 @@ COMMENT ON FUNCTION public.normalize_person_name(text) IS
 -- teks tepat dengan syarat keunikan. Jika lebih daripada satu staf
 -- mengandungi substring itu, hasilnya NULL (cth. "Nur" padan 5 staf -> NULL).
 --
--- Langkah 4 dan 5 mengembalikan NULL jika LEBIH DARIPADA SATU staf padan —
+-- Langkah 4, 5 dan 6 mengembalikan NULL jika LEBIH DARIPADA SATU staf padan —
 -- kekaburan tidak pernah diselesaikan secara rawak.
+--
+-- LANGKAH 2 DIDAHULUKAN atas keputusan pengguna (DP-8): alias manusia ialah
+-- KEPUTUSAN, bukan tekaan, jadi ia mengatasi peraturan berbilang-orang.
+-- Peraturan berbilang-orang kekal berkuat kuasa untuk semua nilai yang
+-- BELUM disahkan manusia — sistem masih tidak pernah meneka.
 
 CREATE OR REPLACE FUNCTION public.resolve_account_manager(p_raw text)
 RETURNS uuid
@@ -253,19 +258,27 @@ BEGIN
     RETURN NULL;
   END IF;
 
-  -- 2. berbilang orang dalam satu sel: "Fuzy / Dila", "Faiz, Siti"
-  --    Veto Kewangan §2.4: JANGAN pilih seorang daripada berbilang.
-  IF v_norm LIKE '%/%' OR v_norm LIKE '%,%' OR v_norm LIKE '% dan %' OR v_norm LIKE '% & %' THEN
-    RETURN NULL;
-  END IF;
-
-  -- 3. alias yang disahkan manusia (keutamaan tertinggi selepas penolakan)
+  -- 2. ALIAS YANG DISAHKAN MANUSIA — keutamaan TERTINGGI (Panel DP-8).
+  --    Diletakkan SEBELUM penolakan berbilang-orang dengan sengaja:
+  --    peraturan berbilang-orang wujud untuk menghalang SISTEM daripada
+  --    meneka. Ia bukan untuk menghalang MANUSIA daripada memutuskan.
+  --    Keputusan pengguna 2026-09-04: 'Fuzy / Dila' dan 'Fuzy / Sholihin'
+  --    kedua-duanya diagih kepada Fuziah. Tanpa susunan ini, keputusan itu
+  --    tidak boleh dilaksanakan sama sekali.
   SELECT a.user_id INTO v_result
     FROM public.account_manager_aliases a
    WHERE public.normalize_person_name(a.raw_text) = v_norm
    LIMIT 1;
   IF v_result IS NOT NULL THEN
     RETURN v_result;
+  END IF;
+
+  -- 3. berbilang orang dalam satu sel: "Fuzy / Dila", "Faiz, Siti"
+  --    Veto Kewangan §2.4 (DIBATALKAN oleh keputusan pengguna DP-8 untuk
+  --    kes yang disahkan manusia; masih berkuat kuasa untuk semua kes lain):
+  --    SISTEM jangan pilih seorang daripada berbilang.
+  IF v_norm LIKE '%/%' OR v_norm LIKE '%,%' OR v_norm LIKE '% dan %' OR v_norm LIKE '% & %' THEN
+    RETURN NULL;
   END IF;
 
   -- 4. padanan tepat pada nama penuh yang dinormalkan

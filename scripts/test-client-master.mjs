@@ -25,6 +25,11 @@
  *   Sistem MENGINGAT keputusan manusia; ia TIDAK MENEKA.
  *   Bila kabur -> NULL. TIADA padanan "terdekat".
  *
+ * KEMASKINI DP-8 (keputusan pengguna 2026-09-04): alias yang DISAHKAN MANUSIA
+ * kini mempunyai keutamaan TERTINGGI, mengatasi penolakan sel berbilang-orang.
+ * Peraturan berbilang-orang kekal berkuat kuasa untuk nilai yang BELUM
+ * diputuskan manusia -- sistem masih tidak pernah meneka sendiri.
+ *
  * Ujian ini menggunakan 18 NAMA STAF SEBENAR daripada
  * `V4 RAW/User Profiles Mapping.xlsx` dan 12 NILAI SEBENAR daripada lajur H
  * `V4 RAW/00. Quotation Tracker (1).xlsx` — bukan data rekaan.
@@ -340,14 +345,29 @@ async function main() {
   const afterVar = await db.query(`SELECT public.resolve_account_manager('  FUZY  ') id`);
   eq(afterVar.rows[0].id, fuziahId, 'alias tahan varian "  FUZY  "');
 
-  // alias TIDAK boleh mengatasi penolakan berbilang-orang
+  // PANEL DP-8 (keputusan pengguna 2026-09-04): "dua dua tu masukkan Fuzy aka
+  // Fuziah". Alias manusia KINI mengatasi penolakan berbilang-orang, kerana
+  // peraturan itu wujud untuk menghalang SISTEM meneka -- bukan untuk
+  // menghalang MANUSIA memutuskan. Jangkaan asal (NULL) DIBALIKKAN.
   await db.query(
     `INSERT INTO public.account_manager_aliases (raw_text,user_id,confirmed_by)
      VALUES ('Fuzy / Dila',$1,$2)`, [fuziahId, UID]);
   const multi = await db.query(
     `SELECT public.resolve_account_manager('Fuzy / Dila') id`);
-  eq(multi.rows[0].id, null,
-     'alias TIDAK membenarkan sel berbilang-orang selesai (veto Kewangan §2.4)');
+  eq(multi.rows[0].id, fuziahId,
+     'DP-8: alias MANUSIA menyelesaikan sel berbilang-orang (Fuzy / Dila -> Fuziah)');
+
+  // ruang hujung pada data sebenar mesti dikendali juga
+  const multiTrail = await db.query(
+    `SELECT public.resolve_account_manager('Fuzy / Dila   ') id`);
+  eq(multiTrail.rows[0].id, fuziahId, 'DP-8: tahan ruang hujung');
+
+  // TETAPI: sel berbilang orang TANPA alias manusia mesti KEKAL NULL.
+  // Veto §2.4 masih berkuat kuasa untuk SISTEM.
+  const multiNoAlias = await db.query(
+    `SELECT public.resolve_account_manager('Faiz / Siti') id`);
+  eq(multiNoAlias.rows[0].id, null,
+     'veto §2.4 KEKAL: sel berbilang orang tanpa alias manusia -> NULL');
 
   console.log('\n[I] KESELAMATAN — pendedahan minimum (veto §2.8)');
   const sig = await db.query(`

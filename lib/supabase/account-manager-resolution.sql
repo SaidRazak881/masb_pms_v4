@@ -26,10 +26,13 @@
 --
 -- VETO YANG DIPATUHI
 -- ------------------
--- §2.4 Kewangan : sel berbilang orang TIDAK boleh diagih kepada seorang.
---                 Fail ini TIDAK menyediakan sebarang cara untuk melakukan
---                 itu — ia hanya mempamerkannya sebagai "perlu keputusan
---                 perniagaan". Lihat DP-6.
+-- §2.4 Kewangan : SISTEM tidak boleh memilih seorang daripada sel berbilang
+--                 orang. `resolve_account_manager()` masih mengembalikan NULL
+--                 untuknya. DIBATALKAN untuk keputusan MANUSIA oleh Panel DP-8
+--                 (keputusan pengguna 2026-09-04): `am_confirm_alias()` kini
+--                 menerima sel berbilang orang, dan merekodkan
+--                 `sel_berbilang_orang = true` dalam jejak audit supaya kesan
+--                 komisen (Fasa 8F) boleh diaudit kemudian.
 -- §2.7 QA       : tiada padanan kabur automatik. Setiap pautan yang diisi
 --                 datang daripada `resolve_account_manager()`, yang
 --                 mengembalikan NULL bila tidak pasti.
@@ -168,20 +171,23 @@ BEGIN
            WHERE up.id = public.resolve_account_manager(a.raw)
            LIMIT 1)                                                  AS rname,
          CASE
-           -- sel berbilang orang: KEKAL NULL selamanya (veto §2.4).
-           -- Diperiksa SEBELUM kategori lain supaya alias tidak boleh
-           -- memintasnya (sudah dibuktikan dalam test-client-master.mjs [H]).
-           WHEN public.normalize_person_name(a.raw) LIKE '%/%'
-             OR public.normalize_person_name(a.raw) LIKE '%,%'
-             OR public.normalize_person_name(a.raw) LIKE '% dan %'
-             OR public.normalize_person_name(a.raw) LIKE '% & %'
-             THEN 'BERBILANG_ORANG'
+           -- SELESAI didahulukan: jika alias manusia wujud ATAU penyelesai
+           -- berjaya, nilai itu selesai -- termasuk sel berbilang orang yang
+           -- sudah diputuskan manusia (Panel DP-8).
            WHEN public.resolve_account_manager(a.raw) IS NOT NULL
              THEN 'SELESAI'
            WHEN EXISTS (SELECT 1 FROM public.account_manager_aliases al
                          WHERE public.normalize_person_name(al.raw_text)
                                = public.normalize_person_name(a.raw))
              THEN 'SELESAI'
+           -- sel berbilang orang yang BELUM diputuskan manusia: kekal NULL.
+           -- Veto Kewangan §2.4 berkuat kuasa untuk SISTEM; DP-8 membenarkan
+           -- MANUSIA memutuskannya melalui am_confirm_alias().
+           WHEN public.normalize_person_name(a.raw) LIKE '%/%'
+             OR public.normalize_person_name(a.raw) LIKE '%,%'
+             OR public.normalize_person_name(a.raw) LIKE '% dan %'
+             OR public.normalize_person_name(a.raw) LIKE '% & %'
+             THEN 'BERBILANG_ORANG'
            -- tiada staf yang mengandungi sebarang token nilai ini
            WHEN NOT EXISTS (
                   SELECT 1 FROM public.user_profiles up
@@ -225,11 +231,12 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_norm     text;
-  v_existing uuid;
-  v_alias_id uuid;
-  v_action   public.audit_action;
-  v_name     text;
+  v_norm      text;
+  v_existing  uuid;
+  v_alias_id  uuid;
+  v_action    public.audit_action;
+  v_name      text;
+  v_berbilang boolean;
 BEGIN
   IF NOT public.can_resolve_account_managers() THEN
     RAISE EXCEPTION 'tiada kuasa: pengesahan alias memerlukan peranan admin, head_governance atau finance'
@@ -241,15 +248,16 @@ BEGIN
     RAISE EXCEPTION 'raw_text tidak boleh kosong' USING ERRCODE = '22023';
   END IF;
 
-  -- Veto §2.4: JANGAN benarkan manusia memetakan sel berbilang orang kepada
-  -- seorang staf. Ini keputusan perniagaan yang belum dibuat (lihat DP-6).
-  -- Penolakan di SINI (bukan hanya dalam resolve_account_manager) supaya
-  -- pemetaan salah tidak pernah tersimpan walaupun ia tidak akan digunakan.
-  IF v_norm LIKE '%/%' OR v_norm LIKE '%,%'
-     OR v_norm LIKE '% dan %' OR v_norm LIKE '% & %' THEN
-    RAISE EXCEPTION 'sel berbilang orang tidak boleh dipetakan kepada seorang staf (veto Kewangan §2.4, lihat DP-6)'
-      USING ERRCODE = '22023';
-  END IF;
+  -- Panel DP-8 (keputusan pengguna 2026-09-04): sel berbilang orang BOLEH
+  -- dipetakan kepada seorang staf, tetapi HANYA melalui keputusan manusia
+  -- yang eksplisit di sini. Veto Kewangan §2.4 masih berkuat kuasa untuk
+  -- SISTEM (resolve_account_manager tidak akan pernah memilih sendiri),
+  -- tetapi ia tidak boleh menghalang MANUSIA daripada memutuskan.
+  --
+  -- Fakta yang direkodkan bersama keputusan ini supaya kesan komisen
+  -- (Fasa 8F) boleh diaudit kemudian:
+  v_berbilang := (v_norm LIKE '%/%' OR v_norm LIKE '%,%'
+                  OR v_norm LIKE '% dan %' OR v_norm LIKE '% & %');
 
   IF NOT EXISTS (SELECT 1 FROM public.user_profiles up WHERE up.id = p_user_id) THEN
     RAISE EXCEPTION 'user_id tidak merujuk kepada profil staf yang wujud'
@@ -299,7 +307,11 @@ BEGIN
                        'user_id', p_user_id,
                        'full_name', v_name,
                        'notes', p_notes),
-    jsonb_build_object('fasa', '8A-2', 'fungsi', 'am_confirm_alias')
+    jsonb_build_object('fasa', '8A-2', 'fungsi', 'am_confirm_alias',
+                       'sel_berbilang_orang', v_berbilang,
+                       'asas', CASE WHEN v_berbilang
+                                    THEN 'Panel DP-8: keputusan pengguna 2026-09-04'
+                                    ELSE 'padanan biasa' END)
   );
 
   RETURN QUERY SELECT btrim(p_raw_text), p_user_id, v_name, v_action::text;
