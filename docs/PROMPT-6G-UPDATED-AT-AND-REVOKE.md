@@ -52,7 +52,7 @@
 > | PROMPT-6G (hardening SQL) | 🟢 **DILULUSKAN** (pada mulanya TANGGUH, kemudian diluluskan pada 2026-09-04) |
 > | **DROP** sisa pra-repo (4 fungsi `private.*`, 3 jadual warisan, 8 polisi) | ⏸️ **KEKAL DITANGGUH** — pengguna setuju ia bukan risiko aktif. **§2 dan §3 TIDAK drop apa-apa**, jadi ia selaras dengan keputusan ini |
 > | Rollout 19 pengguna | ✅ Pengguna maklumkan sendiri, tiada tindakan teknikal |
-> | D1 `Confirm email` | ✅ **OFF** |
+> | D1 `Confirm email` | ✅ **OFF — TELAH DISET oleh pengguna (2026-09-04)** |
 > | Akaun ujian dari UAT D4 | ✅ **SEKAT** melalui UI Super Admin |
 >
 > ### ⚠️ Keadaan SEMASA live (sebelum §2/§3 dijalankan) — inilah yang prompt ini betulkan

@@ -184,3 +184,39 @@
 
 > **Jangan kongsi kata laluan baharu anda dalam laporan** — nyatakan sahaja
 > bahawa pertukaran berjaya.
+
+---
+
+## Status tetapan rollout (2026-09-04)
+
+| Item | Status | Bukti |
+| ---- | ------ | ----- |
+| **D2** `Site URL` + `Redirect URLs` | ✅ disahkan | Dilaporkan pengguna, disahkan ChatGPT (PROMPT-6F §2) |
+| **D1** `Confirm email` | ✅ **OFF** — telah diset oleh pengguna | Dashboard → Auth → Providers → Email |
+| **PROMPT-6G** (trigger `updated_at` + REVOKE) | ✅ SELESAI, semua kriteria PASS | G1 12/12, G2 0, G3 berubah, H3 6/6, I1 wujud, I2 = 0 |
+| **D3** template `Reset Password` | ⏳ belum dilapor (keutamaan rendah, baca-sahaja) | — |
+| **D4** `Rate Limits` | ⏳ belum dilapor (keutamaan rendah, baca-sahaja) | — |
+| Sekat akaun ujian UAT | ⏳ kerja pengguna di `/admin/users` | — |
+| Pembersihan pra-repo (DROP) | ⏸️ **KEKAL DITANGGUH** — keputusan pengguna | — |
+
+### Kenapa `Confirm email = OFF` TIDAK membuka lubang keselamatan
+
+OFF bermakna `signUp()` **mengembalikan sesi serta-merta** (tiada pengesahan e-mel
+diperlukan). Itu kedengaran seperti membenarkan pendaftaran masuk tanpa kelulusan.
+**Ia tidak**, kerana tiga lapisan dalam kod:
+
+1. **`app/(auth)/register/page.tsx` baris ~148** — `await supabase.auth.signOut()`
+   dipanggil **sejurus selepas** `signUp()` berjaya. Sesi yang OFF berikan itu
+   **dibuang sebelum** pengguna sempat guna. Komen dalam kod: *"Buang sesi —
+   pengguna pending belum dibenarkan masuk."*
+2. **Baris ~9–10** — profil dicipta dengan `role = 'viewer'` dan
+   `account_status = 'pending'`. Pengguna **tidak boleh memilih role sendiri**;
+   itu keputusan Super Admin.
+3. **`app/(auth)/login/page.tsx` baris ~78–82** — selepas log masuk, aliran
+   memeriksa destinasi dan menghala ke **`/pending-approval`** atau
+   **`/account-blocked`** jika `account_status` bukan `active`. Jadi walaupun
+   seseorang cuba log masuk terus, mereka tidak sampai ke `/dashboard`.
+
+Kesan praktikal OFF untuk rollout: **19 akaun sedia ada tidak perlu klik pautan
+e-mel** (semuanya sudah `email_confirmed_at IS NOT NULL`), dan pendaftaran baharu
+terus masuk ke baris kelulusan Super Admin tanpa bergantung pada penghantaran e-mel.
