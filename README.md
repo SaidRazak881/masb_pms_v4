@@ -356,6 +356,7 @@ berpuluh-puluh polisi RLS.
 | `docs/PROMPT-6C-AUDIT-LEGACY-TABLES.md` | **V3 dibetulkan** + audit READ-ONLY **3** jadual warisan (`profiles`, `programme_participants`, `user_roles`) yang tiada dalam repo — W1–W8 |
 | `docs/PROMPT-6D-AUTH-VERCEL-LEGACY.md` | **DIGANTIKAN SEBAHAGIAN** (D mustahil via alat → manual pengguna): Langkah D (Auth config) + Langkah E (Production Branch → `arena/01a06274-masb-pms-v4`) + X1–X5 read-only untuk menutup penemuan W5 (`private.has_role()` bukan ciptaan repo). **Tiada** kelulusan DROP/REVOKE |
 | `docs/PROMPT-6E-VERCEL-PRODUCTION-PRIVATE-HAS-ROLE.md` | **DILULUSKAN & AKTIF:** Langkah E (Production Branch → `arena/01a06274-masb-pms-v4`) **dinyahganding** dari D + E1–E9 + **Y1–Y4** (katalog sahaja) untuk kenal pasti `private.has_role()`. Penemuan: fungsi itu **dirujuk** oleh `main` tetapi **tidak pernah ditakrifkan** dalam sejarah git = sisa pra-repo. **Tiada** kelulusan DROP/REVOKE |
+| `docs/PROMPT-6F-AUDIT-PRIVATE-SCHEMA-DRIFT.md` | **AKTIF:** Z1–Z5 (read-only) menyiasat **4 fungsi `private.*` pra-repo** yang tidak wujud dalam mana-mana komit git — `has_role`, `set_updated_at`, `validate_programme_lock`, `write_audit_log`. Persoalan utama: adakah **governance lock** dan **audit log** live masih dikuatkuasakan oleh kod pra-repo? |
 | `docs/ACTION-6-UAT-AUTH-USERS.md` | Senarai semak ujian manual Fasa 6 (log masuk, wajib tukar kata laluan, pendaftaran, kelulusan, sekatan, reset) |
 | `docs/CODEBASE-MAP.md` | Peta kod ringkas untuk konteks pembantu AI (jana semula: `node scripts/codebase-map.mjs`) |
 | `docs/PROMPT-TEMPLATE-FASA.md` | Templat wajib prompt GPT: Persona + Peta Kod + Tugasan + Larangan + Format Laporan |
@@ -400,6 +401,7 @@ meneruskan tanpa pelayan Supabase).
 | `node scripts/test-preflight-b-sql.mjs` | Sahkan blok preflight **Langkah B** dalam PROMPT-6: read-only, kalis ralat pada DB sebelum/selepas Fasa 6, tiada kata laluan bocor |
 | `node scripts/test-c13-has-role-drift.mjs` | Regresi **blocker C13**: lakukan semula drift `has_role()` versi Fasa 5, buktikan super_admin kehilangan 7 role, sahkan `fix-rls-recursion.sql` memulihkan |
 | `node scripts/test-prompt-6e-y-queries.mjs` | Sahkan blok SQL **Y1–Y4** dalam PROMPT-6E: sintaks sah, benar-benar read-only, tidak melaksanakan `private.has_role()`, dan **jangkaan Arena diuji sebelum prompt dihantar**. Ujian inilah yang mendedahkan kesilapan kriteria Y3 Arena |
+| `node scripts/test-prompt-6f-z-queries.mjs` | Sahkan blok SQL **Z1–Z5** dalam PROMPT-6F terhadap persekitaran tiruan **Senario A** (trigger governance masih pada `private.*`). Menguji bahawa Z2 mendedahkan `programmes_enforce_lock → private.validate_programme_lock()` dan Z4 **tidak** menghasilkan positif palsu |
 | `node scripts/test-sql-pglite.mjs` | Ujian pemasangan skema induk + idempotensi |
 | `node scripts/test-sql-functional.mjs` | Ujian fungsi RPC (import sync, lock, change request) |
 | `node scripts/codebase-map.mjs` | Jana semula `docs/CODEBASE-MAP.md` |

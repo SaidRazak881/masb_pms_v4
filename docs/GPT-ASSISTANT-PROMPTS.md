@@ -54,7 +54,8 @@ dashboard **Super Admin** (`saidrazak881@gmail.com`) di `/admin/users`.
 | **Blocker C13** — `has_role()` live tidak sedar `super_admin` | **`docs/PROMPT-6B-FIX-C13-HAS-ROLE.md`** |
 | **V3 dibetulkan** + audit **3** jadual warisan (read-only) | **`docs/PROMPT-6C-AUDIT-LEGACY-TABLES.md`** |
 | D + E diluluskan + audit warisan (X1–X5) — **D digantikan: manual pengguna** | `docs/PROMPT-6D-AUTH-VERCEL-LEGACY.md` |
-| **E DILULUSKAN SEKARANG** (dinyahganding dari D) + Y1–Y4 kenal pasti `private.has_role()` | **`docs/PROMPT-6E-VERCEL-PRODUCTION-PRIVATE-HAS-ROLE.md`** |
+| E diluluskan (dinyahganding dari D) + Y1–Y4 — **E=0/9, Production masih Fasa 5; Production Branch kena tukar MANUAL oleh pengguna** | `docs/PROMPT-6E-VERCEL-PRODUCTION-PRIVATE-HAS-ROLE.md` |
+| **Z1–Z5 AKTIF** — audit 4 fungsi `private.*` pra-repo (governance lock & audit log) | **`docs/PROMPT-6F-AUDIT-PRIVATE-SCHEMA-DRIFT.md`** |
 | Senarai semak ujian manual (log masuk, pendaftaran, kelulusan, sekatan, reset, regresi) | **`docs/ACTION-6-UAT-AUTH-USERS.md`** |
 | Urutan pemasangan SQL penuh (10 fail) | `docs/SETUP-SUPABASE.md` |
 | Konteks struktur sistem untuk GPT | `docs/CODEBASE-MAP.md` (Bahagian 8) |

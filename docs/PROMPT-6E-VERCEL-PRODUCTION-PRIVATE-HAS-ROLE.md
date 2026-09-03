@@ -1,5 +1,16 @@
 # PROMPT 6E — E DILULUSKAN SEKARANG (dinyahganding dari D) + kenal pasti `private.has_role()` (Y1–Y4)
 
+> **📌 STATUS SELEPAS DIJALANKAN:** **E = 0/9 PASS.** ChatGPT membuktikan dengan
+> bukti live bahawa Production masih **Fasa 5** (`MfaGuard` masih dimuatkan;
+> `/register`, `/forgot-password`, `/admin/users` = 404). Puncanya **bukan** kod
+> Fasa 6 — connector ChatGPT tiada operasi mutation untuk Vercel Git settings,
+> jadi **Production Branch belum ditukar**. Ia kini **kerja manual pengguna**.
+> **Y1–Y4 selesai**, dan mendedahkan penemuan yang lebih besar daripada
+> `private.has_role()`: **5 fungsi** dalam skema `private`, empat daripadanya
+> tidak wujud dalam mana-mana komit git. Siasatan itu diteruskan dalam
+> **`docs/PROMPT-6F-AUDIT-PRIVATE-SCHEMA-DRIFT.md`**.
+> **Jangan jalankan semula E1–E9 sehingga pengguna mengesahkan penukaran branch.**
+
 > **Persona kamu:** Jurutera pangkalan data yang teliti dan berhati-hati
 > (`docs/personas/PERSONA-SQL-ARCHITECT.md`).
 >
