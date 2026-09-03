@@ -526,3 +526,130 @@ prompt ini wujud untuk elakkan.
 
 **Tindakan:** seksyen [L] dalam `scripts/test-client-master.mjs` membuktikan
 kedua-dua bentuk; nota amaran dimasukkan ke dalam `docs/PROMPT-8A-CLIENT-MASTER.md`.
+
+---
+
+## DP-6 — Drift enum `app_role` antara repo dan live adalah TERKAWAL (2026-09-04)
+
+**Dikesan semasa membina 8A-2, sebelum prompt J1 dihantar kepada pengguna.**
+
+**Fakta:**
+- `schema-master.sql:202` mencipta `app_role` dengan **7** nilai:
+  `viewer, executive, manager, admin, staff, finance, head_governance`.
+- `user-management.sql` Bahagian 1a menjalankan
+  `ALTER TYPE public.app_role ADD VALUE 'super_admin'` → **8** nilai.
+- Fasa 6 **sudah dipasang** di live (PROMPT-6G ✅ SELESAI), jadi **live = 8**.
+
+**Kesilapan Arena (dua langkah, kedua-duanya dibetulkan):**
+1. Draf `client-master.sql` menulis `'super_admin'::public.app_role` dalam
+   polisi RLS → **ralat 22P02** dalam PGlite (bootstrap hanya memuatkan
+   `schema-master.sql`).
+2. Pembetulan pertama keterlaluan ke arah lain: prompt J1 memberitahu ChatGPT
+   bahawa `super_admin` **dijangka TIADA** di live. Itu akan menghasilkan
+   **penemuan palsu** — ChatGPT akan melaporkan 🔴 untuk keadaan yang betul.
+
+**Punca akar kedua-duanya sama:** ujian PGlite memuatkan **sebahagian** fail
+skema, jadi ia mengesahkan keadaan yang **tidak sama** dengan live.
+
+**KATA PUTUS:**
+1. `client-master.sql` **KEKAL** tanpa `'super_admin'::app_role`. Super Admin
+   dilindungi oleh `has_role()` sendiri (`schema-master.sql:274`), yang
+   mengembalikan `true` untuk SEMUA peranan bila `role = 'super_admin'`.
+   Dibuktikan secara langsung oleh seksyen [5] ujian J1.
+2. **Peraturan baharu untuk semua ujian PGlite:** bootstrap MESTI memuatkan
+   **set fail skema yang sama seperti urutan pemasangan live**
+   (`schema-master` → `schema-import-staging` → `sync-import-transaction` →
+   `governance-lock` → `change-requests` → `fix-rls-recursion` →
+   `fix-add-programme-categories` → `user-management` → `updated-at-triggers` →
+   `client-master` → `account-manager-resolution`). Ujian yang memuatkan
+   sebahagian sahaja **mesti menyatakan** bahawa ia berbuat demikian dan
+   **tidak boleh** membuat dakwaan tentang keadaan live.
+3. Jangkaan J1d dibetulkan kepada **8 nilai, `super_admin` ADA**.
+
+**Tindakan:** kedua-dua prompt dikemas kini; `test-prompt-8a-j1-queries.mjs`
+kini memuatkan `user-management.sql` dan menguji `has_role()` untuk
+`super_admin` secara langsung. **56/56 lulus.**
+
+---
+
+## DP-7 — 🔴 KECACATAN PENGELUARAN: trigger `set_updated_at` pada `import_staging` yang tiada lajur `updated_at` (2026-09-04)
+
+**Dikesan oleh `scripts/test-account-manager-resolution.mjs`** — iaitu ujian
+pertama yang memuatkan **set fail skema penuh mengikut urutan pemasangan live**
+(seperti diwajibkan oleh DP-6). Ujian sebelumnya memuatkan hanya sebahagian fail,
+jadi interaksi antara dua fail ini **tidak pernah diuji**.
+
+### Fakta (diukur, bukan dijangka)
+
+| Perkara | Bukti |
+|---|---|
+| `updated-at-triggers.sql` menyenaraikan `import_staging` dalam `targets` | baris 95–99, 11 jadual + `profiles` = **12** |
+| `set_updated_at()` menulis `NEW.updated_at = now()` | baris 71–78 |
+| `schema-import-staging.sql` **TIDAK** mentakrifkan `updated_at` | `grep -ic updated_at` = **0** |
+| `sync_import_transaction` **MENG-UPDATE** `import_staging` | baris **321** dan **727** |
+| Fasa 6G dilaporkan ✅ SELESAI dengan **G1 = 12/12** | laporan GPT PROMPT-6G |
+| Ralat sebenar yang dihasilkan | `record "new" has no field "updated_at"` (42703) — **direproduksi dalam PGlite** |
+
+### Kesimpulan bersyarat
+
+Jika `import_staging` di live **tiada** lajur `updated_at`, maka **SETIAP**
+kemas kini baris staging gagal. Kerana `sync_import_transaction` adalah
+**ATOMIK**, **seluruh batch import Excel gagal**.
+
+**Ini belum disahkan di live.** Repo ini sudah diketahui mempunyai drift di
+mana live ada lajur yang repo tidak takrifkan (contoh: `invoices.sst_amount`,
+laporan PROMPT-7A J1b). Jadi `import_staging.updated_at` **mungkin** wujud di
+live. Panel menolak untuk mengandaikan sama ada arah.
+
+**Tindakan bukti:** query **J1i** dan **J1j** ditambah kepada
+`docs/PROMPT-8A-J1-READONLY.md` (read-only, tiada kelulusan diperlukan).
+
+### Kata putus
+
+1. **Punca akar dibetulkan dalam repo** — `updated-at-triggers.sql` kini
+   mempunyai **GUARD**: ia melangkau mana-mana jadual dalam `targets` yang
+   tiada lajur `updated_at`, dengan `RAISE NOTICE`. Ini menghapuskan **kelas**
+   ralat ini, bukan hanya contoh ini.
+2. **`schema-import-staging.sql`** kini mentakrifkan
+   `updated_at timestamptz not null default now()` supaya pemasangan baharu
+   konsisten.
+3. **`lib/supabase/fix-import-staging-updated-at.sql`** disediakan untuk live:
+   **ADDITIF sepenuhnya** (1 `ADD COLUMN IF NOT EXISTS`), idempoten, tiada
+   DROP/DELETE/TRUNCATE. **HARD GATE** — memerlukan kelulusan pengguna dan
+   hanya patut dijalankan **selepas** J1i mengesahkan lajur itu tiada.
+4. **Alternatif ditolak:** mengisi `updated_at` daripada `created_at` dengan
+   UPDATE **tidak boleh berfungsi** — trigger BEFORE UPDATE menimpanya dengan
+   `now()` juga. Menambah lajur tidak mencetus trigger, jadi ia satu-satunya
+   laluan bersih. Baris sedia ada menerima cap masa pemasangan; ini
+   **direkodkan sebagai kompromi semantik yang sedar**, bukan oversight.
+5. **Alternatif ditolak:** `DROP TRIGGER` pada `import_staging`. Ia membuang
+   keupayaan audit yang memang diingini, dan ia operasi merosakkan pada
+   produksi.
+
+### Pengajaran (ditambah kepada peraturan DP-6)
+
+Ujian PGlite yang memuatkan **sebahagian** fail skema bukan sahaja boleh
+menghasilkan jangkaan salah tentang live — ia boleh **menyembunyikan kecacatan
+pengeluaran** yang hanya muncul apabila dua fail berinteraksi. Set penuh wajib.
+
+---
+
+## DP-8 — SOALAN TERBUKA: bagaimana sel berbilang orang patut diagih? (belum diputuskan)
+
+`'Fuzy / Dila'` (4 baris) dan `'Fuzy / Sholihin '` (2 baris) masing-masing
+mengandungi **dua orang**. Veto Kewangan §2.4 melarang sistem memilih seorang,
+dan Fasa 8A-2 **menolak secara aktif** sebarang percubaan manusia untuk
+memetakannya kepada seorang (`am_confirm_alias` menaikkan 22023).
+
+**Tetapi ini bermakna 6 baris tidak akan pernah diagih kepada sesiapa** —
+termasuk untuk laporan komisen (Fasa 8F).
+
+**Soalan untuk panel (perlu input perniagaan, bukan teknikal):**
+- Patutkah baris berbilang-orang diagih **50/50** kepada kedua-duanya?
+- Atau kepada **seorang sahaja** yang dipilih manusia, dengan catatan?
+- Atau **dikecualikan** daripada komisen dan dilaporkan berasingan?
+- Adakah `/` sentiasa bermaksud "dua orang", atau kadangkala "atau"?
+
+**Status:** ⏳ **TERBUKA**. Tidak menghalang 8A atau 8A-2 (keduanya selamat:
+6 baris kekal NULL dan kelihatan dalam UI sebagai `BERBILANG_ORANG`).
+Mesti diputuskan **sebelum Fasa 8F** (komisen).

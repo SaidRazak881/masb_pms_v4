@@ -150,9 +150,15 @@ SELECT 'J1c_functions' AS check_name, f.fname,
                ('resolve_account_manager(text)')) AS f(fname);
 
 -- J1d: NILAI ENUM app_role SEBENAR di live.
---      PENTING: 'super_admin' dijangka TIDAK ADA dalam senarai.
---      Super Admin dikendali DI DALAM has_role() (schema-master.sql:274),
---      bukan sebagai nilai enum. Jika ia ADA, laporkan sebagai penemuan.
+--      JANGKAAN: LAPAN (8) nilai — viewer, executive, manager, admin, staff,
+--      finance, head_governance, super_admin.
+--      'super_admin' DITAMBAH oleh lib/supabase/user-management.sql Bahagian 1a
+--      (ALTER TYPE ... ADD VALUE 'super_admin'), dan Fasa 6 SUDAH dipasang
+--      di live (PROMPT-6G ✅ SELESAI).
+--      NOTA: schema-master.sql:202 mencipta enum dengan TUJUH nilai sahaja,
+--      jadi repo dan live BERBEZA di sini secara sengaja (drift terkawal).
+--      Super Admin juga dilindungi DI DALAM has_role() (schema-master.sql:274),
+--      yang mengembalikan true untuk SEMUA peranan bila role = 'super_admin'.
 SELECT 'J1d_app_role_enum' AS check_name, e.enumlabel, e.enumsortorder
   FROM pg_enum e
   JOIN pg_type t ON t.oid = e.enumtypid
@@ -279,11 +285,21 @@ J4b → tepat **4 baris**: `am_aliases_read` (SELECT), `am_aliases_write` (INSER
 `am_aliases_update` (UPDATE), `am_aliases_delete` (DELETE).
 `am_aliases_read` → `USING (true)`. Yang lain → mengandungi `has_role`.
 
-> **NOTA ENUM (DP-2/DP-3):** polisi-polisi ini memanggil `has_role('admin')`,
-> `has_role('head_governance')`, `has_role('finance')`. **`super_admin` BUKAN
-> nilai enum** — ia dikendali di dalam `has_role()` sendiri, yang mengembalikan
-> `true` untuk SEMUA peranan apabila `current_user_role()::text = 'super_admin'`.
-> Jadi Super Admin **sudah** dilindungi. J1d mengesahkan perkara ini di live.
+> **NOTA ENUM (DP-2/DP-3/DP-6):** polisi-polisi ini memanggil `has_role('admin')`,
+> `has_role('head_governance')`, `has_role('finance')` — dan **sengaja tidak**
+> memanggil `has_role('super_admin')`.
+>
+> Di live, `super_admin` **MEMANG** satu nilai enum (ditambah oleh
+> `user-management.sql` Bahagian 1a; Fasa 6 sudah dipasang). Tetapi Super Admin
+> tetap dilindungi kerana `has_role()` sendiri (schema-master.sql:274)
+> mengembalikan `true` untuk **SEMUA** peranan apabila
+> `current_user_role()::text = 'super_admin'`.
+>
+> **Pembetulan Arena:** draf awal menulis `'super_admin'::public.app_role` dalam
+> polisi, yang gagal dengan ralat **22P02** semasa ujian PGlite kerana
+> `schema-master.sql:202` mencipta enum dengan hanya tujuh nilai. Ia dibetulkan
+> sebelum prompt ini dihantar. Dibuktikan oleh
+> `scripts/test-prompt-8a-j1-queries.mjs` seksyen [5].
 
 ### J5 — 2 fungsi: tandatangan, `SECURITY DEFINER`, `search_path` terkunci, grant
 
@@ -507,7 +523,8 @@ Untuk **J6**, tampal **kesemua 12 baris** — jangan ringkaskan.
 **Wajib nyatakan secara eksplisit:**
 - adakah senarai staf live **TEPAT 18** seperti `User Profiles Mapping.xlsx`,
   atau berbeza (senaraikan perbezaan)
-- adakah `J1d` mengesahkan `super_admin` **tiada** dalam enum `app_role`
+- adakah `J1d` mengesahkan `super_admin` **ADA** dalam enum `app_role`
+  (jangkaan: ADA, 8 nilai — kerana Fasa 6 sudah dipasang)
 - adakah nilai `Account Manager` **live** (J1f) sepadan dengan 12 nilai Excel
 
 ### Seksyen 6 — Pengesahan pematuhan larangan
@@ -528,9 +545,18 @@ memaksa kelulusan satu gate untuk dua jenis risiko yang berbeza.
 Direkodkan supaya ia tidak berulang:
 
 1. **`'super_admin'::public.app_role` → ralat 22P02.** Arena mereka-reka nilai
-   enum. Enum sebenar ialah `viewer, executive, manager, admin, staff, finance,
-   head_governance` (`schema-master.sql:202`). Super Admin dikendali **di dalam**
-   `has_role()` (`schema-master.sql:274`). Dikesan oleh PGlite, bukan oleh live.
+   enum. `schema-master.sql:202` mencipta enum dengan **tujuh** nilai:
+   `viewer, executive, manager, admin, staff, finance, head_governance`.
+   Dikesan oleh PGlite, bukan oleh live.
+
+   **Susulan (DP-6):** pembetulan pertama Arena keterlaluan ke arah lain — ia
+   menulis dalam prompt bahawa `super_admin` **tiada** dalam enum di live.
+   Itu **salah**: `user-management.sql` Bahagian 1a menjalankan
+   `ALTER TYPE public.app_role ADD VALUE 'super_admin'`, dan Fasa 6 **sudah**
+   dipasang. Jadi live ada **lapan** nilai. Repo dan live berbeza di sini
+   secara **sengaja dan terkawal**. Kedua-dua prompt dibetulkan, dan
+   `scripts/test-prompt-8a-j1-queries.mjs` kini memuatkan `user-management.sql`
+   supaya bootstrap ujian sepadan live (seksyen [3] + [5]).
 2. **Perlanggaran penamaan fasa.** "7A" sudah digunakan oleh
    `PROMPT-7A-FIX-FIELD-MAPPING` yang sudah dilaksanakan. Roadmap DP-1
    dinomborkan semula ke **8A–8H** (DP-3).

@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-03 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: 7dfe2f0 Tubuhkan Panel Pakar TPMS (9 ahli) + rekod DP-1 susunan kerja · arena/01a06274-masb-pms-v4
+> Git: 0f83953 Fasa 8A-J1: prompt read-only pisahan + ujian query (48/48) · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 
@@ -108,6 +108,9 @@
 
 ## 5. Pangkalan Data — Skema SQL (lib/supabase/)
 
+### `lib/supabase/account-manager-resolution.sql`
+- **Fungsi/RPC:** can_resolve_account_managers, am_list_staff, am_unresolved_values, am_confirm_alias, am_revoke_alias, am_backfill_preview, am_backfill_account_manager
+
 ### `lib/supabase/change-requests.sql`
 - **Jadual:** change_requests
 - **Enum:** change_request_status
@@ -122,6 +125,9 @@
 ### `lib/supabase/fix-add-programme-categories.sql`
 
 ### `lib/supabase/fix-field-mapping.sql`
+
+### `lib/supabase/fix-import-staging-updated-at.sql`
+- **Fungsi/RPC:** set_updated_at
 
 ### `lib/supabase/fix-rls-recursion.sql`
 - **Fungsi/RPC:** current_user_role, current_role_name, has_role
@@ -232,6 +238,7 @@
 - `PROMPT-6H-E1-E9-PRECISE-CRITERIA.md`
 - `PROMPT-7A-FIX-FIELD-MAPPING.md`
 - `PROMPT-8A-CLIENT-MASTER.md`
+- `PROMPT-8A-J1-READONLY.md`
 - `PROMPT-TEMPLATE-FASA.md`
 - `SETUP-SUPABASE.md`
 - `SKILLS.md`

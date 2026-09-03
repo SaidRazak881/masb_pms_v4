@@ -107,6 +107,24 @@ BEGIN
       CONTINUE;
     END IF;
 
+    -- ⚠️ GUARD DP-7 (2026-09-04): JANGAN pasang trigger pada jadual yang
+    -- tiada lajur updated_at. Tanpa guard ini, `import_staging` menerima
+    -- trigger tetapi jadual itu TIDAK mempunyai lajur updated_at
+    -- (schema-import-staging.sql tidak mentakrifkannya), jadi SETIAP UPDATE
+    -- ke atasnya gagal dengan:
+    --     record "new" has no field "updated_at"
+    -- dan `sync_import_transaction` (baris 321 & 727 meng-UPDATE
+    -- import_staging) akan gagal sepenuhnya.
+    IF NOT EXISTS (
+         SELECT 1 FROM information_schema.columns c
+          WHERE c.table_schema = 'public'
+            AND c.table_name   = t
+            AND c.column_name  = 'updated_at'
+       ) THEN
+      RAISE NOTICE 'set_updated_at: public.% TIADA lajur updated_at — trigger DILANGKAU (DP-7)', t;
+      CONTINUE;
+    END IF;
+
     -- Buang trigger pra-repo jika wujud (nama lama dari live)
     EXECUTE format('DROP TRIGGER IF EXISTS trg_%s_updated_at ON public.%I', t, t);
     -- Buang nama seragam baharu jika fail ini dijalankan semula

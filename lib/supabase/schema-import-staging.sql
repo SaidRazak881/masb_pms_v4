@@ -31,6 +31,13 @@ $$;
 create table if not exists import_staging (
   id                  uuid primary key default gen_random_uuid(),
   created_at          timestamptz not null default now(),
+  -- DP-7 (2026-09-04): updated_at DITAMBAH kerana `updated-at-triggers.sql`
+  -- memasang trigger BEFORE UPDATE pada jadual ini. Tanpa lajur ini,
+  -- SETIAP UPDATE import_staging gagal dengan
+  --     record "new" has no field "updated_at"
+  -- dan `sync_import_transaction` (yang meng-UPDATE import_staging pada
+  -- baris 321 & 727) gagal sepenuhnya.
+  updated_at          timestamptz not null default now(),
   imported_by         uuid references auth.users (id),
   batch_id            uuid not null,
 

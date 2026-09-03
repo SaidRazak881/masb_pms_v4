@@ -96,9 +96,15 @@ SELECT 'J1c_functions' AS check_name, f.fname,
                ('resolve_account_manager(text)')) AS f(fname);
 
 -- J1d: NILAI ENUM app_role SEBENAR di live.
---      PENTING: 'super_admin' dijangka TIDAK ADA dalam senarai.
---      Super Admin dikendali DI DALAM has_role() (schema-master.sql:274),
---      bukan sebagai nilai enum. Jika ia ADA, laporkan sebagai penemuan.
+--      JANGKAAN: LAPAN (8) nilai — viewer, executive, manager, admin, staff,
+--      finance, head_governance, super_admin.
+--      'super_admin' DITAMBAH oleh lib/supabase/user-management.sql Bahagian 1a
+--      (ALTER TYPE ... ADD VALUE 'super_admin'), dan Fasa 6 SUDAH dipasang
+--      di live (PROMPT-6G ✅ SELESAI).
+--      NOTA: schema-master.sql:202 mencipta enum dengan TUJUH nilai sahaja,
+--      jadi repo dan live BERBEZA di sini secara sengaja (drift terkawal).
+--      Super Admin juga dilindungi DI DALAM has_role() (schema-master.sql:274),
+--      yang mengembalikan true untuk SEMUA peranan bila role = 'super_admin'.
 SELECT 'J1d_app_role_enum' AS check_name, e.enumlabel, e.enumsortorder
   FROM pg_enum e
   JOIN pg_type t ON t.oid = e.enumtypid
@@ -145,6 +151,61 @@ SELECT 'J1h_raw_columns' AS check_name, c.table_name, c.column_name, c.data_type
    AND c.column_name = 'account_manager'
    AND c.table_name IN ('invoices','import_staging')
  ORDER BY c.table_name;
+
+-- =====================================================================
+-- 🔴 J1i + J1j — KEUTAMAAN TERTINGGI: siasatan kecacatan DP-7
+-- =====================================================================
+-- `updated-at-triggers.sql` (Fasa 6G, dilaporkan ✅ SELESAI dengan G1=12/12)
+-- memasang trigger BEFORE UPDATE `set_updated_at` pada jadual yang
+-- TERMASUK `import_staging`. Tetapi `schema-import-staging.sql` TIDAK
+-- mentakrifkan lajur `updated_at` pada jadual itu.
+--
+-- Jika lajur itu juga tiada di live, maka SETIAP UPDATE ke atas
+-- import_staging gagal dengan  record "new" has no field "updated_at"
+-- dan `sync_import_transaction` (yang meng-UPDATE import_staging pada
+-- baris 321 & 727) GAGAL SEPENUHNYA — kerana sync adalah ATOMIK,
+-- seluruh batch import Excel akan gagal.
+--
+-- DUA query di bawah menjawabnya dengan bukti. Kedua-duanya read-only.
+
+-- J1i: adakah lajur updated_at wujud pada import_staging di live?
+SELECT 'J1i_staging_updated_at' AS check_name,
+       c.column_name, c.data_type, c.is_nullable, c.column_default,
+       CASE WHEN c.column_name IS NULL
+            THEN '🔴 TIADA — import Excel di live MUNGKIN ROSAK'
+            ELSE '🟢 WUJUD — import tidak terjejas oleh DP-7' END AS kesan
+  FROM (VALUES ('updated_at')) AS want(col)
+  LEFT JOIN information_schema.columns c
+         ON c.table_schema='public' AND c.table_name='import_staging'
+        AND c.column_name = want.col;
+
+-- J1j: adakah trigger set_updated_at DIPASANG pada import_staging?
+--      (dan pada jadual lain yang mungkin tiada lajur updated_at)
+SELECT 'J1j_trigger_vs_column' AS check_name,
+       t.tbl AS jadual,
+       (SELECT count(*) FROM pg_trigger tg
+          JOIN pg_class cc ON cc.oid = tg.tgrelid
+          JOIN pg_namespace nn ON nn.oid = cc.relnamespace
+         WHERE nn.nspname='public' AND cc.relname = t.tbl
+           AND NOT tg.tgisinternal
+           AND tg.tgname IN ('set_updated_at','trg_' || t.tbl || '_updated_at')
+       ) AS bilangan_trigger,
+       EXISTS (SELECT 1 FROM information_schema.columns c
+                WHERE c.table_schema='public' AND c.table_name = t.tbl
+                  AND c.column_name='updated_at') AS ada_lajur_updated_at,
+       CASE
+         WHEN EXISTS (SELECT 1 FROM information_schema.columns c
+                       WHERE c.table_schema='public' AND c.table_name = t.tbl
+                         AND c.column_name='updated_at')
+           THEN '🟢 OK'
+         ELSE '🔴 TRIGGER DIPASANG TETAPI LAJUR TIADA — sebarang kemas kini akan gagal'
+       END AS keadaan
+  FROM (VALUES ('import_staging'),('invoices'),('participants'),
+               ('programme_costs'),('programmes'),('app_settings'),
+               ('cost_items'),('financial_docs'),('organizers'),
+               ('programme_documents'),('user_profiles'),
+               ('account_manager_aliases')) AS t(tbl)
+ ORDER BY keadaan DESC, t.tbl;
 ```
 
 
@@ -170,6 +231,8 @@ bahawa **hanya SELECT** dijalankan.
 | J1f Account Manager mentah | … | senaraikan **semua** nilai + bilangan |
 | J1g baseline jadual | … | jangkaan **18** |
 | J1h lajur mentah | … | jangkaan **2 baris** `text` |
+| **J1i** `import_staging.updated_at` | … | 🔴 **KEUTAMAAN** — jangkaan **WUJUD**; jika TIADA, import live mungkin rosak |
+| **J1j** trigger vs lajur | … | 🔴 **KEUTAMAAN** — setiap jadual mesti `🟢 OK` |
 
 ### Seksyen 3 — Tindakan yang diambil
 Query sebenar yang dijalankan + bukti verbatim.
@@ -180,14 +243,22 @@ Query sebenar yang dijalankan + bukti verbatim.
    dalam Excel, dan sebaliknya). Ini menentukan sama ada jangkaan J6 dalam
    prompt 8A masih sah.
 2. **Adakah `super_admin` ADA dalam enum `app_role`** (J1d)?
-   Jangkaan: **TIADA**. Jika ADA, itu penemuan penting — `client-master.sql`
-   mengandaikan Super Admin dikendali di dalam `has_role()`, bukan sebagai
-   nilai enum.
+   Jangkaan: **ADA** (8 nilai keseluruhan), kerana Fasa 6 sudah dipasang.
+   Jika ia **TIADA**, itu bermakna Fasa 6 belum/tidak lengkap di live —
+   laporkan sebagai 🔴 kerana `client-master.sql` mengandaikan `has_role()`
+   versi Fasa 6 yang sedia ada.
 3. **Adakah nilai `Account Manager` live (J1f) sepadan dengan 12 nilai Excel**
    di §2? Senaraikan mana-mana nilai live yang **tiada** dalam senarai 12 itu.
 4. **Adakah mana-mana daripada 6 lajur / 1 jadual / 2 fungsi sudah wujud?**
    Jika ya, pemasangan 8A masih selamat (fail itu idempoten) tetapi kami perlu
    tahu punca ia sudah ada.
+5. 🔴 **DP-7: adakah `import_staging` di live mempunyai lajur `updated_at`?**
+   (J1i). Jika **TIADA**, nyatakan dengan jelas bahawa **aliran import Excel
+   di live mungkin rosak sekarang**, dan sertakan output J1j verbatim
+   (jadual mana yang ada trigger tetapi tiada lajur).
+   **JANGAN** cuba membaikinya — pembaikan ialah fail berasingan
+   (`lib/supabase/fix-import-staging-updated-at.sql`) yang memerlukan
+   kelulusan pengguna.
 
 ### Seksyen 5 — Isu / Blocker / penemuan tak dijangka
 🔴/🟠/🟢 + penerangan + bukti + cadangan.

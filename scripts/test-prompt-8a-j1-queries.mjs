@@ -55,11 +55,12 @@ for (const [re, label] of WRITE) {
                 : ok(`blok SQL J1 tiada ${label}`);
 }
 const selects = (code.match(/\bSELECT\b/gi) || []).length;
-if (selects >= 8) ok(`hanya SELECT (${selects} kali) — read-only tulen`);
-else bad(`SELECT hanya ${selects} kali — jangkaan >= 8`);
+if (selects >= 10) ok(`hanya SELECT (${selects} kali) — read-only tulen`);
+else bad(`SELECT hanya ${selects} kali — jangkaan >= 10`);
 
 // lapan kriteria J1a..J1h mesti hadir
-for (const k of ['J1a', 'J1b', 'J1c', 'J1d', 'J1e', 'J1f', 'J1g', 'J1h']) {
+for (const k of ['J1a', 'J1b', 'J1c', 'J1d', 'J1e', 'J1f', 'J1g', 'J1h',
+                 'J1i', 'J1j']) {
   doc.includes(k) ? ok(`kriteria ${k} hadir dalam prompt`)
                   : bad(`kriteria ${k} HILANG daripada prompt`);
 }
@@ -74,32 +75,86 @@ doc.includes('MESTI TIDAK') && doc.includes('client-master.sql')
 
 console.log('\n[2] LARIKAN KELAPAN-LAPAN QUERY J1 DALAM PGlite');
 const db = new PGlite();
+// pgcrypto tiada dalam PGlite -> stub (hanya untuk ujian)
+try {
+  await db.exec('CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;');
+} catch {
+  await db.exec('CREATE SCHEMA IF NOT EXISTS extensions;');
+  await db.exec(`
+    CREATE OR REPLACE FUNCTION extensions.gen_salt(text) RETURNS text
+      LANGUAGE sql IMMUTABLE AS $$ SELECT 'STUBSALT' $$;
+    CREATE OR REPLACE FUNCTION extensions.crypt(text, text) RETURNS text
+      LANGUAGE plpgsql IMMUTABLE AS $$
+      DECLARE v_salt text; v_pos int;
+      BEGIN
+        IF $2 IS NULL OR $2 = '' THEN RETURN 'STUBSALT|' || md5($1); END IF;
+        v_pos := length($2) - position('|' in reverse($2)) + 1;
+        IF v_pos <= 0 OR v_pos > length($2) THEN v_salt := $2;
+        ELSE v_salt := substring($2 from 1 for v_pos - 1); END IF;
+        RETURN v_salt || '|' || md5($1);
+      END; $$;`);
+}
+// Bootstrap ala-Supabase PENUH: user-management.sql memerlukan
+// auth.users.raw_user_meta_data + auth.identities + auth.refresh_tokens.
 await db.exec(`
 CREATE SCHEMA IF NOT EXISTS auth;
+CREATE SCHEMA IF NOT EXISTS private;
+CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE TABLE IF NOT EXISTS auth.users (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text UNIQUE);
-CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE
-  AS $$ SELECT '11111111-1111-4111-8111-111111111111'::uuid $$;
-CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE
-  AS $$ SELECT '{}'::jsonb $$;
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  instance_id uuid, aud text, role text, email text UNIQUE,
+  encrypted_password text, email_confirmed_at timestamptz,
+  raw_app_meta_data jsonb, raw_user_meta_data jsonb,
+  created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(),
+  last_sign_in_at timestamptz);
+CREATE TABLE IF NOT EXISTS auth.identities (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  provider_id text, identity_data jsonb, provider text,
+  last_sign_in_at timestamptz,
+  created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(),
+  UNIQUE (provider_id, provider));
+CREATE TABLE IF NOT EXISTS auth.refresh_tokens (
+  id bigserial PRIMARY KEY,
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  token text, revoked boolean DEFAULT false, created_at timestamptz DEFAULT now());
+CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$
+  SELECT COALESCE((current_setting('request.jwt.claims', true)::jsonb ->> 'sub')::uuid, NULL::uuid) $$;
+CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(current_setting('request.jwt.claims', true)::jsonb, '{}'::jsonb) $$;
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated')
-    THEN CREATE ROLE authenticated NOLOGIN; END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon')
-    THEN CREATE ROLE anon NOLOGIN; END IF;
-END $$;`);
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE ROLE authenticated NOLOGIN; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    CREATE ROLE anon NOLOGIN; END IF;
+END $$;
+GRANT USAGE ON SCHEMA auth TO authenticated, anon;
+GRANT USAGE ON SCHEMA public TO authenticated, anon;
+GRANT ALL ON ALL TABLES IN SCHEMA auth TO authenticated;`);
+ok('bootstrap ala-Supabase penuh');
+
+// Fail skema dimuatkan supaya bootstrap UJIAN SEPADAN KEADAAN LIVE.
+// user-management.sql (Fasa 6, SUDAH dipasang di live) menambah 'super_admin'
+// ke enum app_role pada Bahagian 1a. Tanpa fail ini, ujian akan mengesahkan
+// jangkaan yang SALAH (7 nilai enum) sedangkan live ada 8.
 for (const f of ['lib/supabase/schema-master.sql',
-                 'lib/supabase/schema-import-staging.sql']) {
-  await db.exec(fs.readFileSync(f, 'utf8'));
+                 'lib/supabase/schema-import-staging.sql',
+                 'lib/supabase/user-management.sql']) {
+  try {
+    await db.exec(fs.readFileSync(f, 'utf8'));
+    ok(`${f.split('/').pop()} dipasang`);
+  } catch (e) {
+    bad(`${f.split('/').pop()} GAGAL: ${e.message}`);
+  }
 }
 
 // pisahkan pada sempadan label '-- J1x:' supaya setiap kenyataan diuji berasingan
-const parts = sql.split(/\n(?=-- J1[a-h]:)/).map((p) => p.trim()).filter(Boolean);
-eq(parts.length, 8, 'bilangan kenyataan J1 yang dipisah');
+const parts = sql.split(/\n(?=-- J1[a-j]:)/).map((p) => p.trim()).filter(Boolean);
+eq(parts.length, 10, 'bilangan kenyataan J1 yang dipisah (J1a-J1j)');
 
 const results = {};
 for (const p of parts) {
-  const label = (p.match(/-- (J1[a-h]):/) || [])[1] || 'TANPA-LABEL';
+  const label = (p.match(/-- (J1[a-j]):/) || [])[1] || 'TANPA-LABEL';
   const stmt = p.replace(/;+\s*$/, '');
   try {
     const r = await db.query(stmt);
@@ -118,17 +173,26 @@ eq(results.J1c?.length, 2, 'J1c: 2 fungsi dilaporkan');
 const belum = results.J1c?.filter((r) => r.keadaan === 'BELUM WUJUD').length;
 eq(belum, 2, 'J1c: kedua-dua fungsi BELUM WUJUD');
 
-// J1d — enum app_role. INI PENGESAHAN PENTING untuk client-master.sql:
-// 'super_admin' MESTI tiada dalam enum (ia dikendali di dalam has_role()).
+// J1d — enum app_role.
+// PEMBETULAN (2026-09-04): jangkaan asal Arena ialah "'super_admin' TIADA
+// dalam enum". Itu SALAH untuk live. `lib/supabase/user-management.sql`
+// (Fasa 6, SUDAH dipasang) menjalankan
+//   ALTER TYPE public.app_role ADD VALUE 'super_admin';
+// pada Bahagian 1a. Jadi live ada LAPAN nilai.
+//
+// client-master.sql TIDAK rosak oleh ini: polisi RLS-nya memanggil
+// has_role('admin'/'head_governance'/'finance'), dan has_role() sendiri
+// mengembalikan true untuk SEMUA peranan bila role = 'super_admin'
+// (schema-master.sql:274). Dibuktikan di [4] bawah.
 const labels = (results.J1d || []).map((r) => r.enumlabel);
-eq(labels.length, 7, 'J1d: bilangan nilai enum app_role');
+eq(labels.length, 8, 'J1d: bilangan nilai enum app_role (live = 8)');
 const ENUM_JANGKAAN = ['viewer', 'executive', 'manager', 'admin', 'staff',
-                       'finance', 'head_governance'];
+                       'finance', 'head_governance', 'super_admin'];
 eq(JSON.stringify(labels), JSON.stringify(ENUM_JANGKAAN),
-   'J1d: nilai enum app_role (ikut susunan)');
+   'J1d: nilai enum app_role (ikut susunan, super_admin terakhir)');
 labels.includes('super_admin')
-  ? bad("J1d: 'super_admin' ADA dalam enum — andaian client-master.sql SALAH")
-  : ok("J1d: 'super_admin' TIADA dalam enum — andaian client-master.sql SAH");
+  ? ok("J1d: 'super_admin' ADA dalam enum — sepadan live (Fasa 6 dipasang)")
+  : bad("J1d: 'super_admin' TIADA — bootstrap ujian tidak sepadan live");
 
 // J1e — baseline baris. Guna query_to_xml + xpath: ciri yang perlu disahkan
 // wujud dalam PGlite, kerana jika tiada, J1e akan gagal di live juga.
@@ -157,6 +221,26 @@ eq(results.J1h?.length, 2, 'J1h: lajur account_manager pada invoices + import_st
 const semuaText = (results.J1h || []).every((r) => r.data_type === 'text');
 semuaText ? ok('J1h: kedua-duanya bertipe text') : bad('J1h: tipe bukan text');
 
+// J1i/J1j — siasatan DP-7. Dalam bootstrap ujian ini import_staging
+// SUDAH ada updated_at (dibetulkan oleh DP-7), jadi kedua-duanya mesti 🟢.
+// Ujian ini membuktikan query itu berfungsi DAN membuktikan pembaikan DP-7
+// berkesan: tanpa lajur itu, J1i akan melaporkan 🔴.
+eq(results.J1i?.length, 1, 'J1i: 1 baris dilaporkan');
+const j1iAda = results.J1i?.[0]?.column_name === 'updated_at';
+j1iAda
+  ? ok('J1i: import_staging.updated_at WUJUD (pembaikan DP-7 berkesan)')
+  : bad('J1i: import_staging.updated_at TIADA — DP-7 belum dibetulkan dalam repo');
+eq(results.J1i?.[0]?.kesan?.startsWith('🟢'), true, 'J1i: kesan = 🟢');
+
+const j1j = results.J1j || [];
+if (j1j.length >= 11) ok(`J1j: ${j1j.length} jadual disiasat`);
+else bad(`J1j: hanya ${j1j.length} jadual — jangkaan >= 11`);
+const rosak = j1j.filter((r) => r.bilangan_trigger > 0 && !r.ada_lajur_updated_at);
+eq(rosak.length, 0,
+   'J1j: TIADA jadual dengan trigger tetapi tanpa lajur updated_at (DP-7)');
+const stg = j1j.find((r) => r.jadual === 'import_staging');
+eq(stg?.ada_lajur_updated_at, true, 'J1j: import_staging ada lajur updated_at');
+
 console.log('\n[4] J1 TIDAK MENGUBAH DATA — jalankan dua kali, bandingkan');
 const before = {};
 for (const t of ['organizers', 'invoices', 'import_staging', 'user_profiles',
@@ -172,6 +256,23 @@ for (const t of Object.keys(before)) {
   if (now !== before[t]) { bad(`${t}: ${before[t]} -> ${now} (J1 MENGUBAH DATA!)`); sama = false; }
 }
 if (sama) ok('kesemua 6 jadual: bilangan baris tidak berubah selepas 2× J1');
+
+console.log('\n[5] SUPER ADMIN MASIH DILINDUNGI has_role() walaupun enum berubah');
+// Sifat yang client-master.sql bergantung kepadanya: has_role('admin') mesti
+// true untuk pengguna ber-role super_admin. Diuji secara langsung.
+const SA_UID = '44444444-4444-4444-8444-444444444444';
+await db.query(`INSERT INTO auth.users (id,email) VALUES ($1,'saidrazak881@gmail.com')
+                ON CONFLICT DO NOTHING`, [SA_UID]);
+await db.query(`INSERT INTO public.user_profiles (id,full_name,email,role)
+                VALUES ($1,'Super Admin','saidrazak881@gmail.com','super_admin')
+                ON CONFLICT (id) DO UPDATE SET role='super_admin'`, [SA_UID]);
+await db.exec(
+  `SELECT set_config('request.jwt.claims','{"sub":"${SA_UID}","role":"authenticated"}',false)`);
+for (const role of ['admin', 'head_governance', 'finance', 'viewer']) {
+  const r = await db.query(`SELECT public.has_role($1::public.app_role) AS g`, [role]);
+  eq(r.rows[0].g, true, `has_role('${role}') = true untuk super_admin`);
+}
+await db.exec(`SELECT set_config('request.jwt.claims','',false)`);
 
 await db.close();
 
