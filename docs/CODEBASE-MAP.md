@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-03 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: bd74a6f Analisis jurang: 4 domain perniagaan tiada + 5 kecacatan pemetaan data · arena/01a06274-masb-pms-v4
+> Git: f121ac2 Betulkan kecacatan pemetaan data GAP-ANALISIS §4.1-4.4 + PROMPT-7A · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 

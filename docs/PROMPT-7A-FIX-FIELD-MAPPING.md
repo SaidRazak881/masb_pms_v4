@@ -1,10 +1,33 @@
 # PROMPT 7A — Pasang `fix-field-mapping.sql` + ganti RPC `sync_import_transaction`
 
-> ## 🟡 STATUS: **MENUNGGU KELULUSAN PENGGUNA** — jangan jalankan lagi
+> ## 🟢 STATUS: **DILULUSKAN oleh pengguna (2026-09-04) — SILA JALANKAN**
 >
-> **HARD GATE:** prompt ini menyentuh **SQL live** dan **mengganti satu RPC
-> `SECURITY DEFINER`**. Mengikut ketetapan gate SEDERHANA (2026-09-03), ia
-> memerlukan kelulusan eksplisit pengguna sebelum dijalankan.
+> **HARD GATE DIBUKA.** Pengguna meluluskan prompt ini pada 2026-09-04 dengan
+> arahan: *"hantar PROMPT-7A kepada ChatGPT sekarang"*. Gate SEDERHANA
+> (2026-09-03) memerlukan kelulusan eksplisit kerana prompt ini menyentuh
+> **SQL live** dan **mengganti satu RPC `SECURITY DEFINER`** — kelulusan itu
+> **kini telah diberikan**.
+>
+> **Pengesahan integriti pada masa pengaktifan (2026-09-04):** 6/6 fail
+> berkaitan disahkan **identik** dengan komit `f121ac2` melalui perbandingan
+> blob SHA (`git rev-parse f121ac2:<fail>` vs `git hash-object <fail>`).
+> Pokok kerja bersih, hujung remote = `f121ac2`. **Tiada suntingan kandungan
+> dibuat semasa pengaktifan ini** — hanya banner status dan rekod kelulusan.
+>
+> | Fail | SHA (12 aksara pertama) | Drift? |
+> | ---- | ----------------------- | ------ |
+> | `lib/supabase/fix-field-mapping.sql` | `d393e4628521` | ✅ tiada |
+> | `lib/supabase/sync-import-transaction.sql` | `5ba925f7ef6a` | ✅ tiada |
+> | `lib/supabase/schema-import-staging.sql` | `23c629377512` | ✅ tiada |
+> | `lib/excel-parser.ts` | `290d5caebdee` | ✅ tiada |
+> | `scripts/test-fix-field-mapping.mjs` | `f73132e411e7` | ✅ tiada |
+> | `scripts/test-v4-raw-parser.mjs` | `17bf142681a9` | ✅ tiada |
+>
+> **Nota skop:** hanya **2** fail yang dipasang (§4 Langkah 1 dan 2).
+> `schema-import-staging.sql`, `excel-parser.ts` dan kedua-dua suite ujian
+> disenaraikan di atas sebagai **rujukan integriti sahaja** — ia kod sisi
+> aplikasi yang sampai ke production melalui **Vercel auto-deploy**, bukan
+> melalui tangan kamu. **Jangan pasangnya di Supabase.**
 >
 > **Ujian Arena (PGlite, semua hijau sebelum prompt ini ditulis):**
 >
@@ -15,16 +38,9 @@
 > | 12 suite sedia ada yang lain | semua ✅ |
 > | `next build` | ✅ lulus |
 >
-> **Blob SHA fail yang diluluskan untuk pemasangan:**
->
-> | Fail | SHA (12 aksara pertama) |
-> | ---- | ----------------------- |
-> | `lib/supabase/fix-field-mapping.sql` | `d393e4628521` |
-> | `lib/supabase/sync-import-transaction.sql` | `5ba925f7ef6a` |
-> | `lib/supabase/schema-import-staging.sql` | `23c629377512` |
->
-> Sila sahkan SHA ini **sebelum** dan **selepas** pemasangan. Jika berbeza,
-> **BERHENTI** dan laporkan — jangan teruskan.
+> **Sila sahkan SHA kedua-dua fail yang dipasang (lihat jadual integriti di
+> atas) SEBELUM dan SELEPAS pemasangan.** Jika berbeza, **BERHENTI** dan
+> laporkan — jangan teruskan.
 
 ---
 
