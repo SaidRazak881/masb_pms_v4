@@ -1,4 +1,10 @@
-# PROMPT 6C — Betulkan kriteria V3 + audit 4 jadual warisan (READ-ONLY)
+# PROMPT 6C — Betulkan kriteria V3 + audit jadual warisan (READ-ONLY)
+
+> **⚠️ PEMBETULAN Arena (selepas prompt ini dijalankan):** dokumen ini asalnya
+> menyebut empat (4) jadual warisan kerana allowlist W1 Arena tersalah
+> klasifikasi `import_batches` + `import_staging` (grep peka huruf besar).
+> Bilangan **betul = 3**: `profiles`, `programme_participants`, `user_roles`.
+> Lihat §1 dan `docs/PROMPT-6D-AUTH-VERCEL-LEGACY.md` §1.
 
 > **Persona kamu:** Jurutera pangkalan data yang teliti dan berhati-hati
 > (`docs/personas/PERSONA-SQL-ARCHITECT.md`).
@@ -33,7 +39,7 @@ tidak menambah bilangan).
 
 Query V3 pula mengira **SEMUA** polisi dalam skema `public` yang merujuk
 `has_role(` — termasuk polisi pada jadual yang **bukan** ciptaan SQL rasmi
-repo. Projek live anda ada 4 jadual warisan sedemikian, menghasilkan
+repo. Projek live anda ada **3** jadual warisan sedemikian, menghasilkan
 **17 = 9 + 8**.
 
 Pengiraan semula terhadap bukti verbatim anda (17 entri `string_agg`):
@@ -57,7 +63,8 @@ Repo hanya mencipta **13** jadual `public`:
 `app_settings, audit_logs, change_requests, cost_items, financial_docs,
 invoices, organizers, participants, programme_costs, programme_documents,
 programme_unlock_requests, programmes, user_profiles`.
-Anda melihat **17** jadual `public` (V6) → **4 jadual warisan**.
+Anda melihat **18** jadual `public` ber-RLS (W1) → **3 jadual warisan**
+(allowlist asal 13 adalah salah; yang betul 15 — lihat nota pembetulan di atas).
 
 **Kriteria V3 yang BETUL:**
 
@@ -71,7 +78,7 @@ Anda melihat **17** jadual `public` (V6) → **4 jadual warisan**.
 
 ---
 
-## 2. Kenapa 4 jadual warisan itu mesti diaudit (bukan diabaikan)
+## 2. Kenapa 3 jadual warisan itu mesti diaudit (bukan diabaikan)
 
 | Jadual warisan | Polisi | Kenapa ia penting |
 | -------------- | ------ | ----------------- |
@@ -125,11 +132,20 @@ SELECT 'W1_public_tables' AS check_name,
        pg_catalog.obj_description(c.oid, 'pg_class') AS table_comment,
        (SELECT count(*)::int FROM information_schema.columns ic
          WHERE ic.table_schema='public' AND ic.table_name=c.relname) AS column_count,
+       -- ⚠️ PEMBETULAN Arena (selepas PROMPT-6C dijalankan): allowlist asal
+       --    hanya 13 jadual kerana diterbitkan dengan grep PEKA HURUF BESAR,
+       --    sedangkan schema-import-staging.sql menulis `create table` dalam
+       --    huruf kecil. BILANGAN BETUL = 15. ChatGPT yang mengesan kesilapan
+       --    ini melalui W1: import_batches + import_staging ialah jadual
+       --    rasmi. Jadual warisan sebenar = profiles, programme_participants,
+       --    user_roles (3), dan 15 + 3 = 18 = tepat bilangan jadual public
+       --    ber-RLS yang dilaporkan live.
        CASE WHEN c.relname IN (
               'app_settings','audit_logs','change_requests','cost_items',
-              'financial_docs','invoices','organizers','participants',
-              'programme_costs','programme_documents',
-              'programme_unlock_requests','programmes','user_profiles')
+              'financial_docs','import_batches','import_staging','invoices',
+              'organizers','participants','programme_costs',
+              'programme_documents','programme_unlock_requests','programmes',
+              'user_profiles')
             THEN 'RASMI (repo)'
             ELSE '⚠️ WARISAN (bukan dari repo)'
        END AS origin
@@ -140,7 +156,7 @@ SELECT 'W1_public_tables' AS check_name,
  ORDER BY origin DESC, c.relname;
 ```
 
-### Langkah 2 — Struktur + isi 4 jadual warisan (W2, W3)
+### Langkah 2 — Struktur + isi 3 jadual warisan (W2, W3)
 
 ```sql
 -- W2. Kolum setiap jadual warisan (nama + jenis SAHAJA, tiada data)
@@ -353,7 +369,7 @@ diteka — **dan** skop query mesti dinyatakan (satu fail vs keseluruhan skema).
 `scripts/test-preflight-b-sql.mjs` kini menjadi sumber baseline: pemasangan
 bersih = tepat 9 polisi bergantung `has_role()`.
 
-**Status 4 jadual warisan:** belum diketahui puncanya (kemungkinan kerja Fasa 1–3
+**Status 3 jadual warisan:** belum diketahui puncanya (kemungkinan kerja Fasa 1–3
 manual sebelum skema dirasmikan). `current_user_role()` hanya membaca
 `user_profiles`, jadi ia **bukan** vektor kebenaran — tetapi W6 mesti
 mengsahkannya sebelum Arena meluluskan sebarang DROP.

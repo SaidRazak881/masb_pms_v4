@@ -471,6 +471,52 @@ console.log('\n--- 7. BLOK B TIDAK MENGUBAH DATA ---');
   }
 }
 
+// ---------------------------------------------------------------------------
+// 8. INVENTORI JADUAL RASMI REPO — guard terhadap kesilapan allowlist W1.
+//    Arena pernah menerbitkan allowlist 13 jadual daripada
+//    `grep "CREATE TABLE"` yang PEKA HURUF BESAR, sedangkan
+//    schema-import-staging.sql menulis `create table` dalam huruf kecil.
+//    ChatGPT yang mengesan kesilapan itu. Pengiraan kini automatik + case-
+//    insensitive, dan allowlist dalam dokumen mesti sepadan.
+console.log('\n--- 8. INVENTORI JADUAL RASMI REPO (case-insensitive) ---');
+{
+  const sqlFiles = fs.readdirSync('lib/supabase')
+    .filter((f) => f.endsWith('.sql'))
+    .map((f) => `lib/supabase/${f}`);
+  const tables = new Set();
+  for (const f of sqlFiles) {
+    const txt = fs.readFileSync(f, 'utf8');
+    for (const m of txt.matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?(?:public\.)?([a-z_][a-z_0-9]*)/gi)) {
+      tables.add(m[1]);
+    }
+  }
+  const sorted = [...tables].sort();
+  console.log(`  ${sorted.length} jadual: ${sorted.join(', ')}`);
+
+  const wajib = ['import_batches', 'import_staging', 'user_profiles',
+                 'programmes', 'participants', 'app_settings'];
+  const hilang = wajib.filter((t) => !tables.has(t));
+  if (hilang.length) bad(`jadual rasmi tidak dikesan (grep case-sensitive?): ${hilang.join(', ')}`);
+  else ok('import_batches + import_staging dikesan — pengiraan case-insensitive berfungsi');
+
+  const warisan = ['profiles', 'programme_participants', 'user_roles'];
+  const tersilap = warisan.filter((t) => tables.has(t));
+  if (tersilap.length) bad(`jadual warisan tersilap dianggap rasmi: ${tersilap.join(', ')}`);
+  else ok('3 jadual warisan live (profiles, programme_participants, user_roles) memang BUKAN dari repo');
+
+  // Allowlist dalam PROMPT-6C mesti sepadan dengan inventori automatik.
+  const docC = fs.readFileSync('docs/PROMPT-6C-AUDIT-LEGACY-TABLES.md', 'utf8');
+  const w1 = docC.slice(docC.indexOf('W1_public_tables'));
+  const allowlist = [...w1.matchAll(/'([a-z_][a-z_0-9]*)'/g)].map((m) => m[1]);
+  const unik = [...new Set(allowlist.filter((t) => tables.has(t) || warisan.includes(t)))];
+  const kurang = sorted.filter((t) => !unik.includes(t));
+  if (kurang.length) {
+    bad(`allowlist W1 dalam PROMPT-6C tidak lengkap — kurang: ${kurang.join(', ')}`);
+  } else {
+    ok(`allowlist W1 dalam PROMPT-6C lengkap (${sorted.length} jadual rasmi)`);
+  }
+}
+
 console.log(failed === 0
   ? '\n🎉 BLOK PREFLIGHT B DISAHKAN: read-only, kalis ralat, tiada kata laluan bocor'
   : `\n🔴 ${failed} KEGAGALAN`);
