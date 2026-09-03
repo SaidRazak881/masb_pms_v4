@@ -161,6 +161,7 @@ GRANT ALL ON ALL TABLES IN SCHEMA auth TO authenticated;`);
     'lib/supabase/fix-import-staging-updated-at.sql',   // pembaikan DP-7
     'lib/supabase/client-master.sql',
     'lib/supabase/account-manager-resolution.sql',
+    'lib/supabase/external-account-managers.sql',      // DP-9
   ];
   for (const f of FILES) {
     if (!fs.existsSync(f)) { bad(`${f} TIDAK WUJUD`); continue; }
@@ -172,7 +173,7 @@ GRANT ALL ON ALL TABLES IN SCHEMA auth TO authenticated;`);
   try { await db.exec(sql); ok('larian kedua berjaya (idempoten)'); }
   catch (e) { bad(`larian kedua GAGAL: ${e.message}`); }
 
-  console.log('\n[D] SEMUA 7 FUNGSI: SECURITY DEFINER + search_path terkunci');
+  console.log('\n[D] SEMUA 10 FUNGSI: SECURITY DEFINER + search_path terkunci');
   const fns = await db.query(`
     SELECT p.proname, pg_get_function_result(p.oid) AS returns,
            p.prosecdef, p.proconfig,
@@ -180,9 +181,13 @@ GRANT ALL ON ALL TABLES IN SCHEMA auth TO authenticated;`);
            has_function_privilege('authenticated', p.oid, 'EXECUTE') AS auth_exec
       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
      WHERE n.nspname='public'
-       AND (p.proname LIKE 'am\\_%' OR p.proname='can_resolve_account_managers')
+       AND (p.proname LIKE 'am\\_%'
+            OR p.proname = 'can_resolve_account_managers'
+            OR p.proname = 'is_external_account_manager')
      ORDER BY p.proname`);
-  eq(fns.rows.length, 7, 'bilangan fungsi 8A-2');
+  // 7 fungsi daripada account-manager-resolution.sql
+  // + 3 fungsi daripada external-account-managers.sql (DP-9)
+  eq(fns.rows.length, 10, 'bilangan fungsi 8A-2 + DP-9');
   for (const r of fns.rows) {
     if (!r.prosecdef) bad(`${r.proname} BUKAN SECURITY DEFINER`);
     const sp = (r.proconfig || []).some((c) => String(c).startsWith('search_path=public'));
@@ -190,9 +195,9 @@ GRANT ALL ON ALL TABLES IN SCHEMA auth TO authenticated;`);
     if (r.anon_exec) bad(`${r.proname} boleh dilaksanakan oleh anon`);
     if (!r.auth_exec) bad(`${r.proname} TIDAK boleh dilaksanakan oleh authenticated`);
   }
-  if (fns.rows.every((r) => r.prosecdef)) ok('semua 7 fungsi SECURITY DEFINER');
+  if (fns.rows.every((r) => r.prosecdef)) ok('semua 10 fungsi SECURITY DEFINER');
   if (fns.rows.every((r) => (r.proconfig || []).some((c) => String(c).startsWith('search_path=public'))))
-    ok('semua 7 fungsi mengunci search_path=public');
+    ok('semua 10 fungsi mengunci search_path=public');
   if (fns.rows.every((r) => !r.anon_exec)) ok('tiada fungsi boleh dilaksanakan oleh anon');
   if (fns.rows.every((r) => r.auth_exec)) ok('semua fungsi boleh dilaksanakan oleh authenticated');
 
@@ -577,14 +582,17 @@ GRANT ALL ON ALL TABLES IN SCHEMA auth TO authenticated;`);
     SELECT kategori, count(*)::int AS bilangan, sum(jumlah_baris)::bigint AS baris
       FROM public.am_unresolved_values() GROUP BY kategori ORDER BY kategori`);
   const kat = Object.fromEntries(s3.rows.map((r) => [r.kategori, Number(r.bilangan)]));
-  eq(kat['SELESAI'] ?? 0, 11, 'S3: 11 nilai SELESAI');
-  eq(kat['TIADA_PADANAN'] ?? 0, 1, "S3: 1 nilai TIADA_PADANAN ('Ow Zi Qi')");
+  eq(kat['SELESAI'] ?? 0, 11, 'S3: 11 nilai SELESAI (keputusan DP-8)');
+  eq(kat['LUAR'] ?? 0, 1, "S3: 1 nilai LUAR ('Ow Zi Qi', keputusan DP-9)");
+  eq(kat['TIADA_PADANAN'] ?? 0, 0,
+     'S3: TIADA nilai TIADA_PADANAN — semua 12 nilai ada keputusan manusia');
   eq(kat['BERBILANG_ORANG'] ?? 0, 0,
      'S3: tiada lagi nilai BERBILANG_ORANG (semua diputuskan DP-8)');
-  const owBaris = s3.rows.find((r) => r.kategori === 'TIADA_PADANAN');
+  eq(kat['PERLU_PENGESAHAN'] ?? 0, 0, 'S3: tiada nilai PERLU_PENGESAHAN');
+  const owBaris = s3.rows.find((r) => r.kategori === 'LUAR');
   // 4 baris = 3 invois + 1 staging (staging juga disemai dengan 'Ow Zi Qi')
   eq(Number(owBaris?.baris), 4,
-     "S3: 'Ow Zi Qi' = 4 baris kekal tanpa agihan (3 invois + 1 staging)");
+     "S3: 'Ow Zi Qi' = 4 baris tidak diagih (3 invois + 1 staging)");
 
   // backfill selepas seed: 3 baris Ow Zi Qi sahaja yang kekal NULL
   const fill3 = await db.query(`SELECT * FROM public.am_backfill_account_manager()`);

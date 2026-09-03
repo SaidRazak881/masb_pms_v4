@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-03 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: 00a8d38 🔴 DP-7: betulkan kecacatan pengeluaran import_staging.updated_at + bina Fasa 8A-2 · arena/01a06274-masb-pms-v4
+> Git: b79769e DP-8 DILAKSANAKAN: keputusan pengguna — Fuzy/Fuzy-Dila/Fuzy-Sholihin -> Fuziah · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 
@@ -121,6 +121,11 @@
 - **Jadual:** account_manager_aliases
 - **Fungsi/RPC:** normalize_person_name, resolve_account_manager
 - **Polisi RLS:** am_aliases_read · am_aliases_write · am_aliases_update · am_aliases_delete
+
+### `lib/supabase/external-account-managers.sql`
+- **Jadual:** external_account_managers
+- **Fungsi/RPC:** is_external_account_manager, am_confirm_external, am_revoke_external
+- **Polisi RLS:** ext_am_read · ext_am_write · ext_am_update · ext_am_delete
 
 ### `lib/supabase/fix-add-programme-categories.sql`
 

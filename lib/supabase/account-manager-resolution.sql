@@ -115,11 +115,19 @@ GRANT EXECUTE ON FUNCTION public.am_list_staff() TO authenticated;
 -- Mengagregat nilai MENTAH daripada invoices + import_staging, dan tunjukkan
 -- sama ada ia sudah selesai atau tidak.
 --
--- `kategori` membezakan TIGA keadaan yang berbeza secara meaningful:
---   'SELESAI'        -> pautan sudah boleh diisi
---   'BERBILANG_ORANG'-> sel mengandungi >1 orang; KEKAL NULL (veto §2.4)
---   'PERLU_PENGESAHAN'-> sistem enggan meneka; manusia mesti memutuskan
---   'TIADA_PADANAN'  -> tiada staf sepadan langsung (cth. 'Ow Zi Qi')
+-- `kategori` membezakan LIMA keadaan yang berbeza secara meaningful,
+-- dalam susunan keutamaan ini:
+--   'SELESAI'         -> pautan sudah boleh diisi (automatik ATAU alias manusia)
+--   'LUAR'            -> orang luar yang SUDAH disahkan manusia (DP-9);
+--                        sengaja tidak diagih, dan laporan mesti memisahkannya
+--   'BERBILANG_ORANG' -> sel mengandungi >1 orang dan BELUM diputuskan manusia
+--   'TIADA_PADANAN'   -> tiada staf sepadan dan BELUM ada keputusan manusia
+--   'PERLU_PENGESAHAN'-> ada calon tetapi sistem enggan meneka
+--
+-- Perbezaan 'LUAR' vs 'TIADA_PADANAN' ialah inti DP-9: kedua-duanya
+-- account_manager_id IS NULL, tetapi yang pertama SUDAH diputuskan dan yang
+-- kedua BELUM. Tanpa pemisahan ini, laporan tidak dapat memberitahu sama ada
+-- baki itu memerlukan tindakan.
 
 CREATE OR REPLACE FUNCTION public.am_unresolved_values()
 RETURNS TABLE (
@@ -180,6 +188,11 @@ BEGIN
                          WHERE public.normalize_person_name(al.raw_text)
                                = public.normalize_person_name(a.raw))
              THEN 'SELESAI'
+           -- DP-9: orang LUAR yang sudah DISAHKAN manusia. Kekal tidak diagih,
+           -- tetapi BERBEZA makna daripada TIADA_PADANAN: ini sudah diputuskan,
+           -- bukan belum. Laporan mesti memisahkannya.
+           WHEN public.is_external_account_manager(a.raw)
+             THEN 'LUAR'
            -- sel berbilang orang yang BELUM diputuskan manusia: kekal NULL.
            -- Veto Kewangan §2.4 berkuat kuasa untuk SISTEM; DP-8 membenarkan
            -- MANUSIA memutuskannya melalui am_confirm_alias().

@@ -141,15 +141,18 @@ SELECT 'W1_public_tables' AS check_name,
        --    user_roles (3), dan 15 + 3 = 18 = tepat bilangan jadual public
        --    ber-RLS yang dilaporkan live.
        --
-       -- ⚠️ KEMASKINI FASA 7A (2026-09-04, Panel DP-2): `account_manager_aliases`
+       -- ⚠️ KEMASKINI FASA 8A (2026-09-04, Panel DP-2/DP-4): `account_manager_aliases`
        --    ditambah oleh `lib/supabase/client-master.sql`. Ia JADUAL RASMI repo
-       --    (bukan warisan). Bilangan rasmi kini 15 -> 16.
+       --    (bukan warisan). Bilangan rasmi 15 -> 16.
+       -- ⚠️ KEMASKINI FASA 8A-2 (2026-09-04, Panel DP-9): `external_account_managers`
+       --    ditambah oleh `lib/supabase/external-account-managers.sql`.
+       --    Bilangan rasmi 16 -> 17.
        --    NOTA: PROMPT-6C SUDAH dijalankan sebelum ini, jadi laporan lama
        --    mengira 15. Jika W1 dijalankan SEMULA selepas Fasa 7A dipasang di
        --    live, jangkaan = 16 rasmi + 3 warisan = 19 jadual public ber-RLS.
        CASE WHEN c.relname IN (
               'account_manager_aliases','app_settings','audit_logs',
-              'change_requests','cost_items',
+              'change_requests','cost_items','external_account_managers',
               'financial_docs','import_batches','import_staging','invoices',
               'organizers','participants','programme_costs',
               'programme_documents','programme_unlock_requests','programmes',

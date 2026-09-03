@@ -3,8 +3,8 @@
 -- Keputusan pengguna 2026-09-04 (Panel DP-8) — direkodkan sebagai data
 -- =====================================================================
 --
--- PRASYARAT: `client-master.sql` (8A) dan `account-manager-resolution.sql`
--- (8A-2) MESTI sudah dipasang.
+-- PRASYARAT: `client-master.sql` (8A), `account-manager-resolution.sql`
+-- (8A-2) dan `external-account-managers.sql` (DP-9) MESTI sudah dipasang.
 --
 -- KEPUTUSAN PENGGUNA YANG DIREKODKAN DI SINI
 -- -------------------------------------------
@@ -28,8 +28,10 @@
 --   `sel_berbilang_orang = true` untuk kedua-duanya supaya ia boleh
 --   diaudit atau dibatalkan kemudian melalui `am_revoke_alias()`.
 --
--- `Ow Zi Qi` (3 baris) TIDAK termasuk dalam keputusan ini dan KEKAL NULL —
--- nama itu tiada dalam senarai 18 staf `User Profiles Mapping.xlsx`.
+-- `Ow Zi Qi` (3 baris invois + 1 baris staging) dikendalikan oleh **DP-9**
+-- di bahagian bawah fail ini: pengguna memutuskan ia **orang luar**, bukan
+-- staf MIMOS Academy — jadi ia KEKAL tidak diagih tetapi direkodkan sebagai
+-- SUDAH diputuskan (kategori `LUAR`), bukan sebagai `TIADA_PADANAN`.
 --
 -- SKOP
 -- ----
@@ -127,3 +129,56 @@ $$;
 --   FROM public.am_unresolved_values() GROUP BY kategori ORDER BY kategori;
 -- Jangkaan: SELESAI = 11 nilai; TIADA_PADANAN = 1 nilai ('Ow Zi Qi', 3 baris);
 --           BERBILANG_ORANG = 0
+
+-- =====================================================================
+-- BAHAGIAN 2 — DP-9: `Ow Zi Qi` ialah ORANG LUAR
+-- =====================================================================
+-- Keputusan pengguna 2026-09-04, apabila ditanya siapa `Ow Zi Qi`:
+--     "Orang luar — bukan staf MIMOS Academy. Biarkan NULL dan
+--      laporkan berasingan."
+--
+-- Ini BERBEZA daripada sekadar membiarkannya NULL. Tanpa rekod ini,
+-- `Ow Zi Qi` kelihatan sama seperti nilai yang BELUM diputuskan, dan
+-- laporan akan sentiasa menunjukkan baki "perlu tindakan" yang sebenarnya
+-- sudah selesai. Dengan rekod ini, `am_unresolved_values()` melaporkannya
+-- sebagai kategori `LUAR`.
+--
+-- `account_manager_id` KEKAL NULL — orang luar tidak dipautkan ke
+-- `user_profiles` kerana mereka bukan staf.
+
+DO $$
+DECLARE
+  v_who uuid;
+BEGIN
+  v_who := public.current_user_id();
+
+  PERFORM public.am_confirm_external(
+    'Ow Zi Qi',
+    'Ow Zi Qi (luar)',
+    'bukan staf MIMOS Academy',
+    'Keputusan pengguna 2026-09-04 (Panel DP-9): orang luar, kekal tidak diagih, laporkan berasingan'
+  );
+
+  RAISE NOTICE 'seed DP-9 selesai: Ow Zi Qi diklasifikasikan sebagai LUAR';
+END
+$$;
+
+-- `am_confirm_external()` idempoten secara dalaman: panggilan kedua
+-- mengemas kini baris yang sama (ON the same raw_text) dan diaudit sebagai
+-- 'updated', jadi fail ini selamat dijalankan berulang kali.
+
+
+-- =====================================================================
+-- PENGESAHAN DP-9 (read-only)
+-- =====================================================================
+-- S4: klasifikasi luar wujud
+-- SELECT 'S4' AS check_name, raw_text, display_name, reason, notes
+--   FROM public.external_account_managers ORDER BY raw_text;
+-- Jangkaan: 1 baris — 'Ow Zi Qi'
+--
+-- S5: rumusan akhir — setiap satu daripada 12 nilai ada keputusan manusia
+-- SELECT 'S5' AS check_name, kategori, count(*) AS bilangan_nilai,
+--        sum(jumlah_baris) AS jumlah_baris
+--   FROM public.am_unresolved_values() GROUP BY kategori ORDER BY kategori;
+-- Jangkaan: SELESAI = 11 nilai (262 baris), LUAR = 1 nilai (4 baris),
+--           TIADA_PADANAN = 0, BERBILANG_ORANG = 0, PERLU_PENGESAHAN = 0

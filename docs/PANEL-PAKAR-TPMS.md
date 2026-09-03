@@ -712,3 +712,96 @@ pengguna secara eksplit menyatakan "Fuzy **aka** Fuziah".
 ⏳ **`Ow Zi Qi`** — 3 baris invois + 1 baris staging, tiada padanan staf.
 Perlu keputusan pengguna: staf baharu yang belum didaftarkan, orang luar
 (bukan staf MIMOS Academy), atau ejaan berbeza bagi staf sedia ada?
+
+---
+
+## DP-9 — KATA PUTUS: `Ow Zi Qi` ialah orang luar (2026-09-04)
+
+**Status: ✅ DIPUTUSKAN OLEH PENGGUNA**
+
+### Soalan
+Selepas DP-8 menyelesaikan 11 daripada 12 nilai `Account Manager`, hanya
+`'Ow Zi Qi'` (3 baris invois + 1 baris staging) yang tinggal. Nama itu tiada
+dalam senarai 18 staf `User Profiles Mapping.xlsx`. Panel bertanya: staf baharu,
+orang luar, atau ejaan berbeza bagi staf sedia ada?
+
+### Keputusan pengguna
+> **Orang luar — bukan staf MIMOS Academy. Biarkan NULL dan laporkan berasingan.**
+
+### Masalah reka bentuk yang timbul daripada keputusan ini
+Sekilas, "biarkan NULL" memerlukan **tiada** kerja. Tetapi itu salah:
+
+Tanpa rekod, `'Ow Zi Qi'` dan nilai yang **belum** diputuskan kelihatan
+**SERUPA** dalam laporan — kedua-duanya `account_manager_id IS NULL`. Maksudnya
+berbeza sepenuhnya:
+
+| Keadaan | Makna | Tindakan |
+|---|---|---|
+| `'Ow Zi Qi'` | **SUDAH** diputuskan manusia: orang luar | tiada |
+| nilai belum disahkan | **BELUM** diputuskan: sistem tidak tahu | perlu perhatian |
+
+Jika dicampur, laporan Fasa 8E (pipeline) dan 8F (komisen) akan sentiasa
+menunjukkan baki "tidak diagih" tanpa membezakan yang **selesai** daripada yang
+**terbuka** — jadi tiada siapa tahu sama ada baki itu perlu tindakan.
+
+### Kata putus pelaksanaan
+1. **Jadual baharu `public.external_account_managers`**
+   (`lib/supabase/external-account-managers.sql`) — rekod nilai yang disahkan
+   manusia sebagai orang luar, dengan `display_name` untuk laporan dan `reason`
+   (ejen / rakan kongsi / staf klien / bekas staf) supaya pengecualian komisen
+   boleh dijelaskan.
+2. **Kategori `LUAR`** ditambah kepada `am_unresolved_values()`, berasingan
+   daripada `TIADA_PADANAN`. Susunan keutamaan: `SELESAI` → `LUAR` →
+   `BERBILANG_ORANG` → `TIADA_PADANAN` → `PERLU_PENGESAHAN`.
+3. **`account_manager_id` KEKAL NULL** untuk orang luar — mereka tidak dipaut
+   ke `user_profiles` kerana mereka bukan staf. Ini mematuhi keputusan pengguna
+   secara harfiah.
+4. **Tiga fungsi:** `is_external_account_manager()`, `am_confirm_external()`,
+   `am_revoke_external()`. Semua `SECURITY DEFINER`, `search_path=public`,
+   dikawal `can_resolve_account_managers()`, dan diaudit.
+5. **Dua penolakan pertahanan** dalam `am_confirm_external()`:
+   - nilai yang **sudah menyelesaikan kepada staf** → tolak (22023). Jangan
+     labelkan staf sebagai luar; guna `am_confirm_alias()`.
+   - **sel berbilang orang** → tolak (22023). Satu klasifikasi luar ialah untuk
+     SATU orang; `'Fuzy / Dila'` bukan seorang orang luar.
+6. **Keputusan direkodkan sebagai DATA** dalam
+   `lib/supabase/seed-account-manager-aliases.sql` Bahagian 2 — idempoten.
+7. **Allowlist W1 dikemas kini 16 → 17** jadual rasmi (pelajaran DP-4:
+   menambah jadual baharu WAJIB menyemak allowlist dokumen sedia ada, jika
+   tidak `test-preflight-b-sql.mjs` §8 gagal).
+
+### Hasil akhir
+**Setiap satu daripada 12 nilai `Account Manager` sebenar kini mempunyai
+keputusan manusia di belakangnya:**
+
+| Kategori | Bilangan nilai | Baris |
+|---|---|---|
+| `SELESAI` (diagih kepada staf) | 11 | 262 invois + 4 staging |
+| `LUAR` (sengaja tidak diagih) | 1 | 3 invois + 1 staging |
+| `TIADA_PADANAN` / `BERBILANG_ORANG` / `PERLU_PENGESAHAN` | **0** | **0** |
+
+Tiada lagi baki senyap.
+
+### Kedudukan pakar
+* **BA (§2.9):** menyokong kuat — pemisahan `LUAR` vs `TIADA_PADANAN` ialah
+  perkara yang membolehkan laporan "perlu tindakan" menjadi bermakna.
+* **Kewangan (§2.4):** menerima — `reason` memberikan asas audit untuk
+  mengecualikan baris luar daripada komisen.
+* **Keselamatan (§2.8):** menerima — jadual ini mendedahkan hanya teks dan UUID
+  pengesah; tiada peranan atau status staf. Polisi tulis dihadkan kepada
+  admin / head_governance / finance, padan dengan `account_manager_aliases`.
+* **SQL Architect (§2.2):** memilih jadual berasingan daripada menambah lajur
+  penanda pada `account_manager_aliases`, kerana `user_id` di sana ialah
+  `NOT NULL REFERENCES user_profiles` — orang luar tidak boleh memenuhinya
+  tanpa melemahkan kekangan itu.
+
+### Pengesahan
+`scripts/test-account-manager-resolution.mjs`: **145/145 LULUS**, termasuk
+seksyen [Q] yang menguji ketiga-tiga fungsi DP-9, kedua-dua penolakan
+pertahanan, kawalan kebenaran, jejak audit, dan idempotensi.
+
+### Nota sandbox
+Reset sandbox #7 berlaku semasa kerja DP-9 (`node_modules` dikosongkan, git
+terpusing ke `535fb13`). Semua fail kerja terselamat; dipulihkan dengan
+`git fetch` + `git reset --mixed` ke `b79769e` kemudian `npm install`.
+Tiada kerja hilang.
