@@ -1,9 +1,42 @@
 # PROMPT 6G — Pasang `updated-at-triggers.sql` + REVOKE privilej tulis jadual warisan
 
-> **📌 STATUS:** masih **menunggu kelulusan eksplisit pengguna** (HARD GATE).
-> Belum dijalankan. Kandungan prompt tidak berubah.
-> Perkembangan terkini: **Production Branch sudah bertukar** — lihat
-> `docs/PROMPT-6H-E1-E9-PRECISE-CRITERIA.md`.
+> ## ⏸️ STATUS: **DITANGGUH oleh pengguna (2026-09-04)** — JANGAN JALANKAN
+>
+> Fasa 6 telah **SELESAI dan disahkan di Production** (E1–E9 = 9/9 PASS,
+> UAT A–K semua lulus). Pengguna memutuskan untuk **menangguhkan** prompt ini.
+>
+> **Keputusan pengguna yang berkaitan (2026-09-04):**
+> | Perkara | Keputusan |
+> | ------- | --------- |
+> | PROMPT-6G (hardening SQL) | ⏸️ **TANGGUH** |
+> | Pembersihan sisa pra-repo (4 fungsi `private.*`, 3 jadual warisan, 8 polisi) | ⏸️ **BIARKAN** — selepas penilaian risiko Arena, pengguna setuju ia bukan risiko aktif |
+> | Rollout 19 pengguna | ✅ Pengguna maklumkan sendiri, tiada tindakan teknikal |
+> | D1 `Confirm email` | ✅ **OFF** |
+> | Akaun ujian dari UAT D4 | ✅ **SEKAT** melalui UI Super Admin |
+>
+> ### ⚠️ Akibat penangguhan yang MESTI diketahui
+>
+> **`lib/supabase/updated-at-triggers.sql` wujud dalam repo tetapi TIDAK
+> dipasang di live.** Jadi:
+>
+> - **Di live:** 6 jadual rasmi masih ada kolum `updated_at` yang **tidak pernah
+>   dikemas kini** (`app_settings`, `cost_items`, `financial_docs`, `organizers`,
+>   `programme_documents`, `user_profiles`), dan 5 jadual + `profiles` masih
+>   bergantung kepada `private.set_updated_at()` pra-repo.
+> - **Untuk pemasangan BERSIH daripada repo:** fail ini **WAJIB** dijalankan,
+>   jika tidak `updated_at` tidak berfungsi langsung. Lihat
+>   `docs/SETUP-SUPABASE.md`.
+> - **REVOKE pada 3 jadual warisan juga tidak dilakukan**, jadi `authenticated`
+>   masih mempunyai privilej tulis penuh (`INSERT/UPDATE/DELETE/TRUNCATE/
+>   REFERENCES/TRIGGER`) pada `profiles`, `programme_participants`, `user_roles`.
+>   Ini **tidak exploitable** (WITH CHECK menolak INSERT bukan-admin, dan W6/Z3
+>   membuktikan tiada fungsi atau polisi Fasa 6 membaca jadual ini), tetapi
+>   ia permukaan yang tidak perlu dan **masih terbuka**.
+>
+> **Jika prompt ini diaktifkan semula kelak, kandungannya masih sah dan tidak
+> perlu diubah** — semua query sudah diuji (`scripts/test-updated-at-triggers.mjs`
+> 13/13, `scripts/test-prompt-6g-revoke.mjs` 8/8). Satu perkara sahaja perlu
+> disemak semula: jawapan I1/I2 mungkin mengubah analisis `validate_programme_lock`.
 
 > **⛔ HARD GATE — prompt ini hanya boleh dijalankan SELEPAS pengguna memberi
 > kelulusan eksplisit.** Ia mengandungi **live SQL** (DDL + REVOKE), yang
