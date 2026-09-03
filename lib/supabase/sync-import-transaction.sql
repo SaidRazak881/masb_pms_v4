@@ -77,6 +77,23 @@ DECLARE
   v_invoice_id uuid;
   v_cost_id uuid;
   v_new_status text;
+  -- GAP-ANALISIS §4.1–4.3: medan perniagaan sebenar. Sebelum ini RPC
+  -- menulis `trainer` ke account_manager dan `client_name` (syarikat) ke
+  -- pic_name (individu) kerana lajur sebenar tidak pernah ditangkap.
+  v_account_manager text;
+  v_pic_name text;
+  v_pic_contact_no text;
+  v_pic_email text;
+  v_po_no text;
+  v_quotation_ref text;
+  v_prepared_by text;
+  v_sst numeric(14,2);
+  v_final_price numeric(14,2);
+  v_unit_price numeric(14,2);
+  v_quantity numeric(14,2);
+  v_total_incl_sst numeric(14,2);
+  v_total_excl_sst numeric(14,2);
+  v_payment_status_raw text;
   v_processed integer := 0;
   v_created integer := 0;
   v_merged integer := 0;
@@ -177,6 +194,76 @@ BEGIN
     ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS programme_id uuid;
   END IF;
 
+  -- -------------------------------------------------------------------
+  -- Lajur BAHARU daripada fix-field-mapping.sql (GAP-ANALISIS §4.1–4.4).
+  -- Diulang di sini sebagai pertahanan: fail SQL ini boleh dipasang
+  -- tanpa fix-field-mapping.sql, dan tanpa lajur ini penyataan INSERT
+  -- statik di bawah akan gagal semasa perancangan.
+  -- -------------------------------------------------------------------
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'invoices'
+      AND column_name = 'client_name'
+  ) THEN
+    ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS client_name text;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'invoices'
+      AND column_name = 'pic_contact_no'
+  ) THEN
+    ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS pic_contact_no text;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'invoices'
+      AND column_name = 'pic_email'
+  ) THEN
+    ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS pic_email text;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'invoices'
+      AND column_name = 'quantity'
+  ) THEN
+    ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS quantity numeric(14,2);
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'invoices'
+      AND column_name = 'unit_price'
+  ) THEN
+    ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS unit_price numeric(14,2);
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'invoices'
+      AND column_name = 'total_value'
+  ) THEN
+    ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS total_value numeric(14,2) NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'invoices'
+      AND column_name = 'sst'
+  ) THEN
+    ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS sst numeric(10,2) NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'invoices'
+      AND column_name = 'quotation_no'
+  ) THEN
+    ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS quotation_no text;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'invoices'
+      AND column_name = 'po_no'
+  ) THEN
+    ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS po_no text;
+  END IF;
+
   -- Penyesuaian untuk programme_costs: pastikan kolum cost_of_sales wujud
   -- (pangkalan data sedia ada mungkin hanya mempunyai amount/budgeted_amount).
   IF NOT EXISTS (
@@ -256,6 +343,30 @@ BEGIN
     v_amount := NULLIF(v_row->>'amount', '')::numeric;
     v_doc_date := NULLIF(v_row->>'doc_date', '')::date;
     v_status := lower(trim(COALESCE(v_row->>'status_raw', '')));
+
+    -- Medan perniagaan (GAP-ANALISIS §4.1–4.3). Semua boleh NULL supaya
+    -- baris staging lama (yang tiada lajur ini) terus berfungsi.
+    v_account_manager    := NULLIF(trim(v_row->>'account_manager'), '');
+    v_pic_name           := NULLIF(trim(v_row->>'pic_name'), '');
+    v_pic_contact_no     := NULLIF(trim(v_row->>'pic_contact_no'), '');
+    v_pic_email          := NULLIF(trim(v_row->>'pic_email'), '');
+    v_po_no              := NULLIF(trim(v_row->>'po_no'), '');
+    v_quotation_ref      := NULLIF(trim(v_row->>'quotation_ref'), '');
+    v_prepared_by        := NULLIF(trim(v_row->>'prepared_by'), '');
+    v_payment_status_raw := NULLIF(trim(v_row->>'payment_status_raw'), '');
+    v_sst                := NULLIF(v_row->>'sst_amount', '')::numeric;
+    v_final_price        := NULLIF(v_row->>'final_price', '')::numeric;
+    v_unit_price         := NULLIF(v_row->>'unit_price', '')::numeric;
+    v_quantity           := NULLIF(v_row->>'quantity', '')::numeric;
+    v_total_incl_sst     := NULLIF(v_row->>'total_incl_sst', '')::numeric;
+    v_total_excl_sst     := NULLIF(v_row->>'total_excl_sst', '')::numeric;
+
+    -- Keutamaan amaun (GAP-ANALISIS §4.1). `amount` staging sudah dikira
+    -- oleh parser dengan keutamaan finalPrice > totalInclSst > amount >
+    -- unitPrice; ini adalah jaring keselamatan kedua di peringkat DB, dan
+    -- yang melindungi baris staging yang ditulis oleh parser versi lama.
+    -- `sst_amount` SENGAJA tidak pernah digunakan sebagai amaun.
+    v_amount := COALESCE(v_final_price, v_total_incl_sst, v_amount, v_unit_price);
 
     IF v_amount IS NULL THEN
       RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = format('Amaun diperlukan untuk %s: %s.', v_kind, COALESCE(v_ref, v_title));
@@ -377,31 +488,69 @@ BEGIN
       LIMIT 1
       FOR UPDATE;
 
+      -- GAP-ANALISIS §4.1–4.3 DIBETULKAN:
+      --   SEBELUM: account_manager <- trainer (JURULATIH)
+      --            pic_name        <- v_client (nama SYARIKAT)
+      --            po_value_excl_tax <- amaun quotation
+      --   SELEPAS: account_manager <- lajur "Account Manager" sebenar
+      --            pic_name        <- lajur "PIC - Full Name" sebenar
+      --            client_name     <- nama syarikat (lajur BAHARU)
+      --            quotation_value <- amaun quotation (lajur betul)
+      -- `po_value_excl_tax` kini HANYA diisi daripada lajur PO sebenar.
       IF v_invoice_id IS NULL THEN
+        -- `po_value_excl_tax` SENGAJA tidak disenaraikan: ia NOT NULL
+        -- DEFAULT 0, dan menyebutnya dengan nilai NULL akan MEMBATALKAN
+        -- DEFAULT lalu melanggar kekangan. Nilai PO sebenar hanya datang
+        -- daripada lajur PO (GAP-ANALISIS §4.3).
+        -- `invoice_value_excl_tax`, `sst` dan `total_value` juga NOT NULL
+        -- DEFAULT 0, jadi setiap satu dibalut COALESCE(..., 0).
         INSERT INTO public.invoices (
           programme_id,
           quotation_no,
-          po_value_excl_tax,
+          invoice_value_excl_tax,
+          sst,
+          total_value,
+          quantity,
+          unit_price,
           invoice_date,
           account_manager,
-          pic_name
+          pic_name,
+          pic_contact_no,
+          pic_email,
+          client_name,
+          notes
         )
         VALUES (
           v_programme_id,
           v_ref,
-          v_amount,
+          COALESCE(v_total_excl_sst, v_amount, 0),
+          COALESCE(v_sst, 0),
+          COALESCE(v_total_incl_sst, v_final_price, v_amount, 0),
+          v_quantity,
+          v_unit_price,
           v_doc_date,
-          NULLIF(trim(v_row->>'trainer'), ''),
-          v_client
+          v_account_manager,
+          v_pic_name,
+          v_pic_contact_no,
+          v_pic_email,
+          v_client,
+          v_prepared_by
         )
         RETURNING id INTO v_invoice_id;
       ELSE
         UPDATE public.invoices
-        SET po_value_excl_tax = v_amount,
-            invoice_date = COALESCE(v_doc_date, invoice_date),
-            account_manager = COALESCE(NULLIF(trim(v_row->>'trainer'), ''), account_manager),
-            pic_name = COALESCE(v_client, pic_name),
-            updated_at = now()
+        SET invoice_value_excl_tax = COALESCE(v_total_excl_sst, v_amount, invoice_value_excl_tax),
+            sst            = COALESCE(v_sst, sst),
+            total_value    = COALESCE(v_total_incl_sst, v_final_price, v_amount, total_value),
+            quantity       = COALESCE(v_quantity, quantity),
+            unit_price     = COALESCE(v_unit_price, unit_price),
+            invoice_date   = COALESCE(v_doc_date, invoice_date),
+            account_manager = COALESCE(v_account_manager, account_manager),
+            pic_name        = COALESCE(v_pic_name, pic_name),
+            pic_contact_no  = COALESCE(v_pic_contact_no, pic_contact_no),
+            pic_email       = COALESCE(v_pic_email, pic_email),
+            client_name     = COALESCE(v_client, client_name),
+            updated_at      = now()
         WHERE id = v_invoice_id;
       END IF;
 
@@ -419,6 +568,19 @@ BEGIN
         ELSE 'pending'
       END;
 
+      -- GAP-ANALISIS §4.4 DIBETULKAN.
+      -- `idx_invoices_quotation_no_unique` ialah indeks UNIQUE separa pada
+      -- invoices(quotation_no). Import quotation mencipta baris dengan
+      -- quotation_no diisi dan invoice_no NULL. Apabila invois sebenar
+      -- tiba, padanan asal HANYA mencari invoice_no, jadi ia tidak jumpa
+      -- baris quotation itu lalu cuba INSERT baris kedua dengan
+      -- quotation_no yang sama → unique_violation (23505) → kerana
+      -- transaksi ini ATOMIK, SELURUH batch gagal.
+      -- Fallback kedua memadankan baris quotation-then-invoice supaya
+      -- kitaran Quotation → PO → Invoice dikemaskini pada SATU baris.
+      -- Padanan DUA LANGKAH.
+      --
+      -- Langkah 1 — padanan tepat: nombor invois dalam program yang sama.
       SELECT id INTO v_invoice_id
       FROM public.invoices
       WHERE programme_id = v_programme_id
@@ -426,34 +588,96 @@ BEGIN
       LIMIT 1
       FOR UPDATE;
 
+      -- Langkah 2 — fallback kitaran Quotation → Invoice (GAP-ANALISIS §4.4).
+      --
+      -- `idx_invoices_quotation_no_unique` ialah indeks UNIQUE SEPARA yang
+      -- GLOBAL — ia TIDAK termasuk programme_id. Jadi kekangan itu boleh
+      -- dilanggar walaupun program berbeza, dan padanan fallback juga mesti
+      -- GLOBAL (tanpa penapis programme_id).
+      --
+      -- Bukti daripada ujian: quotation KENANGA INVESTOR BERHAD mencipta
+      -- program sintetik IMP-xxx, kemudian invois MIMOS Berhad (yang
+      -- merujuk quotation_no yang sama) mencipta program sintetik IMP-yyy
+      -- yang BERBEZA. Fallback versi pertama yang masih menapis
+      -- `programme_id = v_programme_id` tidak menemui baris quotation itu,
+      -- cuba INSERT baris kedua, dan melanggar 23505 — menggagalkan
+      -- SELURUH batch kerana transaksi ini atomik.
+      --
+      -- Syarat `invoice_no IS NULL` memastikan kita hanya mengambil baris
+      -- yang masih berstatus "quotation sahaja" (belum dibilkan). Baris
+      -- yang sudah ada invoice_no ditangani oleh Langkah 1.
+      IF v_invoice_id IS NULL AND v_quotation_ref IS NOT NULL THEN
+        SELECT id INTO v_invoice_id
+        FROM public.invoices
+        WHERE invoice_no IS NULL
+          AND quotation_no = v_quotation_ref
+        LIMIT 1
+        FOR UPDATE;
+      END IF;
+
+      -- GAP-ANALISIS §4.1–4.3 DIBETULKAN (sama seperti blok quotation).
       IF v_invoice_id IS NULL THEN
         INSERT INTO public.invoices (
           programme_id,
           invoice_no,
+          quotation_no,
+          po_no,
           invoice_value_excl_tax,
+          sst,
+          total_value,
           invoice_date,
           payment_status,
           account_manager,
-          pic_name
+          pic_name,
+          pic_contact_no,
+          pic_email,
+          client_name,
+          notes
         )
         VALUES (
           v_programme_id,
           v_ref,
-          v_amount,
+          v_quotation_ref,
+          v_po_no,
+          COALESCE(v_total_excl_sst, v_amount, 0),
+          COALESCE(v_sst, 0),
+          COALESCE(v_total_incl_sst, v_amount, 0),
           v_doc_date,
           v_new_status::public.payment_status,
-          NULLIF(trim(v_row->>'trainer'), ''),
-          v_client
+          v_account_manager,
+          v_pic_name,
+          v_pic_contact_no,
+          v_pic_email,
+          v_client,
+          v_prepared_by
         )
         RETURNING id INTO v_invoice_id;
       ELSE
         UPDATE public.invoices
-        SET invoice_value_excl_tax = v_amount,
-            invoice_date = COALESCE(v_doc_date, invoice_date),
+        SET -- programme_id diselaraskan apabila baris quotation-sahaja
+            -- dipadankan menerusi fallback global: baris itu kini menjadi
+            -- invois bagi program yang invois ini selesaikan kepadanya.
+            -- Tanpa ini, invois MIMOS Berhad akan kekal terikat pada
+            -- program KENANGA — percanggahan data yang senyap.
+            programme_id = COALESCE(v_programme_id, programme_id),
+            -- invoice_no WAJIB diisi: tanpa ini baris kekal berstatus
+            -- "quotation sahaja" (invoice_no IS NULL) dan akan dipadankan
+            -- SEMULA oleh import invois yang seterusnya, menyebabkan
+            -- invois kedua menimpa yang pertama tanpa amaran.
+            invoice_no     = COALESCE(v_ref, invoice_no),
+            invoice_value_excl_tax = COALESCE(v_total_excl_sst, v_amount, invoice_value_excl_tax),
+            sst            = COALESCE(v_sst, sst),
+            total_value    = COALESCE(v_total_incl_sst, v_amount, total_value),
+            po_no          = COALESCE(v_po_no, po_no),
+            quotation_no   = COALESCE(v_quotation_ref, quotation_no),
+            invoice_date   = COALESCE(v_doc_date, invoice_date),
             payment_status = v_new_status::public.payment_status,
-            account_manager = COALESCE(NULLIF(trim(v_row->>'trainer'), ''), account_manager),
-            pic_name = COALESCE(v_client, pic_name),
-            updated_at = now()
+            account_manager = COALESCE(v_account_manager, account_manager),
+            pic_name        = COALESCE(v_pic_name, pic_name),
+            pic_contact_no  = COALESCE(v_pic_contact_no, pic_contact_no),
+            pic_email       = COALESCE(v_pic_email, pic_email),
+            client_name     = COALESCE(v_client, client_name),
+            updated_at      = now()
         WHERE id = v_invoice_id;
       END IF;
 

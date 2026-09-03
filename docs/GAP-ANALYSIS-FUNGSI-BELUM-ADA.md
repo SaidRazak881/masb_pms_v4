@@ -180,7 +180,41 @@ mengikut nombor. Laporan "Kelayakan Sijil" hanya kira boolean.
 
 ---
 
-## 4. ⚠️ KECACATAN PEMETAKAN — data masuk ke lajur yang SALAH
+## 4. ✅ KECACATAN PEMETAKAN — **DIBETULKAN 2026-09-04** (menunggu pemasangan live)
+
+> **STATUS: DIBETULKAN dalam repo, diuji, MENUNGGU kelulusan pengguna untuk
+> dipasang di live** melalui `docs/PROMPT-7A-FIX-FIELD-MAPPING.md`.
+>
+> | Kecacatan | Status | Bukti |
+> | --------- | ------ | ----- |
+> | §4.1 `trainer` → `account_manager` | ✅ dibetulkan | `test-fix-field-mapping.mjs` §4: `account_manager = "Farrah"` |
+> | §4.1b `SST 8% Amount` → `amount` (ralat 13.5×) | ✅ dibetulkan | `test-v4-raw-parser.mjs`: `amount = 21000`, `sstAmount = 1555.56` |
+> | §4.2 `client_name` → `pic_name` | ✅ dibetulkan | `pic_name = "Ms Liyana Ayunni"`, `client_name = "KENANGA INVESTOR BERHAD"` |
+> | §4.3 amaun quotation → `po_value_excl_tax` | ✅ dibetulkan | `po_value_excl_tax = 0` (DEFAULT), nilai ke `invoice_value_excl_tax`/`total_value` |
+> | §4.4 `unique_violation` gagalkan batch | ✅ dibetulkan | padanan dua langkah GLOBAL; ujian §5: 0 × 23505, 1 baris bukan 2 |
+> | §4.5 `programme_id NOT NULL` → program hantu | ⏳ **MASIH TERBUKA** | perlu jadual `quotations` berdiri sendiri = Fasa 2 |
+>
+> Dua kecacatan tambahan ditemui SEMASA pembetulan (tiada dalam laporan asal):
+>
+> | Kecacatan | Kesan | Status |
+> | --------- | ----- | ------ |
+> | **14 baris hantu** (Quotation Tracker 286–299: hanya nombor urutan, semua lajur lain kosong) menjadi rekod staging | 14 rekod kosong per import | ✅ dibetulkan (`hasIdentifier`) |
+> | **Baris JUMLAH RM 11,191,349.41** (baris 299) menjadi satu rekod quotation | **Menggembungkan setiap laporan kewangan** dengan RM11.19 juta | ✅ dibetulkan + amaran `UNIDENTIFIED_AMOUNT_ROW` |
+>
+> **Bukti pengesahan silang:** jumlah amaun 284 quotation = **RM 11,214,029**
+> vs baris jumlah Excel **RM 11,191,349** — beza RM 22,680 (sebut harga yang
+> ditolak sebagai tidak sah). Jika baris jumlah masih bocor, jumlah itu akan
+> ~RM 22.4 juta.
+>
+> **Kesan pada fail sumber sebenar (diukur, bukan dianggarkan):**
+>
+> | Fail | SEBELUM | SELEPAS |
+> | ---- | ------- | ------- |
+> | Quotation Tracker | 297 rekod, `amount`=**cukai** RM1,555.56, 44/49 lajur dibuang | **284** rekod, `amount`=**RM21,000**, 16 medan kewangan ditangkap |
+> | `invoice_2026.xlsx` | 29 rekod, **0 sah** (`MISSING_AMOUNT`) | 29 rekod, **27 sah**, SST+AM+quotationRef ditangkap |
+> | `cost_of_sales_2026.xlsx` | **0 rekod** — 23 baris dibuang **secara senyap** | **23 rekod** |
+> | `office_funnel_2026-08-19.xlsx` | **0 rekod** (senyap) | **100 rekod** |
+> | `R1 INCOME_STATEMENT` | — | **77 rekod** (Invoice 38 sah) |
 
 Ini **berbeza daripada "fungsi belum ada"**: fungsi itu ada, tetapi ia
 menyimpan makna yang salah. Dikesan dalam `lib/supabase/sync-import-transaction.sql`.
@@ -285,8 +319,8 @@ pejabat yang tiada tempat untuk pergi.
 
 | # | Kerja | Kenapa dahulu | Saiz |
 | --- | --- | --- | --- |
-| **1** | **Betulkan §4.1–4.3** (petakan `Account Manager`, `PIC`, `SST`, `Discount`, `Unit Price`, `Qty`, `Final Price` ke lajur betul) | **Kerosakan data aktif.** Setiap import kini menulis makna salah ke lajur betul. Murah dibetulkan sekarang, mahal selepas 299 baris masuk | Sederhana |
-| **2** | **Sahkan & betulkan §4.4** (`UNIQUE quotation_no` berlanggar) | **Boleh gagalkan seluruh batch** — dan kegagalan itu atomik, jadi tiada separa selamat | Kecil (uji dahulu) |
+| **1** | ✅ **SELESAI** — Betulkan §4.1–4.3 (petakan `Account Manager`, `PIC`, `SST`, `Discount`, `Unit Price`, `Qty`, `Final Price` ke lajur betul) | **Kerosakan data aktif.** Setiap import kini menulis makna salah ke lajur betul. Murah dibetulkan sekarang, mahal selepas 299 baris masuk | Sederhana |
+| **2** | ✅ **SELESAI** — Sahkan & betulkan §4.4 (`UNIQUE quotation_no` berlanggar) | **Boleh gagalkan seluruh batch** — dan kegagalan itu atomik, jadi tiada separa selamat | Kecil (uji dahulu) |
 | **3** | **Keputusan reka bentuk §4.5**: adakah quotation **program-independent**? | Menentukan sama ada jadual `quotations` berdiri sendiri atau terikat `programme_id`. **Ini keputusan perniagaan anda, bukan teknikal** | Keputusan |
 | **4** | **Domain Quotation penuh** (§3.1) — jadual `quotations` + parser + UI + laporan | 299 baris sumber terbesar; kitaran jualan Quotation→PO→Invoice tidak boleh ditutup tanpa ini | Besar |
 | **5** | **Induk Pelanggan** (§3.5) — pisahkan `clients` daripada `organizers` | Prasyarat untuk #6 dan untuk lapor hasil mengikut pelanggan | Sederhana |
@@ -300,7 +334,16 @@ tanya **tiada jawapan dalam DB** untuk didedahkan.
 
 ---
 
-## 7. Keputusan yang saya perlukan daripada anda
+## 7. Keputusan pengguna — **DIBERIKAN 2026-09-04**
+
+| # | Soalan | Jawapan pengguna | Kesan |
+| - | ------ | ---------------- | ----- |
+| 1 | Adakah quotation bebas program? | **Ya — wujud SEBELUM program diluluskan** | `quotations` mesti entiti berdiri sendiri dengan `programme_id` **boleh NULL**. → Fasa 2 |
+| 2 | Satu entiti "Pelanggan"? | **Ya — satu entiti "Pelanggan"** | `organizers` → `clients`; buang kekaburan "Pelanggan / Penganjur" (6 tempat dalam kod). → Fasa 2 |
+| 3 | Keutamaan | **Baiki kerosakan data dahulu** | → §4 DIBETULKAN, `docs/PROMPT-7A-FIX-FIELD-MAPPING.md` |
+| 4 | 4 fail tanpa tempat masih aktif? | **Ya — masih aktif diguna** | 715 baris data perniagaan aktif **tiada tempat**. → Fasa 2 jadi keperluan sebenar, bukan pilihan |
+
+### Sejarah (soalan asal sebelum dijawab)
 
 1. **Adakah quotation bebas program?** (Quotation Tracker ada 299 baris; adakah
    setiap satu mesti jadi program, atau quotation wujud **sebelum** program

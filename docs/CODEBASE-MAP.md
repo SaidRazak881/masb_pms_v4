@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-03 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: 905a9f3 D1 Confirm email = OFF telah diset oleh pengguna (2026-09-04) · arena/01a06274-masb-pms-v4
+> Git: bd74a6f Analisis jurang: 4 domain perniagaan tiada + 5 kecacatan pemetaan data · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 
@@ -116,6 +116,8 @@
 
 ### `lib/supabase/fix-add-programme-categories.sql`
 
+### `lib/supabase/fix-field-mapping.sql`
+
 ### `lib/supabase/fix-rls-recursion.sql`
 - **Fungsi/RPC:** current_user_role, current_role_name, has_role
 - **Polisi RLS:** Admin boleh lihat semua profil · Pengguna boleh kemaskini programmes jika tidak dikunci · Pengguna boleh kemaskini participants jika program tidak dikunci · Pengguna boleh kemaskini financial_docs jika program tidak dikunci · Pengguna boleh kemaskini invoices jika program tidak dikunci · Pengguna boleh kemaskini programme_costs jika program tidak dikunci · Pengguna boleh kemaskini cost_items jika program tidak dikunci · Pengguna boleh kemaskini programme_documents jika program tidak dikunci · Pengguna terauth boleh kemaskini programmes
@@ -222,6 +224,7 @@
 - `PROMPT-6F-AUDIT-PRIVATE-SCHEMA-DRIFT.md`
 - `PROMPT-6G-UPDATED-AT-AND-REVOKE.md`
 - `PROMPT-6H-E1-E9-PRECISE-CRITERIA.md`
+- `PROMPT-7A-FIX-FIELD-MAPPING.md`
 - `PROMPT-TEMPLATE-FASA.md`
 - `SETUP-SUPABASE.md`
 - `SKILLS.md`

@@ -69,6 +69,30 @@ create table if not exists import_staging (
   decided_by          uuid references auth.users (id),
 
   -- Payload mentah untuk audit / paparan
+  -- ---- Medan perniagaan (GAP-ANALISIS §4.1–4.3) ----
+  -- Ditambah kerana 44 daripada 49 lajur Quotation Tracker dibuang
+  -- sebelum ini: hanya 11 medan kanonik wujud, jadi Account Manager,
+  -- PIC, SST, Unit Price, Qty, Discount, Final Price, Prepared by
+  -- semuanya hilang (kecuali dalam raw_payload JSON yang tidak boleh
+  -- dicapai oleh laporan atau UI).
+  final_price         numeric(14, 2),
+  unit_price          numeric(14, 2),
+  quantity            numeric(14, 2),
+  sst_amount          numeric(14, 2),
+  discount_pct        numeric(8, 4),
+  total_incl_sst      numeric(14, 2),
+  total_excl_sst      numeric(14, 2),
+  account_manager     text,
+  pic_name            text,
+  pic_contact_no      text,
+  pic_email           text,
+  po_no               text,
+  quotation_ref       text,
+  payment_status_raw  text,
+  net_profit          numeric(14, 2),
+  commission          numeric(14, 2),
+  prepared_by         text,
+
   raw_payload         jsonb not null default '{}'::jsonb
 );
 

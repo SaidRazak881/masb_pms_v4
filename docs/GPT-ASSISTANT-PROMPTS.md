@@ -56,7 +56,9 @@ dashboard **Super Admin** (`saidrazak881@gmail.com`) di `/admin/users`.
 | D + E diluluskan + audit warisan (X1–X5) — ~~D: manual pengguna~~ **DIBATALKAN, D dikembalikan kepada ChatGPT** | `docs/PROMPT-6D-AUTH-VERCEL-LEGACY.md` |
 | E diluluskan (dinyahganding dari D) + Y1–Y4 — **E=0/9, Production masih Fasa 5; Production Branch kena tukar MANUAL oleh pengguna** | `docs/PROMPT-6E-VERCEL-PRODUCTION-PRIVATE-HAS-ROLE.md` |
 | E + baki D + Z1–Z5 — **Z 🟢 selesai (governance lock SELAMAT; kecacatan repo ditemui: tiada trigger updated_at). E=0/9: ChatGPT sudah cuba 2× dan namakan operasi yang tiada → Production Branch kini tugas pengguna** | `docs/PROMPT-6F-AUDIT-PRIVATE-SCHEMA-DRIFT.md` |
-| **🟢 PROMPT AKTIF — HARD GATE DIBUKA oleh pengguna (2026-09-04):** pasang `updated-at-triggers.sql` (G1–G3) + REVOKE tulis 3 jadual warisan (H1–H3) + laporan I1–I2 | **`docs/PROMPT-6G-UPDATED-AT-AND-REVOKE.md`** |
+| ✅ **SELESAI (2026-09-04)** — pasang `updated-at-triggers.sql` (G1 **12/12**, G2 **0**, G3 berubah) + REVOKE tulis 3 jadual warisan (H3 **6/6** hanya SELECT) + I1–I2. Mengandungi **2 pembetulan ChatGPT terhadap kriteria Arena** | **`docs/PROMPT-6G-UPDATED-AT-AND-REVOKE.md`** |
+| 🟡 **MENUNGGU KELULUSAN PENGGUNA (HARD GATE)** — pasang `fix-field-mapping.sql` (23 lajur) + ganti RPC `sync_import_transaction` (kriteria J1–J10). Betulkan §4.1–4.4: `trainer`→`account_manager`, syarikat→`pic_name`, SST jadi amaun (ralat 13.5×), `unique_violation` gagalkan batch | **`docs/PROMPT-7A-FIX-FIELD-MAPPING.md`** |
+| 📋 **Analisis jurang** — 4 domain perniagaan tiada (quotation, pipeline/funnel, P&L/aging, tugasan) + kecacatan pemetaan. 4 keputusan pengguna direkodkan | `docs/GAP-ANALYSIS-FUNGSI-BELUM-ADA.md` |
 | **PROMPT AKTIF: E1–E9 kriteria tepat** — Production Branch DISAHKAN bertukar (commit `ac05871` == hujung branch). `/admin/users` 200 + kandungan `/login` ialah **LULUS** (redirect diikuti) | **`docs/PROMPT-6H-E1-E9-PRECISE-CRITERIA.md`** |
 | Senarai semak ujian manual (log masuk, pendaftaran, kelulusan, sekatan, reset, regresi) | **`docs/ACTION-6-UAT-AUTH-USERS.md`** |
 | Urutan pemasangan SQL penuh (10 fail) | `docs/SETUP-SUPABASE.md` |

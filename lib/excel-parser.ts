@@ -48,7 +48,9 @@ export type ParseWarningCode =
   | "DUPLICATE_SUSPECTED"
   | "DUPLICATE_REF"
   | "UNMAPPED_SHEET"
-  | "NO_DATA";
+  | "NO_DATA"
+  /** Baris amaun tanpa pengecam — kemungkinan baris JUMLAH (GAP-ANALISIS). */
+  | "UNIDENTIFIED_AMOUNT_ROW";
 
 export interface FieldWarning {
   code: ParseWarningCode;
@@ -95,6 +97,29 @@ export interface StagingRecord {
   mode: string;
   status: string;
   description: string;
+
+  // ---- Data kewangan terperinci (GAP-ANALISIS §3.1, §4.1–4.3) ----
+  /** Nilai muktamad (selepas diskaun, termasuk SST). Keutamaan amaun #1. */
+  finalPrice: number | null;
+  unitPrice: number | null;
+  quantity: number | null;
+  /** Amaun CUKAI. TIDAK PERNAH digunakan sebagai amaun rekod. */
+  sstAmount: number | null;
+  discountPct: number | null;
+  totalInclSst: number | null;
+  totalExclSst: number | null;
+  accountManager: string;
+  /** Individu bertanggungjawab — BUKAN nama syarikat pelanggan. */
+  picName: string;
+  picContactNo: string;
+  picEmail: string;
+  poNo: string;
+  /** Nombor sebut harga yang dirujuk oleh invois ini (lajur "Quotation"). */
+  quotationRef: string;
+  paymentStatus: string;
+  netProfit: number | null;
+  commission: number | null;
+  preparedBy: string;
 
   // ---- Pengesahan & keputusan ----
   isValid: boolean;
@@ -164,7 +189,28 @@ type CanonicalField =
   | "trainer"
   | "mode"
   | "status"
-  | "description";
+  | "description"
+  // ---- Medan kewangan (GAP-ANALYSIS §4.1–4.3) ----
+  // Diperkenalkan kerana lajur perniagaan sebenar dalam V4 RAW tidak
+  // pernah ditangkap; akibatnya `trainer` ditulis ke `account_manager`
+  // dan `client_name` (syarikat) ditulis ke `pic_name` (individu).
+  | "finalPrice"
+  | "unitPrice"
+  | "quantity"
+  | "sstAmount"
+  | "discountPct"
+  | "totalInclSst"
+  | "totalExclSst"
+  | "accountManager"
+  | "picName"
+  | "picContactNo"
+  | "picEmail"
+  | "poNo"
+  | "quotationRef"
+  | "paymentStatus"
+  | "netProfit"
+  | "commission"
+  | "preparedBy";
 
 const CANONICAL_FIELDS: CanonicalField[] = [
   "programmeTitle",
@@ -178,6 +224,23 @@ const CANONICAL_FIELDS: CanonicalField[] = [
   "mode",
   "status",
   "description",
+  "finalPrice",
+  "unitPrice",
+  "quantity",
+  "sstAmount",
+  "discountPct",
+  "totalInclSst",
+  "totalExclSst",
+  "accountManager",
+  "picName",
+  "picContactNo",
+  "picEmail",
+  "poNo",
+  "quotationRef",
+  "paymentStatus",
+  "netProfit",
+  "commission",
+  "preparedBy",
 ];
 
 /**
@@ -242,11 +305,16 @@ const FIELD_ALIASES: Record<CanonicalField, string[]> = {
     "nombor rujukan",
   ],
   referenceType: [
-    "type",
+    // "type" dan "jenis" BARE sengaja TIDAK disenaraikan: ia merampas
+    // lajur "Quotation Type" / "Training Type" (Quotation Tracker) dan
+    // lajur "Type" (R3 Funnel = nama unit, cth. "MIMOS Academy").
+    // Lihat GAP-ANALYSIS §4.
     "document type",
-    "jenis",
+    "doc type",
     "jenis dokumen",
     "category type",
+    "reference type",
+    "jenis rujukan",
   ],
   amount: [
     "amount",
@@ -305,6 +373,151 @@ const FIELD_ALIASES: Record<CanonicalField, string[]> = {
     "nama jurulatih",
     "penceramah",
     "pembekal",
+  ],
+  finalPrice: [
+    "final price",
+    "harga muktamad",
+    "harga akhir",
+    "final amount",
+    "net price",
+  ],
+  unitPrice: [
+    "unit price",
+    "harga seunit",
+    "harga unit",
+    "rate per unit",
+    "price per unit",
+  ],
+  quantity: [
+    "no of unit",
+    "number of unit",
+    "qty",
+    "quantity",
+    "bilangan unit",
+    "kuantiti",
+    "no of pax",
+    "number of pax",
+  ],
+  sstAmount: [
+    "sst 8% amount",
+    "sst amount",
+    "sst 8",
+    "sst",
+    "tax amount",
+    "amount of sst",
+    "cukai",
+    "jumlah sst",
+    "amaun sst",
+  ],
+  discountPct: [
+    "discount",
+    "discount %",
+    "diskaun",
+    "diskaun %",
+    "discount percentage",
+  ],
+  totalInclSst: [
+    "total price with sst 8",
+    "total price with sst",
+    "total with sst",
+    "total incl sst",
+    "total including sst",
+    "jumlah termasuk sst",
+  ],
+  totalExclSst: [
+    "total price without sst",
+    "total without sst",
+    "total excl sst",
+    "total excluding sst",
+    "jumlah tanpa sst",
+  ],
+  accountManager: [
+    "account manager",
+    "am name",
+    "sales manager",
+    "pengurus akaun",
+    "pengurus jualan",
+  ],
+  picName: [
+    "pic - full name",
+    "pic full name",
+    "pic name",
+    "pic",
+    "person in charge",
+    "contact person",
+    "nama pic",
+  ],
+  picContactNo: [
+    "pic - contact no",
+    "pic contact no",
+    "pic contact",
+    "contact no",
+    "contact number",
+    "phone",
+    "telefon",
+    "no telefon",
+  ],
+  picEmail: [
+    "pic - email add",
+    "pic email",
+    "email add",
+    "e mail",
+    "emel",
+  ],
+  poNo: [
+    "po no",
+    "po number",
+    "po",
+    "purchase order",
+    "purchase order no",
+    "no po",
+    "nombor po",
+  ],
+  quotationRef: [
+    // Lajur "Quotation" dalam invoice_2026.xlsx / R1 Invoice sheet: ia
+    // merujuk NOMBOR SEBUT HARGA yang invois ini bilakan, dan BERBEZA
+    // daripada lajur "Invoice No". Tanpa medan ini, invoices.quotation_no
+    // tidak pernah diisi untuk import invois, jadi
+    // idx_invoices_quotation_no_unique boleh dilanggar (GAP-ANALISIS §4.4).
+    //
+    // SENGAJA hanya padanan TEPAT disenaraikan. Versi awal turut ada
+    // "quotation ref" / "quotation reference", dan itu merampas lajur
+    // "Training Type" dalam Quotation Tracker:
+    //     a = "quotation ref" ; h = "training type"
+    //     a.includes(h) → "quotation training type".includes("training type")
+    //     → true → skor 70 → quotationRef = "Training" (SALAH)
+    //
+    // "quotation no" juga TIDAK disenaraikan — ia milik referenceNo, supaya
+    // sheet sebut harga tidak kehilangan rujukan utamanya.
+    "quotation",
+    "rujukan quotation",
+    "quotation number billed",
+  ],
+  paymentStatus: [
+    "payment status",
+    "status pembayaran",
+    "status bayaran",
+    "payment state",
+  ],
+  netProfit: [
+    "net profit",
+    "profit",
+    "untung bersih",
+    "keuntungan bersih",
+    "net margin",
+  ],
+  commission: [
+    "commission",
+    "komisen",
+    "bro incentive",
+    "incentive",
+    "insentif",
+  ],
+  preparedBy: [
+    "prepared by",
+    "disediakan oleh",
+    "provider",
+    "issuer",
   ],
   mode: [
     "mode",
@@ -401,6 +614,21 @@ function tokenSimilarity(a: string, b: string): number {
   return inter / union;
 }
 
+/**
+ * Sama ada `phrase` muncul dalam `text` mengikut SEMPADAN PERKATAAN.
+ *
+ * Diperlukan kerana `String.includes` ialah padanan subrentetan tulen:
+ * `"notes".includes("no") === true`, yang menyebabkan lajur urutan "No"
+ * dirampas oleh alias "notes" (medan `description`). Kedua-dua `text` dan
+ * `phrase` dijangka sudah dinormalisasi oleh `normalizeText` (huruf kecil,
+ * bukan-alfanumerik → ruang).
+ */
+function containsPhrase(text: string, phrase: string): boolean {
+  if (!text || !phrase) return false;
+  const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|\\s)${escaped}($|\\s)`).test(text);
+}
+
 /** Skor pemadanan pengepala lajur → medan kanonik. */
 function scoreHeader(
   header: string,
@@ -420,11 +648,28 @@ function scoreHeader(
       continue;
     }
     // Alias terkandung dalam pengepala (atau sebaliknya).
-    // Syarat: alias cukup panjang (≥4 aksara) atau berbilang perkataan
-    // — elak perkataan pendek generik (cth. "kos", "rm") menembusi
-    // pengepala lain seperti "Tarikh Sebut Harga".
+    //
+    // DUA syarat, dan kedua-duanya perlu:
+    //
+    // (i) `substantial` — alias cukup panjang (≥4 aksara) atau berbilang
+    //     perkataan. Elak perkataan pendek generik (cth. "kos", "rm")
+    //     menembusi pengepala lain seperti "Tarikh Sebut Harga".
+    //
+    // (ii) `containsPhrase` — padanan mesti mengikut SEMPADAN PERKATAAN.
+    //     SYARAT INI DITAMBAH kerana (i) sahaja tidak mencukupi: ia
+    //     mengawal panjang ALIAS tetapi membenarkan pengepala PENDEK
+    //     menembusi alias panjang. Bukti nyata:
+    //         a = "notes" (6 aksara → substantial = true)
+    //         h = "no"
+    //         "notes".includes("no") === true  → skor 70
+    //     Akibatnya lajur urutan "No" dalam Quotation Tracker dipetakan ke
+    //     `description`, menjadikan description = "285" (nombor urutan),
+    //     yang kemudiannya lulus pemeriksaan `hasData` dan mencipta 14
+    //     REKOD HANTU (baris 286–299, semua lajur lain kosong).
+    //     Kes sama: "po no", "no of unit", "pic - contact no" dan
+    //     "quotation no" semuanya turut menuntut lajur "No" dengan skor 70.
     const substantial = a.length >= 4 || a.includes(" ");
-    if (substantial && (h.includes(a) || a.includes(h))) {
+    if (substantial && containsPhrase(h, a)) {
       best = Math.max(best, 70);
     }
     // Pertindihan token.
@@ -480,13 +725,58 @@ function buildColumnMapping(
     if (!header) return;
     const h = normalizeText(header);
 
+    // Pengepala urutan tulen ("No", "No.", "Bil", "#") BUKAN medan data.
+    // Tanpa pengawal ini lajur tersebut dirampas oleh poNo / quantity /
+    // picContactNo / referenceNo / description, semuanya pada skor 70.
+    // Pengecualian: "PO No", "Invoice No", "Quotation No", "No of Unit"
+    // dan seumpamanya KEKAL dipetakan kerana ia mengandungi perkataan lain.
+    if (/^(no|nombor|bil|bilangan|number|num|#)$/.test(h)) return;
+
+    // Pengawal GAP-ANALISIS §4.1: lajur CUKAI / DISKAUN tidak boleh
+    // menjadi `amount`. Tanpa pengawal ini, "SST 8% Amount" menang dengan
+    // skor 115 (padanan tepat "amount" + bonus) dan nilai cukai RM1,555.56
+    // disimpan sebagai nilai sebut harga yang sepatutnya RM21,000.
+    const isTaxOrDiscountCol =
+      /\bsst\b|\btax\b|cukai|diskaun|discount|deposit|downpayment|down payment/.test(h);
+    // Lajur JENIS/KATEGORI bukan rujukan dokumen. Tanpa pengawal ini
+    // "Quotation Type" dirampas oleh quotationRef (containment "quotation",
+    // skor 70) setelah referenceNo memenangi "Quotation No" (skor 100),
+    // menyebabkan quotationRef = "Training" untuk 118 rekod.
+    const isTypeOrCategoryCol =
+      /\btype\b|\bjenis\b|\bcategory\b|\bkategori\b|\bclass\b/.test(h);
+
     for (const field of allowedFields) {
-      const { score } = scoreHeader(header, FIELD_ALIASES[field]);
+      let { score } = scoreHeader(header, FIELD_ALIASES[field]);
       if (score < 35) continue;
 
+      if (field === "amount" && isTaxOrDiscountCol) {
+        score = 0;
+        continue;
+      }
+      if (field === "quotationRef" && isTypeOrCategoryCol) {
+        score = 0;
+        continue;
+      }
+
       let bonus = 0;
-      if (field === "amount" && /\(rm\)|\brm\b|\$|%|amount|amaun|jumlah|nilai/.test(h)) {
+      if (field === "amount" && !isTaxOrDiscountCol
+          && /\(rm\)|\brm\b|\$|amount|amaun|jumlah|nilai/.test(h)) {
+        // `%` dikeluarkan daripada isyarat bonus: ia menarik "Discount %"
+        // dan "SST 8%" ke arah `amount`.
         bonus += 15;
+      }
+      // `finalPrice` ialah nilai muktamad yang sepatutnya menjadi amaun
+      // utama sebut harga — beri bonus supaya ia menang apabila wujud.
+      if (field === "finalPrice") bonus += 12;
+      // Nyahkabur "Quotation" mengikut JENIS ENTITI:
+      //  - sheet INVOICE/COST: lajur "Quotation" ialah rujukan silang ke
+      //    sebut harga asal → quotationRef mesti menang.
+      //  - sheet QUOTATION: lajur "Quotation No" ialah rujukan UTAMA →
+      //    referenceNo mesti menang, jadi TIADA bonus diberi.
+      // Tanpa pembezaan ini kedua-dua medan seri pada skor 100 dan
+      // pemenang dipilih mengikut susunan medan, bukan maksud lajur.
+      if (field === "quotationRef" && kind !== "quotation" && /^quotation$/.test(h)) {
+        bonus += 25;
       }
       if (field === "referenceNo" && /no|ref|number|nombor|bil\.?/.test(h)) {
         bonus += 10;
@@ -652,6 +942,14 @@ function looksLikeHeaderRow(
   );
   let hits = 0;
   let dataLike = 0;
+  /**
+   * Bilangan sel yang BERTIPE data (nombor atau Date). Berbeza daripada
+   * `dataLike`, yang juga mengira sel TEKS yang tidak memadankan sebarang
+   * alias. Pembezaan ini penting: header sheet lebar mempunyai BANYAK sel
+   * teks yang tidak dipetakan ("Quotation Type", "Training Type", "Duration
+   * - Days", "% Profit", "BRO Incentive") tetapi SIFAR sel nombor/tarikh.
+   */
+  let typedData = 0;
 
   for (const cell of row) {
     const raw = String(cell ?? "").trim();
@@ -659,6 +957,7 @@ function looksLikeHeaderRow(
 
     if (cell instanceof Date || typeof cell === "number") {
       dataLike++;
+      typedData++;
       continue;
     }
 
@@ -683,7 +982,37 @@ function looksLikeHeaderRow(
     else dataLike++;
   }
 
-  return hits >= 2 && hits > dataLike;
+  // GAP-ANALISIS §4.6 — dua kecacatan berbeza, dua pengawal berbeza:
+  //
+  // (a) Syarat asal `hits > dataLike` terlalu KETAT untuk sheet lebar.
+  //     cost_of_sales_2026.xlsx ada 16 lajur tetapi hanya 6 dipetakan ke
+  //     model data (10 lajur kewangan tidak dikenali) → 6 > 10 = false →
+  //     header tidak pernah dikesan → 23 baris dibuang SECARA SENYAP.
+  //     Dilonggarkan kepada `hits >= 4`.
+  //
+  // (b) Tetapi kelonggaran itu SAHAJA tidak cukup — ia memperkenalkan
+  //     regresi: baris DATA pertama Quotation Tracker
+  //     [1, 2025-12-18, "Training", "Training", "MSSB/QT/TRA/2026/0001",
+  //      "Public Training", "KENANGA INVESTOR BERHAD", ...]
+  //     turut lulus sebagai header, kerana "Training" ≈ "Training Type",
+  //     "MSSB/QT/..." mengandungi "QT NO", dan "KENANGA INVESTOR BERHAD"
+  //     mengandungi "INVESTOR". Akibatnya nama lajur diambil daripada
+  //     NILAI DATA dan semua 266 rekod rosak.
+  //     Pengawalnya: baris header sebenar TIDAK mengandungi sel nombor
+  //     atau Date, jadi `typedData <= 1`. PERHATIAN: pengawal ini mesti
+  //     guna `typedData`, BUKAN `dataLike` — `dataLike` turut mengira sel
+  //     teks yang tidak dipetakan, dan header sheet lebar ada banyak
+  //     daripadanya (Quotation Tracker: 49 lajur, hanya ~25 dipetakan),
+  //     jadi `dataLike <= 1` menolak header yang sah dan menghasilkan
+  //     0 rekod. Kesilapan ini dibuat dan dibetulan semasa kerja ini.
+  //
+  // Nota: kecacatan (b) SEBENARNYA sudah ada dalam parser asal — bukti:
+  // label `raw` yang asal ("SST 8% Amount", "Company/Client", "Project
+  // Title", "Status", "Date", "Quotation No", "No") semuanya ialah NILAI
+  // baris 1, bukan nama lajur baris 0. Parser asal juga mengambil baris
+  // data sebagai header; ia cuma menghasilkan amaun yang kelihatan masuk
+  // akal (RM1,555.56) jadi tiada siapa perasan.
+  return hits >= 2 && typedData <= 1 && (hits > dataLike || hits >= 4);
 }
 
 /* ==================== Pengekstrakan nilai sel ==================== */
@@ -944,7 +1273,15 @@ function extractRecord(
     return "";
   };
 
-  const amount = parseAmount(get("amount"));
+  // Keutamaan amaun (GAP-ANALISIS §4.1): nilai MUKTAMAD dahulu, kemudian
+  // jumlah termasuk SST, kemudian amaun generik, kemudian harga seunit.
+  // `amount` generik diletak TERAKHIR kerana ia paling kabur — dalam
+  // Quotation Tracker ia boleh bermakna apa sahaja.
+  const amount =
+    parseAmount(get("finalPrice")) ??
+    parseAmount(get("totalInclSst")) ??
+    parseAmount(get("amount")) ??
+    parseAmount(get("unitPrice"));
   const docDate = parseDateValue(get("docDate"));
   const programmeTitle = get("programmeTitle");
   const clientName = get("clientName");
@@ -976,6 +1313,23 @@ function extractRecord(
     mode: get("mode"),
     status: get("status"),
     description: get("description"),
+    finalPrice: parseAmount(get("finalPrice")),
+    unitPrice: parseAmount(get("unitPrice")),
+    quantity: parseAmount(get("quantity")),
+    sstAmount: parseAmount(get("sstAmount")),
+    discountPct: parseAmount(get("discountPct")),
+    totalInclSst: parseAmount(get("totalInclSst")),
+    totalExclSst: parseAmount(get("totalExclSst")),
+    accountManager: get("accountManager"),
+    picName: get("picName"),
+    picContactNo: get("picContactNo"),
+    picEmail: get("picEmail"),
+    poNo: get("poNo"),
+    quotationRef: get("quotationRef"),
+    paymentStatus: get("paymentStatus"),
+    netProfit: parseAmount(get("netProfit")),
+    commission: parseAmount(get("commission")),
+    preparedBy: get("preparedBy"),
     isValid: false,
     errors: [],
     warnings: [],
@@ -1049,13 +1403,50 @@ function parseSheet(
 
     const record = extractRecord(row, state, sourceFile, sheetName, i);
     // Rekod perlu mempunyai sekurang-kurangnya satu nilai bermakna.
-    const hasData =
+    //
+    // GAP-ANALISIS: syarat asal `record.amount !== null` menerima amount = 0
+    // sebagai "ada data". Akibatnya 14 BARIS HANTU di hujung Quotation
+    // Tracker (baris 286–299: hanya nombor urutan 285–298, semua lajur
+    // lain kosong) menjadi rekod staging dengan amount = 0.
+    //
+    // Dua kelas baris bukan-data yang perlu ditolak:
+    //
+    // (A) BARIS HANTU — Quotation Tracker baris 286–299 hanya ada nombor
+    //     urutan (285–298), semua lajur lain kosong. Sebelum pembetulan ini
+    //     ia menjadi 14 rekod dengan amount = 0. Punca asal: lajur "No"
+    //     dirampas oleh alias "notes" (≥ sempadan perkataan, kini dibetulkan
+    //     dalam `containsPhrase`), jadi description = "285" dan hasData lulus.
+    //
+    // (B) BARIS JUMLAH — Quotation Tracker baris 299 ada
+    //     `Final Price = 11,191,349.41` dan TIADA lajur lain. `isTotalRow`
+    //     tidak menangkapnya kerana ia menyemak sama ada teks bergabung
+    //     BERMULA dengan "total", sedangkan baris ini bermula dengan "1"
+    //     (nombor urutan). Sekiranya disegerakkan, ia mencipta SATU rekod
+    //     quotation hantu bernilai RM 11.19 juta — menggembungkan setiap
+    //     laporan kewangan dan dashboard.
+    //
+    // Peraturan: rekod mesti ada PENGECAM (tajuk / pelanggan / rujukan /
+    // keterangan). Amaun tanpa pengecam ialah baris jumlah atau baris
+    // kosong yang mengandungi formula. Sebut harga bernilai sifar yang SAH
+    // masih diterima kerana ia ada referenceNo (cth. MASB/QT/TRA/2026/0055)
+    // — 22 rekod sedemikian wujud dan telah disahkan menentang Excel.
+    const hasIdentifier =
       record.programmeTitle ||
       record.clientName ||
       record.referenceNo ||
-      record.amount !== null ||
       record.description;
-    if (hasData) records.push(record);
+    if (hasIdentifier) records.push(record);
+    else if (record.amount !== null && record.amount !== 0) {
+      // Amaun yang besar tanpa pengecam — lapor, jangan telan senyap.
+      record.warnings.push({
+        code: "UNIDENTIFIED_AMOUNT_ROW",
+        message:
+          `Baris ${record.rowNumber}: amaun ${record.amount} dijumpai tanpa ` +
+          `pelanggan/rujukan/tajuk — kemungkinan baris JUMLAH. Baris ini ` +
+          `tidak disimpan sebagai rekod.`,
+        field: "amount",
+      });
+    }
   }
 
   return records;
@@ -1190,6 +1581,26 @@ export interface ImportStagingRow {
   delivery_mode: string;
   status_raw: string;
   description: string;
+  // ---- Medan perniagaan (GAP-ANALISIS §4.1–4.3) ----
+  final_price: number | null;
+  unit_price: number | null;
+  quantity: number | null;
+  /** Amaun CUKAI. TIDAK PERNAH menjadi amaun rekod. */
+  sst_amount: number | null;
+  discount_pct: number | null;
+  total_incl_sst: number | null;
+  total_excl_sst: number | null;
+  account_manager: string;
+  /** Individu bertanggungjawab — BUKAN nama syarikat pelanggan. */
+  pic_name: string;
+  pic_contact_no: string;
+  pic_email: string;
+  po_no: string;
+  quotation_ref: string;
+  payment_status_raw: string;
+  net_profit: number | null;
+  commission: number | null;
+  prepared_by: string;
   is_valid: boolean;
   validation_errors: string[];
   warnings: string[];
@@ -1220,6 +1631,23 @@ export function toStagingRows(
     delivery_mode: r.mode,
     status_raw: r.status,
     description: r.description,
+    final_price: r.finalPrice,
+    unit_price: r.unitPrice,
+    quantity: r.quantity,
+    sst_amount: r.sstAmount,
+    discount_pct: r.discountPct,
+    total_incl_sst: r.totalInclSst,
+    total_excl_sst: r.totalExclSst,
+    account_manager: r.accountManager,
+    pic_name: r.picName,
+    pic_contact_no: r.picContactNo,
+    pic_email: r.picEmail,
+    po_no: r.poNo,
+    quotation_ref: r.quotationRef,
+    payment_status_raw: r.paymentStatus,
+    net_profit: r.netProfit,
+    commission: r.commission,
+    prepared_by: r.preparedBy,
     is_valid: r.isValid,
     validation_errors: r.errors.map((e) => e.message),
     warnings: r.warnings.map((w) => w.message),
