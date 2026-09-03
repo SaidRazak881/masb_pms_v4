@@ -53,7 +53,8 @@ dashboard **Super Admin** (`saidrazak881@gmail.com`) di `/admin/users`.
 | Prompt GPT untuk pasang SQL Fasa 6 + tukar Production Branch Vercel | **`docs/PROMPT-6-INSTALL-USER-MANAGEMENT.md`** |
 | **Blocker C13** — `has_role()` live tidak sedar `super_admin` | **`docs/PROMPT-6B-FIX-C13-HAS-ROLE.md`** |
 | **V3 dibetulkan** + audit **3** jadual warisan (read-only) | **`docs/PROMPT-6C-AUDIT-LEGACY-TABLES.md`** |
-| **D + E diluluskan** + penutup audit warisan (X1–X5 read-only) | **`docs/PROMPT-6D-AUTH-VERCEL-LEGACY.md`** |
+| D + E diluluskan + audit warisan (X1–X5) — **D digantikan: manual pengguna** | `docs/PROMPT-6D-AUTH-VERCEL-LEGACY.md` |
+| **E DILULUSKAN SEKARANG** (dinyahganding dari D) + Y1–Y4 kenal pasti `private.has_role()` | **`docs/PROMPT-6E-VERCEL-PRODUCTION-PRIVATE-HAS-ROLE.md`** |
 | Senarai semak ujian manual (log masuk, pendaftaran, kelulusan, sekatan, reset, regresi) | **`docs/ACTION-6-UAT-AUTH-USERS.md`** |
 | Urutan pemasangan SQL penuh (10 fail) | `docs/SETUP-SUPABASE.md` |
 | Konteks struktur sistem untuk GPT | `docs/CODEBASE-MAP.md` (Bahagian 8) |

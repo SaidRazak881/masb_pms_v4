@@ -1,5 +1,23 @@
 # PROMPT 6D — KELULUSAN D + E, dan penutup audit warisan (X1–X5)
 
+> **⚠️ DIGANTIKAN SEBAHAGIAN oleh `docs/PROMPT-6E-VERCEL-PRODUCTION-PRIVATE-HAS-ROLE.md`**
+> 
+> Laporan ChatGPT untuk prompt ini menunjukkan **connector sesi tiada operasi
+> untuk Supabase Auth configuration**, jadi **Langkah D mustahil dijalankan oleh
+> mana-mana alat**. ChatGPT berhenti dengan betul dan enggan mereka nilai.
+> 
+> Akibatnya:
+> - **Langkah D** → dipindahkan kepada **pengguna** (manual, Supabase Dashboard).
+>   Senarai semak ada dalam PROMPT-6E §3 dan nota akhirnya.
+> - **Langkah E** → **dinyahganding** dari D dan diluluskan dalam **PROMPT-6E**.
+>   Gate "D sebelum E" Arena ialah kesilapan proses: ia menyekat pemulihan
+>   produksi kerana sebab yang tidak berkaitan.
+> - **X1–X5** → X4/X5 berjaya (bukti digunakan dalam PROMPT-6E §6). X1 tidak
+>   lengkap; X2/X3 dihalang kerana bergantung kepada `pg_proc.prosrc` dan
+>   pelaksanaan fungsi. Digantikan oleh **Y1–Y4** (panduan katalog sahaja).
+> 
+> **Dokumen ini dikekalkan sebagai rekod.** Jangan jalankan semula.
+
 > **Persona kamu:** Jurutera pangkalan data yang teliti dan berhati-hati
 > (`docs/personas/PERSONA-SQL-ARCHITECT.md`).
 >
