@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-03 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: 9f353f4 Fasa 6: PROMPT-6F (Z1-Z5) - 4 fungsi private.* pra-repo tidak pernah diaudit · arena/01a06274-masb-pms-v4
+> Git: 88902c8 Fasa 6: PROMPT-6F disusun semula - E + baki D + Z SEMUA kerja ChatGPT · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 
@@ -151,6 +151,10 @@
 ### `lib/supabase/sync-import-transaction.sql`
 - **Fungsi/RPC:** append_import_audit, sync_import_transaction
 
+### `lib/supabase/updated-at-triggers.sql`
+- **Fungsi/RPC:** set_updated_at
+- **Trigger:** set_updated_at
+
 ### `lib/supabase/user-management.sql`
 - **Jadual:** app_settings
 - **Enum:** account_status
@@ -215,6 +219,7 @@
 - `PROMPT-6D-AUTH-VERCEL-LEGACY.md`
 - `PROMPT-6E-VERCEL-PRODUCTION-PRIVATE-HAS-ROLE.md`
 - `PROMPT-6F-AUDIT-PRIVATE-SCHEMA-DRIFT.md`
+- `PROMPT-6G-UPDATED-AT-AND-REVOKE.md`
 - `PROMPT-TEMPLATE-FASA.md`
 - `SETUP-SUPABASE.md`
 - `SKILLS.md`

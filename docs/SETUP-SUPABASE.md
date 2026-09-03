@@ -42,6 +42,13 @@ berikut **SATU PER SATU mengikut urutan**:
 | 4 | `lib/supabase/governance-lock.sql` | Modul Governance: lock/unlock, `programme_unlock_requests`, RPC `request_programme_unlock`, `review_programme_unlock`, `lock_programme` |
 | 5 | `lib/supabase/change-requests.sql` | Modul Change Requests: jadual `change_requests`, RPC `submit_change_request`, `review_change_request`, `cancel_change_request` |
 | 6 | `lib/supabase/fix-rls-recursion.sql` | **WAJIB** — betulkan RLS infinite recursion pada `user_profiles` (ganti subquery dengan `has_role()` SECURITY DEFINER) |
+
+> **Fasa 6G — `lib/supabase/updated-at-triggers.sql`:** repo mencipta kolum
+> `updated_at` pada 10 jadual rasmi tetapi tidak pernah mencipta trigger.
+> Fail ini mencipta `public.set_updated_at()` dan 12 trigger, menggantikan
+> `private.set_updated_at()` pra-repo. **Wajib untuk pemasangan bersih** —
+> tanpanya `updated_at` tidak pernah dikemas kini. Idempoten.
+
 | 7 | `lib/supabase/fix-add-programme-categories.sql` | Tambah kategori `Room Rental`, `Consultancy`, `Certification` ke enum |
 | 8 | `lib/supabase/user-management.sql` | **Fasa 6** — enum `super_admin` + `account_status`, kolum `must_change_password`, RPC `admin_*`, trigger `on_auth_user_created`, column-level GRANT, reset semua kata laluan ke `masb.12345` |
 | 9 | `lib/supabase/seed-v4-raw.sql` | (PILIHAN) Data awal dari V4 RAW |
