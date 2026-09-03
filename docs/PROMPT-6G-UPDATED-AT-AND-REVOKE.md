@@ -1,20 +1,28 @@
 # PROMPT 6G — Pasang `updated-at-triggers.sql` + REVOKE privilej tulis jadual warisan
 
-> ## ⏸️ STATUS: **DITANGGUH oleh pengguna (2026-09-04)** — JANGAN JALANKAN
+> ## 🟢 STATUS: **DILULUSKAN oleh pengguna (2026-09-04)** — SILA JALANKAN
 >
 > Fasa 6 telah **SELESAI dan disahkan di Production** (E1–E9 = 9/9 PASS,
-> UAT A–K semua lulus). Pengguna memutuskan untuk **menangguhkan** prompt ini.
+> UAT A–K semua lulus). Prompt ini pada mulanya **ditangguhkan** oleh pengguna,
+> kemudian **DILULUSKAN** pada tarikh yang sama. **HARD GATE sudah dibuka —
+> §2 dan §3 boleh dijalankan sekarang.**
+>
+> **Pengesahan kandungan masih sah:** blob SHA
+> `lib/supabase/updated-at-triggers.sql` = `5254fd84cdaba647495e9ef60fe41b06b8348d50`
+> — **tidak berubah** sejak ia diuji (`scripts/test-updated-at-triggers.mjs`
+> 13/13, `scripts/test-prompt-6g-revoke.mjs` 8/8). Tiada suntingan kandungan
+> dibuat semasa pengaktifan semula ini; hanya banner status.
 >
 > **Keputusan pengguna yang berkaitan (2026-09-04):**
 > | Perkara | Keputusan |
 > | ------- | --------- |
-> | PROMPT-6G (hardening SQL) | ⏸️ **TANGGUH** |
-> | Pembersihan sisa pra-repo (4 fungsi `private.*`, 3 jadual warisan, 8 polisi) | ⏸️ **BIARKAN** — selepas penilaian risiko Arena, pengguna setuju ia bukan risiko aktif |
+> | PROMPT-6G (hardening SQL) | 🟢 **DILULUSKAN** (pada mulanya TANGGUH, kemudian diluluskan pada 2026-09-04) |
+> | **DROP** sisa pra-repo (4 fungsi `private.*`, 3 jadual warisan, 8 polisi) | ⏸️ **KEKAL DITANGGUH** — pengguna setuju ia bukan risiko aktif. **§2 dan §3 TIDAK drop apa-apa**, jadi ia selaras dengan keputusan ini |
 > | Rollout 19 pengguna | ✅ Pengguna maklumkan sendiri, tiada tindakan teknikal |
 > | D1 `Confirm email` | ✅ **OFF** |
 > | Akaun ujian dari UAT D4 | ✅ **SEKAT** melalui UI Super Admin |
 >
-> ### ⚠️ Akibat penangguhan yang MESTI diketahui
+> ### ⚠️ Keadaan SEMASA live (sebelum §2/§3 dijalankan) — inilah yang prompt ini betulkan
 >
 > **`lib/supabase/updated-at-triggers.sql` wujud dalam repo tetapi TIDAK
 > dipasang di live.** Jadi:
@@ -33,10 +41,18 @@
 >   membuktikan tiada fungsi atau polisi Fasa 6 membaca jadual ini), tetapi
 >   ia permukaan yang tidak perlu dan **masih terbuka**.
 >
-> **Jika prompt ini diaktifkan semula kelak, kandungannya masih sah dan tidak
-> perlu diubah** — semua query sudah diuji (`scripts/test-updated-at-triggers.mjs`
-> 13/13, `scripts/test-prompt-6g-revoke.mjs` 8/8). Satu perkara sahaja perlu
-> disemak semula: jawapan I1/I2 mungkin mengubah analisis `validate_programme_lock`.
+> **Selepas §2/§3 dijalankan**, keadaan di atas akan berubah:
+> - 12 jadual → `public.set_updated_at()`, **0** rujukan `private.set_updated_at()`
+> - `private.set_updated_at()` menjadi **yatim** (tetapi **TIDAK** di-drop)
+> - 3 jadual warisan → `authenticated`/`anon` hanya ada **SELECT**
+>
+> **Nota G3:** pengguna **sudah log masuk** semasa UAT, jadi `user_profiles`
+> kini ada sekurang-kurangnya 1 baris. G3 akan memberi bukti yang bermakna
+> (sebelum ini ia berisiko mengembalikan `NULL` dan tidak membuktikan apa-apa).
+>
+> **Di luar skop prompt ini (tugas pengguna melalui UI, bukan ChatGPT):**
+> - **D1** `Confirm email` = **OFF** (Supabase Dashboard → Auth → Providers → Email)
+> - **Sekat akaun ujian** dari UAT D4 (`/admin/users` → butang **Sekat**)
 
 > **⛔ HARD GATE — prompt ini hanya boleh dijalankan SELEPAS pengguna memberi
 > kelulusan eksplisit.** Ia mengandungi **live SQL** (DDL + REVOKE), yang

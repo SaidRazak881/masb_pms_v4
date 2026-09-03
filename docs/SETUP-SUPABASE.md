@@ -43,8 +43,8 @@ berikut **SATU PER SATU mengikut urutan**:
 | 5 | `lib/supabase/change-requests.sql` | Modul Change Requests: jadual `change_requests`, RPC `submit_change_request`, `review_change_request`, `cancel_change_request` |
 | 6 | `lib/supabase/fix-rls-recursion.sql` | **WAJIB** — betulkan RLS infinite recursion pada `user_profiles` (ganti subquery dengan `has_role()` SECURITY DEFINER) |
 
-> **⚠️ STATUS LIVE (2026-09-04): fail 6G DITANGGUH oleh pengguna — ia BELUM
-> dipasang di live.** Projek live `lmenmfsbjgxfhnykkgow` masih bergantung kepada
+> **🟢 STATUS (2026-09-04): fail 6G DILULUSKAN oleh pengguna — pemasangan di
+> live sedang dijalankan melalui PROMPT-6G.** Projek live `lmenmfsbjgxfhnykkgow` masih bergantung kepada
 > `private.set_updated_at()` pra-repo untuk 5 jadual + `profiles`, dan 6 jadual
 > rasmi lain (`app_settings`, `cost_items`, `financial_docs`, `organizers`,
 > `programme_documents`, `user_profiles`) mempunyai kolum `updated_at` yang
