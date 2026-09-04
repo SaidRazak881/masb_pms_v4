@@ -51,81 +51,21 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { PGlite } from '@electric-sql/pglite';
 
+import {
+  UID, STAFF, PROFIL_TAMBAHAN_LIVE, binaFixture, pasangLangkah,
+} from './lib/fixture-live.mjs';
+
+// Fixture (UID, STAFF, PROFIL_TAMBAHAN_LIVE, bootstrap, pengawal kesetaraan)
+// kini tinggal di `scripts/lib/fixture-live.mjs` — SATU takrifan dikongsi oleh
+// semua penjana rekonsiliasi. Sebab: DP-14.2 berlaku kerana fixture tidak
+// setara live; dua fixture yang diselenggara berasingan akan drift antara satu
+// sama lain dan kedua-duanya kelihatan "lulus".
 const SQL_FILE = 'lib/supabase/client-master.sql';
 const OUT = 'docs/PROMPT-8A3-L1-REKONSILIASI.md';
 const BRANCH = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'],
   { encoding: 'utf8' }).trim();
 const REPO = execFileSync('git', ['remote', 'get-url', 'origin'], { encoding: 'utf8' })
   .trim().match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/)[1];
-const UID = '11111111-1111-4111-8111-111111111111';
-
-// 18 staf daripada `V4 RAW/User Profiles Mapping.xlsx`. Nama-nama ini DISAHKAN
-// sepadan tepat dengan J0a live yang ChatGPT laporkan (live ada 20: 18 staf ini
-// + `Admin` + `test`, dan kedua-duanya tidak berlanggar dengan mana-mana probe).
-const STAFF = [
-  ['Zalina Sayuti', 'zalina@mimos.my'], ['Siti Sarah', 'sitisarah.ramli@mimos.my'],
-  ["Abu Sa'id", 'abu.razak@mimos.my'], ['Qusyairi', 'qusyairi.zolkefle@mimos.my'],
-  ['Fuziah', 'fuziah.rahim@mimos.my'], ['Adilah', 'adilah.nisman@mimos.my'],
-  ['Aisyah', 'aisyah.alias@mimos.my'], ['Dr. Ahmad Nizar', 'nizar.harun@mimos.my'],
-  ['Farrah', 'farrah.johar@mimos.my'], ['Sholihin', 'sholihin.abdullah@mimos.my'],
-  ['Dr. Afiq', 'muhammadafiq.azmi@mimos.my'], ['Ainur Najwa', 'ainur.rodzi@mimos.my'],
-  ['Mohd Suhairi', 'suhairi.soobni@mimos.my'], ['Omar', 'omar.azmi@mimos.my'],
-  ['Fatin Firzana', 'fatin.pata@mimos.my'], ['Amalia Adriana', 'amalia.rizam@mimos.my'],
-  ['Nur Aleeya', 'aleeya.amran@mimos.my'], ['Muhammad Yusuf', 'yusuf.zolkipli@mimos.my'],
-];
-
-// DUA PROFIL TAMBAHAN LIVE yang tiada dalam Excel (DP-10.4 / J0a).
-//
-// Fixture asal hanya menyemai 18 staf Excel, jadi Arena MERAMALKAN
-// resolve_account_manager('test') dan ('Admin') -> NULL. Ramalan itu SALAH:
-// bukan kerana fungsi live rosak, tetapi kerana FIXTURE tidak sepadan data live.
-// Fungsi berkelakuan identik; DATAnya yang berbeza.
-//
-// Ini pengulangan tepat pengajaran DP-10.7(4) "ukur data live SEBELUM meramalkan
-// kesan pelaksanaan" - dan kali ini nama kedua-dua profil SUDAH diketahui daripada
-// J0a, jadi tiada alasan untuk meninggalkannya. Direkodkan sebagai DP-14.1.
-// Atribut diambil verbatim daripada J0a live yang ChatGPT laporkan.
-const PROFIL_TAMBAHAN_LIVE = [
-  // nama,   email,            role,          is_active, account_status
-  ['Admin', 'admin@mimos.my',  'super_admin', true,      'active'],
-  ['test',  'test@mimos.my',   'staff',       false,     'blocked'],
-];
-
-const BOOTSTRAP = `
-CREATE SCHEMA IF NOT EXISTS auth;
--- Stub auth.users dipertingkatkan (dahulu hanya id+email).
--- 'user-management.sql' (Fasa 6, DIPASANG di live) membaca
--- raw_user_meta_data, encrypted_password, email_confirmed_at dan
--- auth.identities. Tanpa lajur-jadual ini ia gagal dipasang, dan fixture
--- tidak dapat menyemai role 'super_admin' (DP-6: schema-master.sql hanya ada
--- 7 nilai app_role; live ada 8).
-CREATE TABLE IF NOT EXISTS auth.users (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  instance_id uuid, aud text, role text, email text UNIQUE,
-  encrypted_password text, email_confirmed_at timestamptz,
-  raw_app_meta_data jsonb, raw_user_meta_data jsonb,
-  created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(),
-  last_sign_in_at timestamptz);
-CREATE TABLE IF NOT EXISTS auth.identities (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
-  provider_id text, identity_data jsonb, provider text,
-  last_sign_in_at timestamptz,
-  created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(),
-  UNIQUE (provider_id, provider));
-CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE
-  AS $$ SELECT '${UID}'::uuid $$;
-CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE
-  AS $$ SELECT '{}'::jsonb $$;
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated')
-    THEN CREATE ROLE authenticated NOLOGIN; END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon')
-    THEN CREATE ROLE anon NOLOGIN; END IF;
-END $$;
-INSERT INTO auth.users (id, email) VALUES ('${UID}'::uuid, 'staff@mimos.my')
-  ON CONFLICT DO NOTHING;
-`;
 
 const q = (v) => (v === null ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`);
 
@@ -328,80 +268,10 @@ const PROBE = [
 // -----------------------------------------------------------------------------
 // Jalankan dalam PGlite untuk mendapatkan JANGKAAN
 // -----------------------------------------------------------------------------
-const db = new PGlite();
-await db.exec(BOOTSTRAP);
-// SUSUNAN FAIL mesti meniru live, bukan hanya repo asas.
-//
-// 🔴 DP-6 (drift enum app_role) muncul semula di sini: `schema-master.sql`
-// mentakrifkan 7 nilai app_role TANPA 'super_admin', tetapi J1d live melaporkan
-// 8 nilai TERMASUK 'super_admin' — kerana Fasa 6 memasang `user-management.sql`
-// di live. Tanpa fail itu, fixture tidak boleh menyemai profil `Admin` dengan
-// role super_admin, dan fixture itu TIDAK SETARA live.
-//
-// Maka `user-management.sql` dipasang — fail Fasa 6 yang SEBENAR, bukan enum
-// yang ditadbir tangan (yang akan mewujudkan drift baharu).
-// pgcrypto: di Supabase sebenar ia tersedia sebagai extension. PGlite tiada,
-// jadi pasang extension jika boleh, jika tidak stub deterministik dengan
-// semantik yang sama (blok ini DISALIN dari test-user-management-sql.mjs
-// supaya kelakuan fixture tidak bercabang dua).
-try {
-  await db.exec('CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;');
-} catch {
-  await db.exec('CREATE SCHEMA IF NOT EXISTS extensions;');
-  await db.exec(`
-    CREATE OR REPLACE FUNCTION extensions.gen_salt(text) RETURNS text
-      LANGUAGE sql IMMUTABLE AS $$ SELECT 'STUBSALT' $$;
-    CREATE OR REPLACE FUNCTION extensions.crypt(text, text) RETURNS text
-      LANGUAGE plpgsql IMMUTABLE AS $$
-      DECLARE v_salt text; v_pos int;
-      BEGIN
-        IF $2 IS NULL OR $2 = '' THEN RETURN 'STUBSALT|' || md5($1); END IF;
-        v_pos := length($2) - position('|' in reverse($2)) + 1;
-        IF v_pos <= 1 OR v_pos > length($2) THEN v_salt := $2;
-        ELSE v_salt := substring($2 from 1 for v_pos - 1); END IF;
-        RETURN v_salt || '|' || md5($1);
-      END; $$;`);
-}
-
-for (const f of ['lib/supabase/schema-master.sql',
-                 'lib/supabase/schema-import-staging.sql',
-                 'lib/supabase/user-management.sql']) {
-  await db.exec(fs.readFileSync(f, 'utf8'));
-}
-// Sahkan fixture kini setara live pada dua titik yang DP-6/DP-10.4 kenalkan.
-const nEnum = (await db.query(
-  `SELECT count(*)::int n FROM pg_enum e
-     JOIN pg_type t ON t.oid = e.enumtypid
-    WHERE t.typname = 'app_role'`)).rows[0].n;
-if (nEnum !== 8) throw new Error(`jangkaan 8 nilai app_role seperti J1d live, dapat ${nEnum}`);
-let i = 0;
-for (const [name, email] of STAFF) {
-  const uid = `22222222-2222-4222-8222-22222222${String(++i).padStart(4, '0')}`;
-  await db.query(`INSERT INTO auth.users (id,email) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [uid, email]);
-  await db.query(
-    `INSERT INTO public.user_profiles (id,full_name,email) VALUES ($1,$2,$3)
-     ON CONFLICT (id) DO UPDATE SET full_name=EXCLUDED.full_name`, [uid, name, email]);
-}
-const nStaf = (await db.query(`SELECT count(*)::int n FROM public.user_profiles`)).rows[0].n;
-if (nStaf !== 18) throw new Error(`jangkaan 18 staf Excel, dapat ${nStaf}`);
-
-// 2 profil tambahan live -> fixture kini 20, SEPADAN J0a/J0e live.
-let k = 0;
-for (const [nama, email, role, aktif, status] of PROFIL_TAMBAHAN_LIVE) {
-  const uid = `44444444-4444-4444-8444-44444444${String(++k).padStart(4, '0')}`;
-  await db.query(`INSERT INTO auth.users (id,email) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [uid, email]);
-  // `user-management.sql` dipasang di atas, jadi `account_status` KINI wujud
-  // dan boleh disemai verbatim seperti J0a live — fixture setia sepenuhnya.
-  await db.query(
-    `INSERT INTO public.user_profiles (id, full_name, email, role, is_active, account_status)
-     VALUES ($1,$2,$3,$4::app_role,$5,$6::account_status)
-     ON CONFLICT (id) DO UPDATE SET full_name=EXCLUDED.full_name`,
-    [uid, nama, email, role, aktif, status]);
-}
-const nSemua = (await db.query(`SELECT count(*)::int n FROM public.user_profiles`)).rows[0].n;
-if (nSemua !== 20) throw new Error(`jangkaan 20 profil (18 staf + Admin + test) seperti J0e live, dapat ${nSemua}`);
-
-await db.exec(fs.readFileSync(SQL_FILE, 'utf8'));
+// Fixture setara live dibina oleh modul dikongsi (pengawal: 8 nilai app_role,
+// 18 staf Excel, 20 profil keseluruhan — gagal = balingan).
+const { db } = await binaFixture({ uid: UID });
+await pasangLangkah(db, [SQL_FILE]);
 
 const hasil = [];
 const JANGKAAN_BARIS = { R1: VEKTOR_NORM.length, R2: VEKTOR_RESOLVE.length };

@@ -504,6 +504,7 @@ console.log('\n[8] DP-12 — prompt langkah sepadan output penjana (tiada drift)
   const PENJANA = [
     ['scripts/generate-8a3-install-prompts.mjs', '4 prompt langkah 8A-3'],
     ['scripts/generate-8a3-l1-reconciliation.mjs', 'prompt rekonsiliasi L1'],
+    ['scripts/generate-8a3-l3-reconciliation.mjs', 'prompt rekonsiliasi L3'],
   ];
   for (const [PEN, label] of PENJANA) {
     if (!fs.existsSync(PEN)) { bad(`${PEN} tiada`); continue; }
@@ -589,23 +590,25 @@ console.log('\n[9] DP-14 — pembetulan fixture rekonsiliasi DIKUNCI (tidak bole
     eq(d.includes('DP-14.2'), true, 'prompt merujuk DP-14.2 (gate berasingan)');
   }
 
-  // DP-14.3: fixture mesti setara live. Kedua-dua pengawal ini WAJIB wujud
-  // dalam penjana; tanpanya fixture boleh senyap-senyap kembali tidak setara
-  // (DP-6 muncul semula sebagai ramalan salah).
-  const PEN = 'scripts/generate-8a3-l1-reconciliation.mjs';
-  if (!fs.existsSync(PEN)) {
-    bad(`${PEN} tiada`);
+  // DP-14.3: fixture mesti setara live. Pengawal-pengawal ini kini tinggal di
+  // `scripts/lib/fixture-live.mjs` (DP-17.5) kerana fixture itu DIKONGSI oleh
+  // penjana L1-R dan L3-R — dua fixture berasingan akan drift antara satu sama
+  // lain dan kedua-duanya kelihatan "lulus". Tanpanya fixture boleh
+  // senyap-senyap kembali tidak setara (DP-6 muncul semula sebagai ramalan salah).
+  const FIXMOD = 'scripts/lib/fixture-live.mjs';
+  if (!fs.existsSync(FIXMOD)) {
+    bad(`${FIXMOD} tiada — fixture dikongsi hilang`);
   } else {
-    const g = fs.readFileSync(PEN, 'utf8');
+    const g = fs.readFileSync(FIXMOD, 'utf8');
     eq(g.includes('nEnum !== 8'), true,
-       'penjana: pengawal app_role = 8 (sepadan J1d live)');
+       'fixture: pengawal app_role = 8 (sepadan J1d live)');
     eq(g.includes('nSemua !== 20'), true,
-       'penjana: pengawal 20 profil (sepadan J0a live)');
+       'fixture: pengawal 20 profil (sepadan J0a live)');
     eq(g.includes('lib/supabase/user-management.sql'), true,
-       'penjana: user-management.sql (Fasa 6) DIPASANG dalam fixture');
+       'fixture: user-management.sql (Fasa 6) DIPASANG');
     // Enum yang ditadbir tangan akan mewujudkan drift ketiga — dilarang.
     eq(/ALTER TYPE\s+public\.app_role\s+ADD VALUE/i.test(g), false,
-       'penjana: TIDAK mentadbir enum app_role dengan tangan (DP-14.3)');
+       'fixture: TIDAK mentadbir enum app_role dengan tangan (DP-14.3)');
   }
 
   // Kata putus mesti direkodkan dalam panel, bukan hanya dalam kod.
@@ -621,6 +624,90 @@ console.log('\n[9] DP-14 — pembetulan fixture rekonsiliasi DIKUNCI (tidak bole
        'panel: bantahan posisi A direkodkan (protokol panel)');
   } else {
     bad(`${PANEL} tiada`);
+  }
+}
+
+// -----------------------------------------------------------------------------
+console.log('\n[10] DP-17 — rekonsiliasi L3: pengawal keselamatan DIKUNCI');
+{
+  // L3 dipasang daripada SQL yang "semantically equivalent tetapi bukan
+  // byte-for-byte" (DP-13.2 berulang). Kata putus DP-13.2: sahkan melalui
+  // KELAKUAN. L3-R mesti menguji sisi yang laporan L3 tidak sentuh: pendedahan
+  // minimum (veto 2.8), pengawal kuasa, postur GRANT, deny-by-default, dan
+  // penolakan tulis tanpa kuasa.
+  const REK = 'docs/PROMPT-8A3-L3-REKONSILIASI.md';
+  if (!fs.existsSync(REK)) {
+    bad(`${REK} tiada`);
+  } else {
+    const d = fs.readFileSync(REK, 'utf8');
+    for (const id of ['S1', 'S2', 'S3', 'S4', 'S5', 'S6']) {
+      eq(new RegExp(`### ${id} — `).test(d), true, `L3-R: probe ${id} hadir`);
+    }
+    // Veto 2.8: pendedahan minimum ialah sebab utama L3-R wujud.
+    eq(d.includes('TABLE(id uuid, full_name text)'), true,
+       'L3-R: pendedahan minimum am_list_staff (id, full_name sahaja) dikunci');
+    eq(d.includes('§2.8'), true, 'L3-R: merujuk veto Keselamatan §2.8');
+    // S5 mesti dinyatakan sebagai KEGAGALAN yang dijangka, dengan 42501.
+    eq(d.includes('42501'), true, 'L3-R: S5 menjangka errcode 42501');
+    eq(d.includes('Jangkaan: query ini GAGAL'), true,
+       'L3-R: S5 dinyatakan sebagai kegagalan yang DIJANGKA (bukan ralat)');
+    // Keselamatan probe tulis: UUID tidak wujud + backstop FK mesti dijelaskan,
+    // kerana inilah satu-satunya probe yang memanggil fungsi tulis.
+    eq(d.includes('99999999-9999-4999-8999-999999999999'), true,
+       'L3-R: S5 guna UUID yang tidak wujud (selamat walaupun pengawal hilang)');
+    eq(d.includes('account_manager_aliases_user_id_fkey'), true,
+       'L3-R: backstop FK dinyatakan sebagai lapisan ketiga');
+    // Read-only: tiada manipulasi identiti.
+    eq(d.includes('JANGAN** tetapkan `request.jwt.claims`'), true,
+       'L3-R: melarang set_config claims (ujian kuasa positif = kerja L4)');
+    eq(/\bINSERT\b|\bUPDATE\b|\bDELETE\b/.test(d.split('```sql').slice(1).join('')),
+       false, 'L3-R: tiada DML dalam mana-mana blok sql probe');
+    // Mesti dirujuk supaya L4 tidak dimulakan sebelum rekonsiliasi.
+    eq(d.includes('SEBELUM Langkah 4'), true,
+       'L3-R: menyatakan ia mesti selesai sebelum L4 menulis');
+  }
+
+  // DP-17.3: probe L3x asal membuat kesilapan kategori - can_resolve_account_
+  // managers() mengambil SIFAR argumen dan menilai identiti PEMANGGIL, bukan
+  // baris yang disenaraikan. Jangkaan "= true" per baris tidak boleh dipenuhi
+  // dalam execute_sql (tiada claims), jadi ChatGPT melaporkan false bagi
+  // semua baris dan membenderanya sebagai penemuan. Prompt kini dipisah dua.
+  const L3 = 'docs/PROMPT-8A3-L3-ACCOUNT-MANAGER-RESOLUTION.md';
+  if (fs.existsSync(L3)) {
+    const d3 = fs.readFileSync(L3, 'utf8');
+    eq(d3.includes('L3x_inventori'), true,
+       'L3: probe kuasa dipisah - (a) inventori peranan live');
+    eq(d3.includes('L3x_sesi'), true,
+       'L3: probe kuasa dipisah - (b) kuasa sesi semasa (satu nilai)');
+    eq(d3.includes('DP-17.3'), true, 'L3: kesilapan kategori asal direkodkan');
+    eq(d3.includes('deny-by-default'), true,
+       'L3: false tanpa claims dinyatakan sebagai BUKAN kecacatan');
+    eq(/Jangkaan: Super Admin \/ admin \/ head_governance \/ finance = true/.test(d3),
+       false, 'L3: jangkaan kategori-salah ("= true" per baris) telah dibuang');
+  } else {
+    bad(`${L3} tiada`);
+  }
+
+  // Fixture dikongsi: dua penjana rekonsiliasi MESTI guna modul yang sama,
+  // kerana dua fixture berasingan akan drift (punca DP-14.2).
+  const FIX = 'scripts/lib/fixture-live.mjs';
+  if (!fs.existsSync(FIX)) {
+    bad(`${FIX} tiada`);
+  } else {
+    const fd = fs.readFileSync(FIX, 'utf8');
+    for (const pen of ['scripts/generate-8a3-l1-reconciliation.mjs',
+                       'scripts/generate-8a3-l3-reconciliation.mjs']) {
+      eq(fs.readFileSync(pen, 'utf8').includes("./lib/fixture-live.mjs"), true,
+         `${path.basename(pen)}: guna fixture DIKONGSI (bukan salinan sendiri)`);
+    }
+    // Pengawal atribut: pepijat trigger on_auth_user_created membuat semua profil
+    // menjadi viewer/tidak aktif, dan pengawal KIRAAN (20) tidak mengesannya.
+    eq(fd.includes('attr.aktif !== 19'), true,
+       'fixture: pengawal 19 profil aktif (bukan hanya kiraan 20)');
+    eq(fd.includes('ROLE_DIUKUR_LIVE'), true,
+       'fixture: peranan yang DIUKUR daripada live (L3x), bukan diteka');
+    eq(fd.includes('on_auth_user_created'), true,
+       'fixture: punca pepijat trigger didokumenkan');
   }
 }
 

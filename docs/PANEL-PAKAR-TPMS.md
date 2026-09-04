@@ -2174,3 +2174,270 @@ Sehingga salah satu bukti itu wujud, **tiada MCP akan ditambah**.
 38. **Selesaikan punca, bukan gejala, dengan alat termurah yang berfungsi.**
     DP-14.1 berpunca daripada buta versi. Penyelesaiannya bukan MCP data
     fabric — ia **satu query `SELECT version()`**.
+
+---
+
+## DP-17 — Langkah 3 dipasang; versi live diketahui; dan empat penemuan yang laporan itu dedahkan (2026-09-04)
+
+**Pencetus:** Laporan ChatGPT `L3` diterima — `account-manager-resolution.sql`
+dipasang, migration `8a3_l3_account_manager_resolution` `{"success":true}`,
+7 fungsi disahkan, K6 12 baris verbatim, dan **probe versi L3v berjaya**.
+ChatGPT berhenti sebelum L4 seperti diarahkan.
+
+### 17.1 🟢 L3 diterima — dan DP-14.1 kini TERBUKTI, bukan lagi kesimpulan
+
+| Perkara | Laporan live | Keputusan |
+|---|---|---|
+| blob SHA | `afcdc600efda41bc4e1928c60fe71dd6be2880ba` | 🟢 sepadan |
+| L3c 7 fungsi | 7/7 + senarai argumen tepat | 🟢 |
+| `prosecdef` / `search_path` | semua 7 `true` / `public` | 🟢 |
+| K6 | **12 baris verbatim**, 8 SEPADAN + 3 `Fuzy*` NULL + `Ow Zi Qi` NULL | 🟢 pra-seed betul |
+| K8 / counts / audit | `[]` / `44·1124·6·12·14·20` / **44 → 44** | 🟢 |
+| K1 | 🟢 | ✅ **pembetulan DP-15.3 berkesan** |
+| **L3v versi platform** | **PostgreSQL 17.6**, `versi_num 170006`, `kekangan_not_null_bernama = 0` | 🟢 |
+
+**Dua pembetulan DP-15 disahkan berkesan oleh laporan ini sendiri:**
+
+1. **K6 kini betul.** ChatGPT menampal **12 baris verbatim** termasuk
+   `Abu Said` **dan** `Abu said` sebagai dua baris berasingan, dan **tiada**
+   `Afiq / Ahmad Nizar` yang direka. Tiga `Fuzy*` dilaporkan `⚠️ BEZA` terhadap
+   lajur `jangkaan_pglite` (yang memang jangkaan *selepas* seed) **tanpa**
+   "memperbaiki" apa-apa — larangan #13 dipatuhi. Bandingkan dengan laporan L2
+   yang menggugurkan `Abu said` dan mereka satu baris: **pembetulan itu berkesan.**
+2. **K1 kini 🟢**, bukan 🟠 kekal. Penjelasan DP-11 dalam FORMAT berfungsi.
+
+**DP-14.1 kini terbukti, bukan disimpulkan.** Panel sebelum ini *mengambil
+kesimpulan* bahawa R6b ialah artifak versi kerana PGlite berjalan 18.3 dan live
+"lebih lama". L3v memberikan **fakta**: live = **PostgreSQL 17.6** dan
+`kekangan_not_null_bernama = 0`. Kata putus DP-14.1 **disahkan oleh ukuran**,
+dan probe yang direka dalam DP-16.3 membayar kosnya pada penggunaan pertama.
+
+### 17.2 🔴 DP-13.2 BERULANG — pemasangan bukan byte-for-byte
+
+ChatGPT mendedahkan:
+
+> "aku menghantar **implementation SQL yang semantically equivalent tetapi bukan
+> byte-for-byte keseluruhan 539-line file**. Jadi aku **tidak akan claim bahawa
+> migration ini ialah exact byte-for-byte execution daripada fail asal**."
+
+Ini **pengulangan tepat** DP-13.2 (Langkah 1). Pendedahan itu betul dan
+dihargai; ia juga bermakna **badan** tujuh fungsi itu belum disahkan. Yang
+sudah disahkan hanyalah *kewujudan*, *nama*, *argumen* dan *metadata* — iaitu
+katalog, bukan kelakuan.
+
+**Kata putus 17.2:** ikut DP-13.2 — **sahkan melalui KELAKUAN**. Dikeluarkan
+`docs/PROMPT-8A3-L3-REKONSILIASI.md` (penjana
+`scripts/generate-8a3-l3-reconciliation.mjs`, 6 probe S1–S6, semua jangkaan
+dikira dalam PGlite daripada fail yang diluluskan).
+
+**🔴 L3-R MESTI selesai SEBELUM Langkah 4.** Alasan, bukan keutamaan selera:
+L4 akan memanggil `am_confirm_alias()` dan `am_confirm_external()` untuk
+**benar-benar menulis** alias DP-8, klasifikasi luar DP-9, dan baris
+`audit_logs`. Jika badan fungsi itu berbeza daripada yang diluluskan, L4 menulis
+**data salah dan jejak audit salah**. Mengesahkan badan fungsi *sebelum* menulis
+ialah verifikasi; *selepas* menulis ialah pembersihan.
+
+**Reka bentuk L3-R (keputusan yang disengajakan):**
+* **Read-only sepenuhnya, dan TIDAK memanipulasi `request.jwt.claims`.**
+  Ujian kuasa **positif** (admin → `true`, alias ditulis) **sudah** dilakukan
+  oleh seed L4, yang menetapkan claims kepada Super Admin dan menaikkan ralat
+  diagnostik jika `can_resolve_account_managers()` masih `false`. Mengulanginya
+  di L3-R menambah risiko tulis tanpa menambah maklumat.
+* Maka L3-R menguji sisi **negatif** — *deny-by-default* — yang justru sisi
+  keselamatan paling penting dan boleh diuji tanpa identiti.
+* **S5 (satu-satunya probe yang memanggil fungsi tulis) direka supaya selamat
+  walaupun pengawal kuasa itu HILANG.** Ia menghantar UUID
+  `99999999-9999-4999-8999-999999999999` yang **tidak wujud**: (1) pengawal
+  kuasa naik dahulu → `42501`; (2) jika pengawal hilang → pemeriksaan kewujudan
+  profil naik; (3) jika kedua-duanya hilang → FK
+  `account_manager_aliases_user_id_fkey` menolak baris. **Tiada keadaan** di
+  mana probe ini boleh menulis.
+* Penjana mempunyai pengawal: **jika S5 tidak gagal, penjanaan berhenti** —
+  kerana itu bermakna pengawal kuasa telah hilang daripada SQL yang diluluskan.
+
+### 17.3 🔴 Kecacatan prompt L3x — kesilapan KATEGORI, dan ChatGPT yang betul
+
+Prompt L3 mengandungi probe `L3x` yang menyenaraikan profil berkuasa dan
+meletakkan `can_resolve_account_managers()` sebagai **lajur**, dengan jangkaan
+`super_admin / admin / head_governance / finance = true`.
+
+**Itu kesilapan kategori.** `can_resolve_account_managers()` mengambil **sifar
+argumen** dan menilai identiti **PEMANGGIL** (`auth.uid()` → `current_user_role()`),
+**bukan** baris yang disenaraikan. Jadi setiap baris memulangkan nilai yang
+**sama**, dan dalam `Supabase.execute_sql` — yang tiada `request.jwt.claims` —
+nilai itu sentiasa `false`.
+
+ChatGPT mendapat `false` bagi kelima-lima baris (`Admin`, `Zalina Sayuti`,
+`Adilah`, `Farrah`, `Dr. Ahmad Nizar`), **mentafsirnya dengan betul** ("tidak
+boleh digunakan sebagai bukti bahawa authorization aplikasi rosak"), dan **tidak
+mengubah apa-apa**. Ia kemudian membenderanya untuk perhatian Arena. **Tindak
+balas yang tepat terhadap prompt yang salah.**
+
+**Kata putus 17.3:** probe itu dipisah kepada dua fakta berbeza —
+`L3x_inventori` (peranan live yang **akan** berkuasa apabila log masuk) dan
+`L3x_sesi` (kuasa sesi semasa, **satu** nilai), dengan jangkaan `false` +
+`uid = NULL` dinyatakan sebagai **bukti deny-by-default, bukan kecacatan**, dan
+larangan eksplisit untuk menetapkan claims "bagi memperbaikinya".
+
+> **Keputusan `false` itu sebenarnya penemuan keselamatan yang positif.** Ia
+> membuktikan fungsi ini **tidak** membocorkan kuasa kepada konteks tanpa
+> identiti — direkodkan sebagai kawalan yang **lulus**, bukan anomali.
+
+### 17.4 🟠 Soalan keselamatan ChatGPT DIJAWAB dengan ukuran
+
+ChatGPT menulis: *"`SECURITY DEFINER` dalam `public` mempunyai implikasi
+keselamatan yang perlu dinilai terhadap model auth sebenar."* Panel menilai
+dengan **ukuran dalam PGlite**, bukan dengan jaminan.
+
+**Yang SAH (diukur):**
+
+| Kawalan | Bukti |
+|---|---|
+| `search_path` dipin | semua 7: `proconfig = {search_path=public}` → tiada *search_path hijack* |
+| Tiada capaian awam | semua 7: `REVOKE ALL FROM PUBLIC` + `GRANT EXECUTE TO authenticated`; diukur `authenticated=true`, **`anon=false`** |
+| Kuasa dikawal **di dalam** | `am_confirm_alias`, `am_revoke_alias`, `am_backfill_account_manager` naik `42501`; `am_list_staff`, `am_unresolved_values`, `am_backfill_preview` **pulangan kosong** (bukan ralat) |
+| Pendedahan minimum §2.8 | `am_list_staff` → `TABLE(id uuid, full_name text)` — **tiada** `role`, `email`, `account_status`, `designation`, `department` |
+| Deny-by-default | tanpa identiti: ketiga-tiga fungsi baca → **0 baris** (diukur) |
+| `LAST_SUPER_ADMIN` | `admin_set_user_blocked` menolak sekatan Super Admin terakhir |
+
+`SECURITY DEFINER` di sini ialah **corak yang betul**, bukan kelemahan: ia
+diperlukan supaya pengawal peranan dinilai secara konsisten dan supaya fungsi
+boleh menulis ke jadual yang pemanggil tidak mempunyai capaian tulis langsung.
+Bahaya biasanya (*privilege escalation*) ditutup oleh pengawal dalaman + pin
+`search_path` + `REVOKE FROM PUBLIC`.
+
+**Jadual kebenaran yang diukur** (identiti ditukar dalam fixture):
+
+| peranan | `can_resolve` | `am_list_staff` |
+|---|---|---|
+| `super_admin`, `admin`, `head_governance`, `finance` | **true** | disenaraikan |
+| `manager`, `executive`, `staff`, `viewer` | **false** | 0 baris |
+| tiada identiti | **false** | 0 baris |
+
+**DUA jurang SEBENAR yang dijumpai — dan kedua-duanya ditangguh, bukan diabaikan:**
+
+**(a) 🟠 `current_user_role()` tidak menapis `is_active`.** Diukur: akaun
+**blocked** (`is_active = false`, `account_status = 'blocked'`) dengan peranan
+`admin` atau `finance` **masih** memulangkan `can_resolve_account_managers() =
+true` dan **masih** boleh menyenaraikan 19 staf.
+
+*Mitigasi sedia ada (diukur):* `admin_set_user_blocked` **memadam
+`auth.refresh_tokens`** pengguna itu (log keluar paksa), jadi jendela pendedahan
+terhad kepada **JWT capaian yang sudah diterbitkan** sehingga ia luput.
+
+*Kata putus:* **TANGGUH** ke 8C sebagai **migration aditif**, dengan gate.
+Sebab: `current_user_role()` dipanggil oleh **polisi RLS di seluruh sistem**
+(Fasa 6), jadi menukarnya menyentuh permukaan yang jauh lebih besar daripada
+Fasa 8A dan memerlukan suite penuh dijalankan semula. Ia **bukan** kecemasan
+kerana penamatan sesi sudah menutup vektor utama. **Jangan** edit
+`user-management.sql` yang sudah dipasang.
+
+**(b) 🟠 `am_backfill_account_manager()` tiada gate 8C dalam SQL, dan tiada
+penapis DP-14.2.** Diukur pada badan fungsi: pengawal **hanya**
+`can_resolve_account_managers()`. Tiada semakan `is_active`, tiada semakan
+`role = 'super_admin'`, dan **tiada mekanisme** yang menghalang `admin` /
+`finance` / `head_governance` daripada memanggilnya **hari ini**. Gate 8C
+sepanjang ini adalah **prosedur sahaja** (larangan #4 dalam prompt).
+
+*Kesan semasa: **sifar*** — kerana live mempunyai **sifar** nilai
+`account_manager` (K8 = `[]`), jadi `UPDATE` akan mengisi 0 baris.
+Selepas import 8C, memanggilnya awal akan mengikat nilai **tanpa** penapis
+DP-14.2, termasuk kepada akaun blocked atau Super Admin.
+
+*Kata putus:* **kekalkan kata putus DP-14.2** dan **ikat kedua-duanya bersama**
+dalam migration aditif 8C: (1) tolak `user_id` yang `is_active = false` atau
+`role = 'super_admin'`, (2) **laporkan** penolakan itu sebagai pengecualian
+(bukan `NULL` senyap), dan (3) tambah **gate 8C sebenar dalam SQL** supaya
+backfill tidak boleh dijalankan sebelum import 8C — menukar gate prosedur
+kepada gate yang **dikuatkuasakan**.
+
+**Bantahan direkodkan:** Keselamatan berpendapat (a) patut ditutup sekarang
+kerana ia lubang kebenaran, bukan kebersihan data. **Diterima sebagai risiko
+terkawal:** penamatan refresh token menutup vektor utama; perubahan itu
+menyentuh RLS seluruh sistem; dan 8C ialah **HARD GATE** yang merujuk DP-14.2
+dan DP-17.4 secara eksplisit supaya ia tidak boleh dilupakan.
+
+### 17.5 🔴 Pepijat FIXTURE dijumpai semasa membina L3-R — dan mengapa L1-R tidak terjejas
+
+Semasa mengukur jangkaan L3-R, `Admin` (super_admin) memulangkan
+`can_resolve_account_managers() = **false**` dalam fixture. Siasatan mendapati
+**pepijat dalam fixture Arena sendiri**:
+
+* `user-management.sql` memasang trigger **`on_auth_user_created`** pada
+  `auth.users` yang **mencipta** baris `user_profiles` dengan
+  `('viewer', is_active=false, 'pending', must_change_password=true)` dan
+  `ON CONFLICT (id) DO NOTHING`.
+* INSERT fixture kemudian melanggar kekangan unik, dan
+  `ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name` yang lama
+  **hanya mengemas kini nama** — jadi `role`, `is_active` dan `account_status`
+  **kekal pada default trigger**.
+* Akibatnya **semua 20 profil** fixture adalah `viewer` + **tidak aktif**, dan
+  `am_list_staff()` (yang menapis `is_active = true`) memulangkan **0 baris**.
+
+**Mengapa pengawal sedia ada tidak menangkapnya:** pengawal DP-14.3 mengira
+**bilangan** profil (`= 20`) dan bilangan enum (`= 8`). Kedua-duanya **lulus**
+walaupun setiap atribut salah. **Mengira baris tidak mengesahkan baris.**
+
+**Adakah L1-R terjejas? TIDAK — dan ini diukur, bukan diandaikan.**
+`resolve_account_manager()` **tidak menapis** `is_active` (itulah penemuan
+DP-14.2), jadi R1/R2 tidak bergantung kepadanya; R3–R7 menguji katalog.
+Selepas fixture dibaiki, penjana L1-R dijana semula dan outputnya
+**byte-identik** (`diff` kosong, `--check` lulus). **Kesimpulan rekonsiliasi L1
+yang ChatGPT sudah puaskan KEKAL SAH.**
+
+**Pembetulan:**
+1. Semaian kini menetapkan `role`, `is_active`, `account_status` secara
+   eksplisit melalui `ON CONFLICT DO UPDATE` yang **lengkap**.
+2. **Pengawal atribut** ditambah, bukan hanya kiraan: `19` profil aktif
+   (20 − `test`), tepat `1` `super_admin`, dan setiap peranan dalam
+   `ROLE_DIUKUR_LIVE` mesti sepadan.
+3. `ROLE_DIUKUR_LIVE` mengandungi **hanya** peranan yang **diukur daripada
+   live** (L3x: `Admin`=super_admin, `Zalina Sayuti`=admin, `Adilah`=finance,
+   `Farrah`=finance, `Dr. Ahmad Nizar`=head_governance, `test`=staff). Baki 14
+   staf **tidak diketahui** peranannya daripada mana-mana laporan live, jadi
+   mereka disemai `viewer` — iaitu **kurang kuasa**, yang tidak boleh
+   menghasilkan positif palsu "kuasa ada".
+4. Sebab itu **jangkaan L3-R dinyatakan sebagai PERATURAN** (peranan → boleh /
+   tidak), bukan sebagai nilai tetap per pengguna: peraturan boleh disahkan
+   baris-demi-baris terhadap live **tanpa** Arena perlu mengetahui peranan live
+   terlebih dahulu. Ini pengajaran DP-14.2 dipakai, bukan diulang.
+
+**Fixture diekstrak ke modul dikongsi** `scripts/lib/fixture-live.mjs`, dipakai
+oleh **kedua-dua** penjana L1-R dan L3-R. Sebab: dua fixture yang diselenggara
+berasingan akan **drift antara satu sama lain**, dan kedua-duanya akan kelihatan
+"lulus" — kegagalan berganda yang lebih sukar dikesan daripada yang asal.
+
+### 17.6 Pengajaran direkodkan
+
+39. **Probe yang memulangkan satu nilai per SESI tidak boleh disenaraikan per
+    BARIS.** `can_resolve_account_managers()` mengambil sifar argumen;
+    meletakkannya sebagai lajur dalam senarai profil menghasilkan N salinan
+    jawapan yang sama dan jangkaan yang mustahil. **Semak ariti dan skop fungsi
+    sebelum menulis jangkaan per baris.**
+40. **Fungsi berkuasa tanpa argumen menilai PEMANGGIL.** Dalam konteks
+    `execute_sql` tiada pemanggil, jadi jawapannya sentiasa "tidak berkuasa".
+    Ujian kuasa **positif** memerlukan identiti; ujian **negatif** tidak.
+    Reka probe mengikut apa yang konteks pelaksanaan boleh sediakan.
+41. **Trigger pemasangan boleh membatalkan semaian anda secara senyap.**
+    `ON CONFLICT DO UPDATE` yang menyenaraikan **satu** lajur meninggalkan
+    lajur lain pada nilai default trigger. Jika semaian menetapkan atribut,
+    **pengawal mesti mengesahkan atribut itu**, bukan bilangan baris.
+42. **Apabila fixture dibaiki, sahkan semula kesimpulan lama secara eksplisit.**
+    Arena tidak *mengandaikan* L1-R tidak terjejas — penjana dijana semula dan
+    outputnya dibandingkan bait-demi-bait (`diff` kosong). Itu yang menukar
+    "mungkin tidak terjejas" kepada "tidak terjejas".
+43. **Jangkaan berasaskan PERATURAN lebih tahan daripada berasaskan NILAI
+    apabila fakta live tidak lengkap.** Arena hanya mengetahui 6 daripada 20
+    peranan live. Meneka 14 yang lain akan mengulangi DP-14.2; menyatakan
+    peraturan (peranan → keputusan) membolehkan live disahkan tanpa tekaan.
+44. **Probe yang memanggil fungsi tulis mesti selamat walaupun kawalan yang
+    diujinya hilang.** S5 menghantar UUID yang tidak wujud supaya tiga lapisan
+    (pengawal kuasa → pemeriksaan kewujudan → FK) masing-masing boleh
+    menolaknya. Tanpa itu, probe keselamatan boleh **menjadi** kejadian
+    keselamatan.
+45. **Jawapan kepada kebimbangan keselamatan mesti diukur, bukan dijamin.**
+    ChatGPT membangkitkan `SECURITY DEFINER`. Jawapannya bukan "ia selamat" —
+    ia jadual kebenaran yang diukur, enam kawalan yang disahkan, **dan dua
+    jurang sebenar yang ditemui semasa menjawabnya.** Menjawab soalan
+    keselamatan dengan jujur sering mendedahkan lebih banyak daripada yang
+    ditanya.

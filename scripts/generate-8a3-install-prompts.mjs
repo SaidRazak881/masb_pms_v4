@@ -344,14 +344,38 @@ const LANGKAH = [
 > **memasang** fungsinya dan mengesahkan ia wujud.
 >
 > \`\`\`sql
-> -- L3x: SEMAKAN KUASA (read-only) — siapa boleh mengesahkan alias?
-> SELECT 'L3x' AS check_name, up.full_name, up.role::text AS role,
->        public.can_resolve_account_managers() AS boleh_selesai
+> -- L3x: SEMAKAN KUASA (read-only). DUA perkara BERBEZA — jangan dikelirukan.
+> --
+> -- 🔴 DP-17.3: versi asal probe ini menyenaraikan profil dan meletakkan
+> -- \`can_resolve_account_managers()\` sebagai lajur, dengan jangkaan "= true"
+> -- bagi super_admin/admin/head_governance/finance. Itu KESILAPAN KATEGORI:
+> -- fungsi ini mengambil SIFAR argumen dan menilai identiti PEMANGGIL
+> -- (\`auth.uid()\`), BUKAN baris yang disenaraikan. Jadi setiap baris
+> -- memulangkan nilai yang SAMA — dan dalam \`Supabase.execute_sql\` (tiada
+> -- \`request.jwt.claims\`) nilai itu sentiasa \`false\`. ChatGPT mendapat \`false\`
+> -- bagi kelima-lima baris, mentafsirnya dengan betul, dan TIDAK mengubah
+> -- apa-apa. Jangkaan prompt itu yang salah, bukan live.
+>
+> -- (a) INVENTORI peranan live: siapa yang AKAN berkuasa apabila log masuk.
+> SELECT 'L3x_inventori' AS check_name, up.role::text AS role, count(*) AS bilangan
 >   FROM public.user_profiles up
->  WHERE up.role::text IN ('super_admin', 'admin', 'head_governance', 'finance')
->  ORDER BY up.role::text, up.full_name;
-> -- Jangkaan: Super Admin / admin / head_governance / finance = true;
-> --           viewer / executive / staff = false (tidak disenaraikan di sini).
+>  WHERE up.is_active = true
+>  GROUP BY up.role::text
+>  ORDER BY up.role::text;
+>
+> -- (b) Kuasa SESI SEMASA (satu nilai, bukan per baris).
+> SELECT 'L3x_sesi' AS check_name, auth.uid()::text AS uid,
+>        public.can_resolve_account_managers() AS boleh_selesai;
+>
+> -- Jangkaan (b): \`uid = NULL\` dan \`boleh_selesai = false\` dalam konteks
+> --   \`Supabase.execute_sql\`, kerana tiada \`request.jwt.claims\`.
+> --   🟢 Itu BUKAN kecacatan — ia bukti **deny-by-default**: fungsi ini tidak
+> --   membocorkan kuasa kepada konteks tanpa identiti. **JANGAN** tetapkan
+> --   claims untuk "memperbaikinya".
+> -- Jangkaan (a): senarai peranan aktif. \`super_admin\`, \`admin\`,
+> --   \`head_governance\` dan \`finance\` ialah peranan yang AKAN lulus (b) apabila
+> --   pengguna itu log masuk dengan JWT sebenar; \`viewer\`, \`executive\`,
+> --   \`manager\` dan \`staff\` tidak akan.
 > \`\`\``,
   },
   {
