@@ -1506,3 +1506,224 @@ Tiada bantahan lain.
 20. **Penjanaan deterministik + ujian byte-identik lebih selamat daripada
     penyalinan teliti.** Manusia dan model kedua-duanya "memperbaiki" ruang
     kosong semasa menyalin. Skrip tidak.
+
+---
+
+## DP-13 — Langkah 1 TERPASANG di live; jurang pengesahan definisi; dan positif palsu Langkah 5 (2026-09-04)
+
+### 13.1 🟢 Langkah 1 berjaya — pemasangan production pertama Fasa 8A
+
+ChatGPT memasang `client-master.sql` ke live `lmenmfsbjgxfhnykkgow`:
+
+```text
+Migration : 8a3_l1_client_master
+Result    : {"success":true}
+```
+
+| Probe | Keputusan live | Status |
+|---|---|---|
+| L1a 6 lajur | `import_staging.account_manager_id uuid`, `invoices.account_manager_id uuid`, `organizers.billing_address text`, `organizers.client_code text`, `organizers.payment_terms_days integer`, `organizers.sst_registration_no text` | 🟢 6/6 |
+| L1b RLS | `account_manager_aliases \| true` | 🟢 |
+| L1c fungsi | `normalize_person_name(p_input text)`, `resolve_account_manager(p_raw text)` | 🟢 2/2 |
+| L1d polisi | `am_aliases_delete/read/update/write` | 🟢 4/4 |
+| L1e indeks | `idx_am_aliases_user`, `idx_organizers_name_lower` | 🟢 2/2 |
+
+**Senarai objek L1a–L1e itu DITERBITKAN daripada fail SQL itu sendiri** oleh
+`generate-8a3-install-prompts.mjs`, bukan direka — dan ia sepadan tepat, termasuk
+"6 lajur" K1 (4 `organizers` + 1 `invoices` + 1 `import_staging`).
+
+ChatGPT berhenti selepas laporan, tidak menjalankan Langkah 2–4, tidak
+`fix-import-staging-updated-at.sql`, tidak backfill, tidak rename. Pematuhan
+penuh.
+
+### 13.2 🟠 Pendedahan jujur: SQL yang dihantar bukan byte-for-byte
+
+> "SQL yang dihantar ke `apply_migration` ialah implementation SQL yang sama
+> secara semantik, tetapi **bukan salinan byte-for-byte penuh** termasuk semua
+> komen dokumentasi."
+
+**Ini pendedahan yang betul, bukan pelanggaran.** ChatGPT menandakan setiap cap
+jari yang tidak dapat dikira sebagai `⏳` dan **tidak** mendakwa pengesahan
+bebas. Ia mematuhi larangan #8.
+
+Tetapi ia mendedahkan **jurang sebenar**: L1a–L1e mengesahkan **kewujudan dan
+nama**, bukan **definisi**.
+
+| Objek | Disahkan di live | **Belum disahkan** |
+|---|---|---|
+| 6 lajur | nama + `data_type` | `is_nullable`, `column_default`, FK |
+| `account_manager_aliases` | wujud + `rls_aktif` | lajur, `NOT NULL`, `UNIQUE`, kekangan |
+| 2 fungsi | nama + argumen | **BADAN FUNGSI — logik padanan** |
+| 4 polisi | nama + `cmd` | **`qual` / `with_check` — KESELAMATAN** |
+| 2 indeks | nama | ungkapan indeks |
+
+**Mengapa perbandingan teks TIDAK boleh dipakai.** Badan fungsi dalam fail
+mengandungi komen `--` **di dalam** blok `$$ … $$`:
+
+```sql
+AS $$
+  SELECT NULLIF(
+    btrim(
+      regexp_replace(
+        regexp_replace(
+          regexp_replace(
+            lower(coalesce(p_input, '')),
+            '[''’.`\-]', ' ', 'g'          -- apostrofu, titik, tanda pisah -> ruang
+          ),
+          '\s+', ' ', 'g'                   -- runtuhkan ruang berlebihan
+        ),
+        -- gelaran kehormat Malaysia + antarabangsa, hanya di permulaan
+        '^(dr|pn|en|ms|…|tan sri|puan sri)\s+',
+```
+
+Jika komen dibuang, `pg_get_functiondef()` di live berbeza secara **teks**
+walaupun betul secara **semantik**. Membandingkan teks akan memberi **positif
+palsu** dan mendorong seseorang "memperbaiki" production supaya sepadan — lebih
+berbahaya daripada jurang itu sendiri.
+
+**Kata putus 13.2: sahkan melalui KELAKUAN, bukan teks.**
+
+`scripts/generate-8a3-l1-reconciliation.mjs` memasang fail yang **diluluskan** ke
+dalam PGlite atas 18 staf yang **sama namanya dengan J0a live**, menjalankan 8
+probe (R1–R7), dan menerbitkan output PGlite sebagai **jangkaan**. ChatGPT
+menjalankan probe yang sama di live dan membandingkan. Kerana probe menguji
+input→output, ia **kalis** terhadap pembuangan komen, ruang kosong dan susun
+atur — tetapi **tidak kalis** terhadap logik yang berubah.
+
+Hasil: `docs/PROMPT-8A3-L1-REKONSILIASI.md` — **8 probe, semuanya read-only**.
+
+| Probe | Ketat? | Baris | Apa yang ditutup |
+|---|---|---|---|
+| R1 `normalize_person_name` | 🔴 | 11 | keempat-empat langkah penormalan |
+| R2 `resolve_account_manager` | 🔴 | 16 | seluruh logik berperingkat |
+| R3 `pg_policies` `qual`/`with_check` | 🔴 | 4 | **keselamatan RLS** |
+| R4 `pg_get_indexdef` | 🟠 maklum | 2 | ungkapan indeks (render berbeza antara versi) |
+| R5 6 lajur `is_nullable`/`default` | 🔴 | 6 | kebolehubahan lajur |
+| R6 lajur `account_manager_aliases` | 🔴 | 7 | struktur jadual |
+| R6b kekangan | 🔴 | 9 | `UNIQUE(raw_text)`, `NOT NULL`, FK |
+| R7 FK → `user_profiles` | 🔴 | 2 | **K5: `NO ACTION`** |
+
+**Probe diskriminatif dipilih dengan sengaja.** `normalize_person_name('Dr. Afiq')`
+→ `afiq` **sahaja tidak mencukupi**: jika regexp gelaran hilang, profil
+`Dr. Afiq` juga menjadi `dr afiq` dan kedua-dua sisi gagal **bersama-sama**, jadi
+padanan tepat masih berlaku dan probe itu **lulus secara palsu**. Probe yang
+sebenarnya diskriminatif ialah:
+
+```text
+resolve_account_manager('Afiq')        -> 'Dr. Afiq'        (hanya lulus jika gelaran dibuang pada sisi PROFIL)
+resolve_account_manager('Ahmad Nizar') -> 'Dr. Ahmad Nizar'  (sama)
+```
+
+Kedua-duanya dikira dalam PGlite dan **lulus**, mengesahkan fungsi yang dipasang
+di repo benar-benar membuang gelaran.
+
+**Anotasi ditambah supaya perbezaan yang DIJANGKA tidak ditandakan sebagai
+kegagalan:**
+
+- **R7:** `pg_get_constraintdef()` **membuang** `ON DELETE NO ACTION` kerana ia
+  lalai PostgreSQL. Ketiadaan `ON DELETE` dalam output **ialah** `NO ACTION` yang
+  K5 tuntut. Tanpa anotasi ini, ChatGPT akan menandanya 🔴.
+- **R3:** `am_aliases_read` mempunyai `qual = true` **dengan sengaja** — komen
+  fail menyatakan Veto Keselamatan §2.8 mengehadkan **menulis**, bukan membaca.
+  Bacaan dibuka kepada `authenticated`; tulisan kepada
+  `admin`/`head_governance`/`finance`.
+- **R4:** PostgreSQL boleh merender `lower(btrim(name))` sedikit berbeza antara
+  versi — perbezaan kosmetik bukan kegagalan.
+
+**Kecacatan penjana yang ditemui semasa membina ini:** probe R1 dan R2 pada
+mulanya mengembalikan **1 baris** dan bukan 11/16 — kurungan luar berlebihan
+dalam `VALUES ((…),(…))` menghasilkan satu baris komposit. Rekonsiliasi itu akan
+sia-sia secara senyap (ChatGPT membandingkan 11 baris live dengan 1 baris
+jangkaan). Dibetulkan, dan **penjaga ditambah**: penjana kini menaikkan ralat
+jika bilangan baris probe tidak sama bilangan vektor.
+
+### 13.3 🔴 Penemuan baharu: positif palsu Langkah 5 (padanan token pertama)
+
+Probe negatif yang Arena reka — `Siti Nurhaliza`, seorang yang **bukan** staf —
+**tidak** mengembalikan NULL:
+
+```text
+resolve_account_manager('Siti Nurhaliza')  ->  'Siti Sarah'
+```
+
+**Punca (diukur, daripada badan fungsi):** Langkah 5 memadankan **token pertama**
+dengan syarat **tepat satu** staf berkongsi token itu. `siti` unik dalam kalangan
+18 staf (hanya `Siti Sarah`), jadi `Siti Nurhaliza` menyelesaikan kepadanya.
+
+**Ini BUKAN kecacatan pelaksanaan — ia kelakuan yang DIREKA.** Komen dalam fail
+menyatakan Langkah 5 wujud untuk `Zalina` → `Zalina Sayuti`, dan DP-2a
+memutuskan peraturan token pertama. Ia berfungsi betul untuk **bentuk pendek
+orang yang sama**. Ia **gagal** untuk **orang berbeza yang berkongsi nama
+pertama**.
+
+**Sama ada ia berbahaya SEKARANG — diukur:**
+
+| Fakta | Nilai | Sumber |
+|---|---|---|
+| Nilai `Account Manager` di live | **SIFAR** | J1f = `[]` |
+| Daripada 12 nilai Excel sebenar, berapa yang mencetus positif palsu ini | **0** | semua 12 ada keputusan manusia (11 SELESAI + 1 LUAR) |
+| `account_manager_id` diisi oleh | `am_backfill_account_manager()` sahaja | reka bentuk |
+| Backfill boleh dijalankan sekarang? | **TIDAK** — gate berasingan selepas import 8C | larangan #4 |
+| Ada pratinjau? | **YA** — `am_backfill_preview()` | `account-manager-resolution.sql` |
+
+**Jadi risiko ini LATEN, bukan AKTIF.** Tiada baris live boleh terjejas hari ini.
+
+**Mengapa Arena TIDAK memperketat Langkah 5 sekarang — diuji, bukan diandaian.**
+Dua peraturan ketat yang obvious **kedua-duanya memecahkan kes sebenar**:
+
+| Peraturan dicadangkan | `Siti Nurhaliza` (mahu NULL) | `Abu Said` → `Abu Sa'id` (kes SEBENAR, mahu padan) | `Zalina` → `Zalina Sayuti` (kes sebenar) |
+|---|---|---|---|
+| Mentakrif semula: raw mesti **awalan** nama calon | ✅ NULL | ❌ **PECAH** — `abu said` bukan awalan `abu sa id` | ✅ lulus |
+| Mentakrif semula: raw mesti **satu token** sahaja | ✅ NULL | ❌ **PECAH** — `Abu Said` dua token | ✅ lulus |
+
+Kedua-duanya akan **merosakkan padanan sebenar** yang fail itu direka untuk
+selesaikan. Membezakan `Abu Said`/`Abu Sa'id` (orang sama, bezanya apostrofu)
+daripada `Siti Nurhaliza`/`Siti Sarah` (orang berbeza, bezanya token kedua)
+memerlukan padanan **kabur** — dan `normalize_person_name()` secara eksplisit
+berdokumentasi "**TIDAK membuat padanan kabur**". Melanggar itu akan melanggar
+spec sistem.
+
+**Kata putus 13.3:**
+
+1. **`client-master.sql` TIDAK diubah.** Ia **sudah dipasang di live**. Mengubah
+  inya sekarang akan (a) mewujudkan drift live↔repo yang baru sahaja kita tutup,
+   (b) membatalkan blob SHA `37b8d8b8fa88…` yang baru sahaja LULUS, dan
+   (c) memerlukan pemasangan semula tanpa kelulusan baharu. **Tiada perubahan.**
+2. **Risiko diterima sebagai keterbatasan yang DIREKODKAN**, dengan mitigasi yang
+   sudah wujud dalam reka bentuk:
+   - `am_backfill_preview()` **mesti** disemak manusia sebelum
+     `am_backfill_account_manager()` — ia bukan pilihan.
+   - Backfill kekal **gate berasingan** selepas import 8C (larangan #4).
+   - `account_manager_id` kekal **NULL** sehingga backfill; laporan tidak
+     bergantung kepadanya sebelum itu.
+3. **Tetapkan semula keputusan bila ada data untuk diukur.** Kita mempunyai
+   **sifar** nilai live, jadi kadar positif palsu **tidak boleh diukur**.
+   Memperketat tanpa ukuran ialah meneka — melanggar protokol anti-handwave.
+   Isu ini **ditangguh ke Fasa 8C/8F**, apabila import sebenar menghasilkan
+   nilai yang boleh diukur, dan pratinjau backfill boleh mendedahkan setiap
+   padanan token-pertama untuk semakan manusia.
+4. **Probe ini dikekalkan secara kekal** dalam `test-client-master.mjs` dan dalam
+   rekonsiliasi, supaya sebarang perubahan masa depan terhadap Langkah 5
+   **dikesan**, bukan dilupakan.
+
+### 13.4 Pengajaran direkodkan
+
+21. **Mengesahkan kewujudan objek bukan mengesahkan objek itu betul.** L1a–L1e
+    lulus sepenuhnya dan masih meninggalkan badan fungsi, `qual` polisi, dan
+    ungkapan indeks **tidak disahkan**. Katalog memberi nama dengan murah;
+    definisi memerlukan usaha.
+22. **Apabila input tidak boleh dipercayai byte-for-byte, sahkan OUTPUT.**
+    Perbandingan teks terhadap SQL yang telah dibuang komennya menghasilkan
+    positif palsu dan mendorong "pembaikan" production. Probe kelakuan
+    menguji apa yang sebenarnya penting dan kalis terhadap format.
+23. **Probe mesti direka untuk MEMBEZAKAN, bukan sekadar menguji.**
+    `normalize_person_name('Dr. Afiq')` lulus secara palsu jika regexp gelaran
+    hilang, kerana kedua-dua sisi gagal bersama. Hanya
+    `resolve_account_manager('Afiq')` membezakannya.
+24. **Probe negatif yang "gagal" mungkin penemuan, bukan kesilapan.**
+    `Siti Nurhaliza` → `Siti Sarah` kelihatan seperti probe yang salah; ia
+    sebenarnya mendedahkan keterbatasan reka bentuk yang sebenar dan kini
+    direkodkan. Jangan padam probe yang mengejutkan — fahaminya dahulu.
+25. **Jangan perketat peraturan tanpa mengukur kadar ralatnya.** Dua peraturan
+    ketat yang kelihatan jelas kedua-duanya memecahkan kes sebenar. Dengan sifar
+    nilai live, tiada asas empirikal untuk memilih. Tangguh sehingga ada data.

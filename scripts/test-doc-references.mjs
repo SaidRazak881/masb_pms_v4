@@ -497,24 +497,32 @@ console.log('\n[7] DP-12 — SQL inline dalam prompt langkah byte-identik dengan
 // kandungan sudah dipin lebih kuat oleh blob SHA yang content-addressed.
 console.log('\n[8] DP-12 — prompt langkah sepadan output penjana (tiada drift)');
 {
-  const PENJANA = 'scripts/generate-8a3-install-prompts.mjs';
-  if (!fs.existsSync(PENJANA)) {
-    bad(`${PENJANA} tiada`);
-  } else {
+  // KEDUA-DUA penjana mesti bebas drift. Penjana rekonsiliasi membina semula
+  // JANGKAAN probe dalam PGlite daripada fail SQL yang diluluskan, jadi jika
+  // fail itu berubah dan prompt tidak dijana semula, ChatGPT akan membandingkan
+  // output live dengan jangkaan LAPUK dan melaporkan kegagalan palsu.
+  const PENJANA = [
+    ['scripts/generate-8a3-install-prompts.mjs', '4 prompt langkah 8A-3'],
+    ['scripts/generate-8a3-l1-reconciliation.mjs', 'prompt rekonsiliasi L1'],
+  ];
+  for (const [PEN, label] of PENJANA) {
+    if (!fs.existsSync(PEN)) { bad(`${PEN} tiada`); continue; }
     let kod = 0;
     let output = '';
     try {
-      output = execFileSync('node', [PENJANA, '--check'], { encoding: 'utf8' });
+      output = execFileSync('node', [PEN, '--check'], { encoding: 'utf8' });
     } catch (e) {
       kod = e.status ?? 1;
       output = `${e.stdout ?? ''}${e.stderr ?? ''}`;
     }
-    eq(kod, 0, 'penjana --check: prompt langkah sepadan output penjana');
+    eq(kod, 0, `penjana --check: ${label} sepadan output penjana`);
     if (kod !== 0) {
       for (const l of output.split('\n').filter((x) => x.trim())) {
         console.log(`       ${l}`);
       }
     }
+  }
+  {
     // Cop commit yang lapuk mesti TIDAK muncul semula — ia punca drift asal.
     for (const pf of ['docs/PROMPT-8A3-L1-CLIENT-MASTER.md',
                       'docs/PROMPT-8A3-L2-EXTERNAL-ACCOUNT-MANAGERS.md',

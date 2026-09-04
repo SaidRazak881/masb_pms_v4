@@ -260,6 +260,36 @@ async function main() {
   eq(resolved, 8, 'bilangan nilai yang SELESAI');
   eq(nulled, 4, 'bilangan nilai yang NULL (enggan meneka)');
 
+  // -------------------------------------------------------------------
+  // [F2] DP-13.3 — positif palsu Langkah 5 + probe DISKRIMINATIF
+  //
+  // MESTI dijalankan SEBELUM seksyen [G]: [G] menyemai dua profil bernama
+  // 'Siti Nurhaliza' untuk menguji kekaburan, yang akan menukar jawapan
+  // probe pertama di bawah daripada 'Siti Sarah' kepada NULL.
+  //
+  // Probe ini MENGUNCI kelakuan yang direkodkan supaya sebarang perubahan
+  // masa depan terhadap Langkah 5 dikesan, bukan dilupakan.
+  // -------------------------------------------------------------------
+  console.log('\n[F2] DP-13.3 — positif palsu Langkah 5 + probe diskriminatif');
+  const KES_DP13 = [
+    ['Siti Nurhaliza', 'Siti Sarah',
+      'POSITIF PALSU Langkah 5 yang DIREKODKAN: bukan staf, tetapi token ' +
+      'pertama "siti" unik dalam kalangan 18 staf -> selesai ke Siti Sarah. ' +
+      'Kelakuan DIREKA (DP-2a), risiko diterima + mitigasi pratinjau backfill.'],
+    ['Afiq', 'Dr. Afiq',
+      'DISKRIMINATIF: hanya lulus jika pembuangan gelaran berfungsi pada sisi ' +
+      'PROFIL. Jika regexp gelaran hilang, profil menjadi "dr afiq" dan probe ' +
+      'ini gagal — manakala normalize("Dr. Afiq") sahaja lulus secara PALSU ' +
+      'kerana kedua-dua sisi gagal bersama-sama.'],
+    ['Ahmad Nizar', 'Dr. Ahmad Nizar', 'DISKRIMINATIF: sama seperti "Afiq"'],
+  ];
+  for (const [raw, expectName, why] of KES_DP13) {
+    const r = await db.query('SELECT public.resolve_account_manager($1) id', [raw]);
+    const got = await nameOf(r.rows[0].id);
+    if (got === expectName) ok(`'${raw}' -> ${JSON.stringify(got)}`);
+    else bad(`'${raw}': dapat ${JSON.stringify(got)}, jangkaan ${JSON.stringify(expectName)}\n       ${why}`);
+  }
+
   console.log('\n[G] KEKABURAN -> NULL (veto QA §2.7)');
   // dua staf bernama sama
   await db.query(

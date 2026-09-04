@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-04 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: 7fe431d DP-12: benamkan SQL penuh dalam 4 prompt langkah - selesaikan blocker pengangkutan kandungan · arena/01a06274-masb-pms-v4
+> Git: c48266e DP-12 susulan: penjana deterministik + penjaga drift (test-doc-references 115 -> 120) · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 
@@ -248,6 +248,7 @@
 - `PROMPT-8A-J1-READONLY.md`
 - `PROMPT-8A3-INSTALL.md`
 - `PROMPT-8A3-L1-CLIENT-MASTER.md`
+- `PROMPT-8A3-L1-REKONSILIASI.md`
 - `PROMPT-8A3-L2-EXTERNAL-ACCOUNT-MANAGERS.md`
 - `PROMPT-8A3-L3-ACCOUNT-MANAGER-RESOLUTION.md`
 - `PROMPT-8A3-L4-SEED-ALIASES.md`

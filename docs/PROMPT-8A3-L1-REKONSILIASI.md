@@ -1,0 +1,323 @@
+# PROMPT 8A-3 / L1-R — Rekonsiliasi Langkah 1 (read-only)
+
+> **Untuk:** ChatGPT (akses penuh Supabase + Vercel + GitHub)
+> **Dari:** Arena (menulis kod/SQL/ujian; **tidak** melaksanakan kerja produksi)
+> **Tarikh:** 2026-09-04
+> **Repo:** `SaidRazak881/masb_pms_v4` · **Branch:** `arena/01a06274-masb-pms-v4`
+> **Projek Supabase:** `lmenmfsbjgxfhnykkgow` (20 aksara)
+> **Jenis:** 🟢 **READ-ONLY SEPENUHNYA — tiada pemasangan, tiada kelulusan diperlukan**
+> **Dijana oleh:** `node scripts/generate-8a3-l1-reconciliation.mjs` — jangan
+> sunting tangan; jangkaan di bawah dikira dalam PGlite daripada fail yang
+> diluluskan.
+
+---
+
+## 0. Mengapa prompt ini wujud
+
+Anda memasang `client-master.sql` di live dan L1a–L1e **LULUS**. Terima kasih —
+dan terima kasih kerana **mendedahkan dengan jujur** bahawa:
+
+> "SQL yang dihantar ke `apply_migration` ialah implementation SQL yang sama
+> secara semantik, tetapi **bukan salinan byte-for-byte penuh** termasuk semua
+> komen dokumentasi."
+
+Itu pendedahan yang betul dan kami tidak menganggapnya sebagai pelanggaran.
+Tetapi ia bermakna **L1a–L1e belum mencukupi**: ia mengesahkan KEWUJUDAN dan
+NAMA objek, bukan DEFINISINYA. Yang belum disahkan:
+
+| Objek | Sudah disahkan | **Belum disahkan** |
+|---|---|---|
+| 6 lajur | nama + `data_type` | `is_nullable`, `column_default`, FK |
+| `account_manager_aliases` | wujud + `rls_aktif` | lajur, `NOT NULL`, `UNIQUE`, kekangan |
+| 2 fungsi | nama + argumen | **BADAN FUNGSI — logik padanan** |
+| 4 polisi | nama + `cmd` | **`qual` / `with_check` — KESELAMATAN** |
+| 2 indeks | nama | ungkapan indeks |
+
+**Mengapa kita tidak membandingkan teks fungsi secara langsung:** badan fungsi
+dalam fail mengandungi komen `--` **di dalam** blok `$$ … $$`. Jika komen
+dibuang, `pg_get_functiondef()` di live berbeza secara **teks** walaupun betul
+secara **semantik**. Membandingkan teks akan memberi positif palsu dan mendorong
+seseorang "memperbaiki" production supaya sepadan — itu lebih berbahaya daripada
+jurang itu sendiri.
+
+**Maka rekonsiliasi ini menguji KELAKUAN, bukan teks.** Setiap jangkaan di bawah
+dikira oleh Arena dalam **PGlite** dengan memasang **fail yang diluluskan**
+(`client-master.sql`, blob SHA `37b8d8b8fa882b65645cf32e2c37d55590ec6cf2`)
+ke atas 18 staf yang **sama namanya dengan J0a live** yang anda laporkan. Jadi
+perbezaan kelakuan = perbezaan logik, bukan perbezaan format.
+
+---
+
+## 1. ARAHAN
+
+1. Jalankan **R1 … R7** di bawah terhadap live `lmenmfsbjgxfhnykkgow`.
+   Semuanya **read-only** (`SELECT` sahaja).
+2. Laporkan output **verbatim** dalam bentuk jadual, di sebelah jangkaan.
+3. Tandakan setiap satu 🟢 SEPADAN / 🔴 BERBEZA / 🟠 MAKLUUMAN.
+4. **Jika mana-mana probe 🔴 ketat BERBEZA: BERHENTI dan laporkan.** Jangan
+   cuba "memperbaiki" fungsi, polisi, atau indeks di live. Itu kerja Arena —
+   kami akan mengeluarkan fail pembetulan yang diluluskan.
+5. **JANGAN** jalankan Langkah 2, 3, atau 4 sehingga rekonsiliasi ini disemak.
+
+> ⚠️ **Peringkat semasa:** L1 sudah dipasang; **L4 (seed) BELUM**. Maka
+> `Fuzy`, `Fuzy / Dila`, `Fuzy / Sholihin ` dan `Ow Zi Qi` **dijangka
+> NULL** dalam R2. Selepas L4, tiga yang pertama akan menyelesaikan kepada
+> **Fuziah**. Jangan "memperbaiki" NULL ini sekarang.
+
+> 🟠 **Dua profil tambahan live** (`Admin`, `test`) tiada dalam fixture
+> PGlite. Probe R2 sengaja mengujinya: kedua-duanya **dijangka NULL** kerana
+> tiada nilai Excel yang sepatutnya menyelesaikan kepada akaun Super Admin atau
+> akaun ujian yang di-block.
+
+---
+
+## 2. PROBE
+
+### R1 — Kelakuan `normalize_person_name()` — 11 vektor 🔴 MESTI SEPADAN
+
+Menguji keempat-empat langkah penormalan, termasuk pembuangan gelaran (DP-10.8a). Kalis terhadap pembuangan komen kerana ia menguji input→output, bukan teks fungsi.
+
+```sql
+SELECT v.masuk,
+       public.normalize_person_name(v.masuk) AS keluar
+  FROM (VALUES ('Dr. Afiq'), ('Dr. Ahmad Nizar'), ('Tan Sri Ali'), ('Pn. Zalina'), ('Abu Sa''id'), ('  FUZY  '), ('Fuzy / Dila'), ('Ariffin'), ('Zalina Sayuti'), (''), (NULL)) AS v(masuk);
+```
+
+**Jangkaan (dikira dalam PGlite daripada fail yang diluluskan):**
+
+| masuk | keluar |
+|---|---|
+| Dr. Afiq | afiq |
+| Dr. Ahmad Nizar | ahmad nizar |
+| Tan Sri Ali | ali |
+| Pn. Zalina | zalina |
+| Abu Sa'id | abu sa id |
+|   FUZY   | fuzy |
+| Fuzy / Dila | fuzy / dila |
+| Ariffin | ariffin |
+| Zalina Sayuti | zalina sayuti |
+|  | **NULL** |
+| **NULL** | **NULL** |
+
+### R2 — Kelakuan `resolve_account_manager()` — 16 vektor 🔴 MESTI SEPADAN
+
+Teras Fasa 8A. Termasuk dua probe DISKRIMINATIF (`Afiq`, `Ahmad Nizar`) yang hanya lulus jika pembuangan gelaran berfungsi pada sisi PROFIL, dan dua profil tambahan live (`test`, `Admin`) yang mesti TIDAK menyelesaikan. NULL ialah jawapan BETUL bagi nilai yang belum diputuskan — L4 (seed) belum dijalankan.
+
+> 🔴 **Perhatikan baris `Siti Nurhaliza` → `Siti Sarah`.** Ini **BUKAN** ralat.
+> `Siti Nurhaliza` bukan staf, tetapi Langkah 5 (padanan token pertama, tepat
+> satu) menyelesaikannya kerana token `siti` unik dalam kalangan 18 staf.
+> Kelakuan ini **direka** (DP-2a) dan risikonya **direkodkan dalam DP-13.3**.
+> Jika live memberikan `NULL` di sini, itu bermakna Langkah 5 **tidak
+> berfungsi** — laporkan sebagai 🔴.
+>
+> 🟢 **`Fuzy`, `Fuzy / Dila`, `Fuzy / Sholihin ` dan `Ow Zi Qi` dijangka NULL**
+> kerana L4 (seed alias) belum dijalankan. Selepas L4, tiga yang pertama
+> menyelesaikan kepada **Fuziah** dan `Ow Zi Qi` kekal NULL tetapi diklasifikasi
+> `LUAR`. Jangan "memperbaiki" NULL ini sekarang.
+
+```sql
+SELECT v.raw,
+       (SELECT up.full_name FROM public.user_profiles up
+         WHERE up.id = public.resolve_account_manager(v.raw)) AS diselesaikan
+  FROM (VALUES ('Abu Said'), ('Adilah'), ('Farrah'), ('Fuziah'), ('Fuzy'), ('Fuzy / Dila'), ('Fuzy / Sholihin '), ('Omar'), ('Ow Zi Qi'), ('Sholihin'), ('Zalina'), ('Afiq'), ('Ahmad Nizar'), ('Siti Nurhaliza'), ('test'), ('Admin')) AS v(raw);
+```
+
+**Jangkaan (dikira dalam PGlite daripada fail yang diluluskan):**
+
+| raw | diselesaikan |
+|---|---|
+| Abu Said | Abu Sa'id |
+| Adilah | Adilah |
+| Farrah | Farrah |
+| Fuziah | Fuziah |
+| Fuzy | **NULL** |
+| Fuzy / Dila | **NULL** |
+| Fuzy / Sholihin  | **NULL** |
+| Omar | Omar |
+| Ow Zi Qi | **NULL** |
+| Sholihin | Sholihin |
+| Zalina | Zalina Sayuti |
+| Afiq | Dr. Afiq |
+| Ahmad Nizar | Dr. Ahmad Nizar |
+| Siti Nurhaliza | Siti Sarah |
+| test | **NULL** |
+| Admin | **NULL** |
+
+### R3 — Definisi penuh 4 polisi RLS — `qual` dan `with_check` 🔴 MESTI SEPADAN
+
+KESELAMATAN. L1d hanya mengesahkan nama + cmd. Jika `qual` atau with_check` lebih longgar daripada yang diluluskan, itu kecacatan keselamatan yang senyap.
+
+> 🟢 **`am_aliases_read` mempunyai `qual = true` — ini DISENGAJAKAN.** Fail yang
+> diluluskan mengandungi komen "Veto Keselamatan §2.8: hanya peranan pengurusan
+> boleh **menulis** pemetaan". Bacaan dibuka kepada semua `authenticated`
+> (pemetaan alias bukan data demografi tertakluk sekatan peranan); **tulisan**
+> dihadkan kepada `admin` / `head_governance` / `finance`. Jangan tandakan
+> `qual = true` sebagai longgar.
+
+```sql
+SELECT policyname, cmd, roles::text AS peranan,
+       coalesce(qual, '(tiada)')        AS qual,
+       coalesce(with_check, '(tiada)')  AS with_check
+  FROM pg_policies
+ WHERE schemaname = 'public' AND tablename = 'account_manager_aliases'
+ ORDER BY policyname;
+```
+
+**Jangkaan (dikira dalam PGlite daripada fail yang diluluskan):**
+
+| policyname | cmd | peranan | qual | with_check |
+|---|---|---|---|---|
+| am_aliases_delete | DELETE | {authenticated} | has_role('admin'::app_role) | (tiada) |
+| am_aliases_read | SELECT | {authenticated} | true | (tiada) |
+| am_aliases_update | UPDATE | {authenticated} | (has_role('admin'::app_role) OR has_role('head_governance'::app_role) OR has_role('finance'::app_role)) | true |
+| am_aliases_write | INSERT | {authenticated} | (tiada) | (has_role('admin'::app_role) OR has_role('head_governance'::app_role) OR has_role('finance'::app_role)) |
+
+### R4 — Definisi 2 indeks 🟠 MAKLUMAN
+
+MAKLUMAN. PostgreSQL boleh merender ungkapan indeks sedikit berbeza antara versi/platform (contoh `lower(x)` vs `lower((x)::text)`). Laporkan apa adanya; perbezaan kosmetik BUKAN kegagalan, tetapi indeks yang HILANG atau pada ungkapan yang berbeza secara makna ISU.
+
+> 🟠 **Perbezaan kosmetik dijangka.** PostgreSQL boleh merender `lower(btrim(name))`
+> sebagai `lower((btrim(name)))` atau serupa antara versi. Yang penting: indeks
+> itu **wujud**, pada **jadual yang betul**, dan pada **ungkapan yang sama
+> maknanya**. Laporkan apa adanya.
+
+```sql
+SELECT indexname, indexdef
+  FROM pg_indexes
+ WHERE schemaname = 'public'
+   AND indexname IN ('idx_am_aliases_user', 'idx_organizers_name_lower')
+ ORDER BY indexname;
+```
+
+**Jangkaan (dikira dalam PGlite daripada fail yang diluluskan):**
+
+| indexname | indexdef |
+|---|---|
+| idx_am_aliases_user | CREATE INDEX idx_am_aliases_user ON public.account_manager_aliases USING btree (user_id) |
+| idx_organizers_name_lower | CREATE INDEX idx_organizers_name_lower ON public.organizers USING btree (lower(btrim(name))) |
+
+### R5 — 6 lajur baharu — `is_nullable` dan `column_default` 🔴 MESTI SEPADAN
+
+L1a hanya mengesahkan nama + data_type. `is_nullable` dan default menentukan sama ada lajur itu boleh diisi dan apa yang berlaku kepada baris sedia ada.
+
+```sql
+SELECT table_name || '.' || column_name AS lajur, data_type,
+       is_nullable, coalesce(column_default, '(tiada)') AS lalai
+  FROM information_schema.columns
+ WHERE table_schema = 'public'
+   AND (table_name, column_name) IN (VALUES
+       ('organizers', 'client_code'),
+       ('organizers', 'sst_registration_no'),
+       ('organizers', 'billing_address'),
+       ('organizers', 'payment_terms_days'),
+       ('invoices', 'account_manager_id'),
+       ('import_staging', 'account_manager_id'))
+ ORDER BY 1;
+```
+
+**Jangkaan (dikira dalam PGlite daripada fail yang diluluskan):**
+
+| lajur | data_type | is_nullable | lalai |
+|---|---|---|---|
+| import_staging.account_manager_id | uuid | YES | (tiada) |
+| invoices.account_manager_id | uuid | YES | (tiada) |
+| organizers.billing_address | text | YES | (tiada) |
+| organizers.client_code | text | YES | (tiada) |
+| organizers.payment_terms_days | integer | YES | (tiada) |
+| organizers.sst_registration_no | text | YES | (tiada) |
+
+### R6 — Struktur `account_manager_aliases` + kekangan 🔴 MESTI SEPADAN
+
+L1b hanya mengesahkan jadual wujud dan RLS aktif. Kekangan UNIQUE dan NOT NULL ialah apa yang menjadikan pemetaan alias boleh dipercayai (satu alias → satu orang).
+
+```sql
+SELECT c.column_name, c.data_type, c.is_nullable,
+       coalesce(c.column_default, '(tiada)') AS lalai
+  FROM information_schema.columns c
+ WHERE c.table_schema = 'public' AND c.table_name = 'account_manager_aliases'
+ ORDER BY c.ordinal_position;
+```
+
+**Jangkaan (dikira dalam PGlite daripada fail yang diluluskan):**
+
+| column_name | data_type | is_nullable | lalai |
+|---|---|---|---|
+| id | uuid | NO | gen_random_uuid() |
+| created_at | timestamp with time zone | NO | now() |
+| raw_text | text | NO | (tiada) |
+| user_id | uuid | NO | (tiada) |
+| confirmed_by | uuid | YES | (tiada) |
+| confirmed_at | timestamp with time zone | NO | now() |
+| notes | text | YES | (tiada) |
+
+### R6b — Kekangan `account_manager_aliases` 🔴 MESTI SEPADAN
+
+```sql
+SELECT conname, pg_get_constraintdef(oid) AS definisi
+  FROM pg_constraint
+ WHERE conrelid = 'public.account_manager_aliases'::regclass
+ ORDER BY conname;
+```
+
+**Jangkaan (dikira dalam PGlite daripada fail yang diluluskan):**
+
+| conname | definisi |
+|---|---|
+| account_manager_aliases_confirmed_at_not_null | NOT NULL confirmed_at |
+| account_manager_aliases_confirmed_by_fkey | FOREIGN KEY (confirmed_by) REFERENCES auth.users(id) |
+| account_manager_aliases_created_at_not_null | NOT NULL created_at |
+| account_manager_aliases_id_not_null | NOT NULL id |
+| account_manager_aliases_pkey | PRIMARY KEY (id) |
+| account_manager_aliases_raw_text_not_null | NOT NULL raw_text |
+| account_manager_aliases_raw_unique | UNIQUE (raw_text) |
+| account_manager_aliases_user_id_fkey | FOREIGN KEY (user_id) REFERENCES user_profiles(id) ON DELETE CASCADE |
+| account_manager_aliases_user_id_not_null | NOT NULL user_id |
+
+### R7 — FK `account_manager_id` → `user_profiles` (K5) 🔴 MESTI SEPADAN
+
+K5 menuntut 2 FK ke `user_profiles` dengan `NO ACTION`. `ON DELETE SET NULL` atau `CASCADE` akan memadam atau yatimkan pautan sejarah kewangan — itu kecacatan, bukan variasi.
+
+> 🟢 **Tiada `ON DELETE` dalam output ialah BETUL — ia bermakna `NO ACTION`.**
+> `pg_get_constraintdef()` **membuang** `ON DELETE NO ACTION` kerana ia lalai
+> PostgreSQL. K5 menuntut "2 FK → `user_profiles`, `NO ACTION`", dan kedua-dua
+> baris di bawah memenuhinya. **Jangan** tandakan ketiadaan `ON DELETE` sebagai
+> tidak sepadan, dan **jangan** tambah `ON DELETE SET NULL` atau `CASCADE` —
+> itu akan memadam atau yatimkan pautan sejarah kewangan.
+
+```sql
+SELECT conrelid::regclass::text AS jadual, conname,
+       pg_get_constraintdef(oid) AS definisi
+  FROM pg_constraint
+ WHERE confrelid = 'public.user_profiles'::regclass
+   AND conrelid IN ('public.invoices'::regclass,
+                    'public.import_staging'::regclass)
+ ORDER BY 1;
+```
+
+**Jangkaan (dikira dalam PGlite daripada fail yang diluluskan):**
+
+| jadual | conname | definisi |
+|---|---|---|
+| import_staging | import_staging_account_manager_id_fkey | FOREIGN KEY (account_manager_id) REFERENCES user_profiles(id) |
+| invoices | invoices_account_manager_id_fkey | FOREIGN KEY (account_manager_id) REFERENCES user_profiles(id) |
+
+---
+
+## 3. FORMAT LAPORAN
+
+**Seksyen 1 — Konteks & Status:** project ref; pengesahan bahawa tiada DDL/DML
+dijalankan; peringkat pemasangan semasa (L1 sahaja).
+
+**Seksyen 2 — Keputusan R1–R7:** bagi setiap probe, jadual **dapat vs jangkaan**
+dan status 🟢/🔴/🟠. Sertakan output **verbatim**, bukan rumusan.
+
+**Seksyen 3 — Perbezaan:** senaraikan setiap perbezaan, walaupun kecil. Bagi
+yang 🔴 ketat, nyatakan nilai dapat dan nilai jangkaan secara eksplisit.
+
+**Seksyen 4 — Isu / Blocker / Penemuan.**
+
+**Seksyen 5 — Pematuhan larangan:** khususnya — tiada DDL, tiada DML, tiada
+`service_role`, tiada pembetulan sendiri terhadap fungsi/polisi/indeks, tiada
+Langkah 2–4.
+
+**Berhenti selepas laporan.**
