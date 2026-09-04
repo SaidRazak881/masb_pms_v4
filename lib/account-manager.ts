@@ -184,6 +184,36 @@ export function isMultiPersonRaw(rawText: string): boolean {
 }
 
 /**
+ * Cermin TS bagi `public.normalize_person_name(text)` — huruf kecil, buang
+ * apostrofu/titik/tanda pisah, runtuhkan ruang, buang gelaran di permulaan.
+ *
+ * 🔴 **MENGAPA INI WAJIB, bukan pilihan gaya.** Nilai yang sampai ke UI datang
+ * daripada `am_unresolved_values()`, dan view itu mengenakan `btrim()` pada
+ * nilai mentah. Diukur dalam PGlite (`scripts/test-seed-l4-idempoten.mjs`
+ * Bahagian D, DP-21.2): invois mengandungi `'Fuzy / Sholihin '` (ruang hujung,
+ * bentuk Excel sebenar) tetapi UI menerima **`'Fuzy / Sholihin'`**. Perbandingan
+ * rentetan tepat terhadap bentuk Excel oleh itu **gagal secara senyap** —
+ * lencana "keputusan pengguna DP-8" tidak muncul untuk baris yang sebenarnya
+ * sudah diputuskan manusia, iaitu tepat maklumat yang menghalang pembatalan
+ * sambil lewa.
+ *
+ * Pangkalan data kekal pihak berkuasa: fungsi ini hanya memutuskan **label
+ * paparan**, sama seperti `isMultiPersonRaw`. Jangan gunakannya untuk menolak
+ * pengesahan.
+ */
+export function kunciNama(rawText: string): string {
+  return rawText
+    .toLowerCase()
+    .replace(/['\u2019.`\-]/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(
+      /^(dr|pn|en|ms|mr|mrs|puan|encik|tuan|datuk|datin|hajah|haji|prof|ir|ar|sr|tun|tan sri|puan sri)\s+/g,
+      "",
+    )
+    .trim();
+}
+
+/**
  * Keputusan DP-8 (pengguna, 2026-09-04, verbatim: *"dua dua tu masukkan Fuzy
  * aka Fuziah"*): ketiga-tiga nilai ini diagih kepada **Fuziah**.
  *
@@ -203,18 +233,31 @@ export const KEPUTUSAN_DP8 = new Set(["Fuzy", "Fuzy / Dila", "Fuzy / Sholihin "]
  */
 export const KEPUTUSAN_DP9 = new Set(["Ow Zi Qi"]);
 
+/**
+ * Set kunci yang DINORMALKAN, diterbitkan daripada set Excel di atas.
+ *
+ * Set Excel dikekalkan sebagai **dokumen** (ia mencatat bait sebenar sumber,
+ * termasuk ruang hujung `Fuzy / Sholihin `), tetapi **padanan** mesti melalui
+ * `kunciNama` kerana DB menghantar nilai tertrim. Satu sumber, dua bentuk —
+ * diterbitkan, bukan ditaip dua kali, supaya keduanya tidak boleh drift.
+ */
+const DP8_KUNCI = new Set([...KEPUTUSAN_DP8].map(kunciNama));
+const DP9_KUNCI = new Set([...KEPUTUSAN_DP9].map(kunciNama));
+
 export function isKeputusanPengguna(rawText: string): boolean {
-  return KEPUTUSAN_DP8.has(rawText) || KEPUTUSAN_DP9.has(rawText);
+  const k = kunciNama(rawText);
+  return DP8_KUNCI.has(k) || DP9_KUNCI.has(k);
 }
 
 /** Nota keputusan manusia bagi nilai yang sudah diputuskan pengguna. */
 export function notaKeputusanPengguna(rawText: string): string | null {
-  if (KEPUTUSAN_DP8.has(rawText)) {
+  const k = kunciNama(rawText);
+  if (DP8_KUNCI.has(k)) {
     return "DP-8 (keputusan pengguna 2026-09-04): diagih kepada Fuziah. " +
       "Kesan direkodkan — Dila/Sholihin tidak menerima kredit untuk baris ini, " +
       "dan ia akan mempengaruhi laporan komisen Fasa 8F.";
   }
-  if (KEPUTUSAN_DP9.has(rawText)) {
+  if (DP9_KUNCI.has(k)) {
     return "DP-9 (keputusan pengguna 2026-09-04): orang luar, bukan staf MIMOS " +
       "Academy. Sengaja tidak diagih; laporan mesti memisahkannya daripada " +
       "baki yang belum diputuskan.";

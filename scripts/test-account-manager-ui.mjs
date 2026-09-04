@@ -375,6 +375,18 @@ eq(autoTulis, 0, 'tiada useEffect yang menulis ke pangkalan data (tiada pengesah
 truthy(/sistem/i.test(COMP) && /meneka|auto/i.test(COMP),
   'UI menyatakan dengan jelas bahawa sistem tidak meneka');
 
+// F6: DP-21.5 — halaman ini kosong pada live walaupun seed berjaya (live ada
+// SIFAR nilai Account Manager mentah: K9 bilangan_nilai = 0, K8 []). Tanpa
+// penjelasan, kosong kelihatan seperti kerosakan kepada pengguna pertama.
+truthy(/dijangka/.test(COMP), 'UI menyatakan bahawa senarai kosong itu DIJANGKA, bukan rosak');
+truthy(COMP.includes('invoices') && COMP.includes('import_staging'),
+  'UI menamakan sumber senarai (invoices + import_staging) supaya kosong boleh dijelaskan');
+truthy(COMP.includes('KEPUTUSAN_DP8') && COMP.includes('KEPUTUSAN_DP9'),
+  'UI menyenaraikan keputusan pra-rekod DP-8/DP-9 dalam keadaan kosong');
+truthy(/8B\/8D|8B|8D/.test(COMP),
+  'UI menyatakan bila nilai itu akan muncul (Fasa 8B/8D)');
+truthy(/pra-rekod|prarekod/i.test(COMP), 'UI menggunakan istilah "pra-rekod" bagi keputusan seed');
+
 /* ===================================================================== */
 section('BAHAGIAN G — kebersihan teks');
 

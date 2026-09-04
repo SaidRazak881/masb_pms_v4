@@ -2948,3 +2948,240 @@ atau menggunakan `service_role`.
     akan terus menjejaskan setiap prompt bundel kelak. Berhenti dengan sebab
     yang dinyatakan ialah kelakuan yang betul, dan ia harus direkodkan sebagai
     kejayaan proses, bukan kegagalan jadual.
+
+---
+
+## DP-21 — L4 diterima: ruang hujung yang tidak merosakkan resolusi tetapi merosakkan UI, idempotensi mengikut dimensi, dan halaman yang akan kelihatan kosong (2026-09-05)
+
+**Pencetus.** ChatGPT melaporkan seed L4 **berjaya dipasang** di live
+(`8a3_l4_seed_account_manager_aliases`, `{"success":true}`), dengan pendedahan
+sukarela bahawa payload pertamanya bukan byte-for-byte. Panel mesti memutuskan:
+apa yang diterima, apa yang perlu dibaiki di sisi Arena, dan apa yang mesti
+diberitahu kepada pengguna sebelum mereka membuka halaman baharu itu.
+
+### 21.1 Apa yang live laporkan — dan diterima
+
+| Perkara | Live |
+|---|---|
+| Migration | `20260904071437 8a3_l4_seed_account_manager_aliases` · `{"success":true}` |
+| Alias DP-8 | **3** → Fuziah (`Fuzy`, `Fuzy / Dila`, `Fuzy / Sholihin`) |
+| Klasifikasi luar DP-9 | **1** (`Ow Zi Qi`, `display_name` = "Ow Zi Qi (luar)", sebab "bukan staf MIMOS Academy") |
+| `audit_logs` | **44 → 48 (+4)** — tepat 4 keputusan |
+| Data perniagaan | `1124/6/12/14/20` **tidak berubah** |
+| K6 / K6b / K8 | 12/12 SEPADAN · 3/3 NULL (veto §2.4 hidup) · `[]` |
+| K9 | Super Admin `true/19/0` · viewer `false/0/0` |
+| L4v | PostgreSQL **17.6**, `kekangan_not_null_bernama = 0` |
+| K4 | 🟠 `anon_exec = true` bagi 12 fungsi — **dijangka** mengikut DP-20.2, tidak diubah di L4, kekal gate 8C |
+| K12 | ⏳ tidak dijalankan (Larangan 1) → **dijawab oleh Arena di PGlite, lihat 21.3** |
+
+Cap jari disahkan semula oleh Arena terhadap fail sebenar: blob
+`22fc847e4708…` ✅ · bait `12284` ✅ · aksara `12229` ✅ · SHA-256 `0bcc03a8…` ✅
+· `CREATE 0/0/0/0` ✅.
+
+**Pengesahan sampingan yang berharga:** K9 melaporkan **19** staf dilihat oleh
+Super Admin daripada **20** profil. Itu **pengesahan live pertama** bagi pengawal
+*atribut* fixture yang ditambah selepas DP-17.5 (19 aktif, 1 `super_admin`,
+`test` blocked). Fixture kini terbukti setara live dalam dimensi itu, bukan
+sekadar dikira baris.
+
+**Kata putus 21.1:** **Fasa 8A SELESAI.** L1–L4 dipasang, direkonsiliasi, dan
+keputusan manusia DP-8/DP-9 kini hidup sebagai **data** yang boleh diaudit dan
+dibatalkan melalui `/account-managers`.
+
+### 21.2 🔴 Percanggahan ruang hujung — selamat untuk resolusi, pepijat untuk UI
+
+Baris 142 fail seed menulis kunci **tanpa** ruang hujung:
+
+```sql
+FOREACH v_raw IN ARRAY ARRAY['Fuzy', 'Fuzy / Dila', 'Fuzy / Sholihin']
+```
+
+sedangkan komen seed sendiri (baris 18, 25), query verifikasinya (baris 190),
+`account-manager-resolution.sql` (baris 20) dan `KEPUTUSAN_DP8` dalam
+`lib/account-manager.ts` semuanya menggunakan bentuk **dengan** ruang
+(`'Fuzy / Sholihin '`) — iaitu bait sebenar lajur H Excel.
+
+Diukur dalam PGlite (`scripts/test-seed-l4-idempoten.mjs`, 48 penegasan),
+bukan dihujahkan:
+
+* **Resolusi TIDAK terjejas.** `resolve_account_manager('Fuzy / Sholihin ')` →
+  UUID Fuziah ✅, begitu juga `'  FUZY  '` dan dua ruang hujung. Sebabnya:
+  carian alias menormalkan **kedua-dua** belah
+  (`normalize_person_name(a.raw_text) = v_norm`), dan `btrim()` membuang ruang.
+* **UI TERJEJAS — dan ini pepijat milik Arena.** `am_unresolved_values()`
+  mengenakan `btrim()` pada nilai mentah, jadi UI menerima
+  **`'Fuzy / Sholihin'`**. `isKeputusanPengguna()` membandingkan **rentetan
+  tepat** terhadap set Excel yang mengandungi bentuk beruang hujung → padanan
+  **gagal secara senyap** → lencana "keputusan pengguna DP-8" dan nota auditnya
+  **tidak muncul** untuk baris yang sebenarnya sudah diputuskan manusia. Itulah
+  maklumat yang menghalang pembatalan sambil lewa.
+
+**Pembetulan:** `kunciNama()` ditambah sebagai cermin TS bagi
+`normalize_person_name` (huruf kecil → buang `' ’ . \` -` → runtuhkan ruang →
+buang gelaran → trim). Set Excel **dikekalkan sebagai dokumen** (ia mencatat
+bait sebenar sumber) tetapi **padanan melalui kunci ternormal**, dan set kunci
+**diterbitkan** daripada set Excel — bukan ditaip dua kali, jadi keduanya tidak
+boleh drift. Cermin itu dikunci oleh Bahagian G ujian: **22 kes** (12 nilai Excel
++ 10 kes tepi termasuk `Dr. Afiq`, `Abu Sa'id`, `Tan Sri Ali`, kosong, ruang
+sahaja) **sepadan SQL tepat**.
+
+**Kesan yang TIDAK perlu dibaiki:** kunci alias di live kekal tanpa ruang
+hujung. Jika pengguna mengesahkan nilai yang sama melalui UI, kunci yang
+disimpan ialah bentuk tertrim yang **sama** → tiada baris keempat, tiada
+duplikasi. Normalisasi menjadikan kedua-dua bentuk setara, jadi menukar kunci
+live hanya menambah risiko tanpa faedah.
+
+### 21.3 K12 dijawab tanpa menyentuh live: idempoten mengikut **dimensi**
+
+GPT dengan betul tidak menjalankan semula seed (Larangan 1). Soalan itu dijawab
+di PGlite dengan melaksanakan fail seed **dua kali**:
+
+| Dimensi | Larian 2 |
+|---|---|
+| `account_manager_aliases` | **kekal 3**, set kunci tidak berubah (tiada baris keempat) ✅ |
+| `external_account_managers` | **kekal 1** ✅ |
+| Resolusi | masih betul ✅ |
+| `audit_logs` | 🔴 **+4 lagi** (jumlah +8, bukan +4) |
+| Peristiwa `created` | 🔴 **6** bagi 3 alias — larian kedua melabel baris **sedia ada** sebagai `created` |
+
+Puncanya dilihat dalam fail: `PERFORM public.log_audit(… 'created' …)` dipanggil
+**tanpa syarat** di dalam gelung `FOREACH`, selepas `ON CONFLICT DO UPDATE`.
+
+**Kata putus 21.3:**
+
+1. **Jangan jalankan seed ini dua kali di live.** Ia tidak merosakkan data
+   perniagaan, tetapi mencemarkan jejak audit — dan jejak audit ialah seluruh
+   sebab DP-8 menuntut keputusan manusia boleh diaudit.
+2. Pembetulan (audit bersyarat: hanya log apabila baris benar-benar berubah, dan
+   tindakan `updated` pada laluan `ON CONFLICT`) dimasukkan ke **migration aditif
+   8C**, bersama `REVOKE … FROM anon`, DP-14.2 dan DP-17.4(a)(b). **Bukan**
+   suntingan pada fail yang sudah dipasang.
+3. Ini juga menjelaskan mengapa K12 tidak boleh ditutup dengan "rerun sahaja":
+   L1–L3 idempoten (`CREATE OR REPLACE`, `IF NOT EXISTS`), **L4 tidak** dalam
+   dimensi audit.
+
+### 21.4 🟠 Byte-for-byte: kejadian **ketiga**, dan dua kawalan baharu
+
+GPT mendedahkan sendiri: *"payload pertama bukan salinan penuh byte-for-byte fail
+asal kerana saya mengecualikan komen/pengabsahan yang tidak dieksekusi"* — lalu
+menandakan functional 🟢 tetapi strict byte-for-byte 🟠. Ini corak: DP-13.2 (L1),
+DP-17.2 (L3), kini L4.
+
+**Kata putus 21.4:** terima **secara fungsi**. Bukti kelakuan sudah lengkap
+(K6 12/12, K7 3+1 dengan provenans Admin, K10 +4 audit, K11 20 jadual, data
+perniagaan tidak berubah), dan kata putus DP-13.2/DP-17.2 sudah menetapkan
+apabila input tidak boleh dipercayai byte-for-byte, sahkan melalui kelakuan.
+Komen tidak dieksekusi, jadi membuangnya **tidak mengubah** keadaan pangkalan
+data; yang berbahaya ialah pemendekan **kod**, dan K1–K11 menolak kemungkinan itu.
+
+**Tetapi pendedahan sukarela mesti dibalas dengan kawalan yang boleh mengesan,
+bukan tuntutan yang tidak boleh dipatuhi.** Dua kawalan baharu untuk prompt 8C
+dan seterusnya:
+
+* **(a) Laporkan panjang bait payload yang sebenarnya dihantar.** Murah, dan
+  serta-merta mendedahkan pemendekan (`12284` vs kurang).
+* **(b) Nyatakan bahawa SHA-256 boleh dikira TANPA rangkaian.** GPT dua kali
+  melaporkan ⏳ dengan sebab "sandbox tidak mempunyai akses rangkaian untuk
+  menarik raw GitHub" — itu **salah faham**: teks SQL sudah ada dalam konteks
+  prompt, jadi tiada muat turun diperlukan untuk menulisnya ke fail dan
+  menghiranya.
+
+### 21.5 🔴 Fakta penggunaan: halaman `/account-managers` akan kelihatan KOSONG
+
+Live mempunyai **sifar** nilai `Account Manager` mentah (J1f; K9
+`bilangan_nilai = 0`; K8 `[]`). Maka halaman baharu itu akan memaparkan
+**senarai kosong walaupun seed berjaya**.
+
+**Itu betul, bukan kerosakan.** Tiga alias dan satu klasifikasi luar ialah
+keputusan **pra-rekod**: ia akan terpakai **secara automatik** sebaik sahaja data
+quotation/invoice yang mengandungi nilai-nilai itu masuk melalui 8B/8D. Tanpa
+fakta ini dinyatakan, pengguna akan melihat halaman kosong dan menyimpulkan
+sistem rosak — jadi ia mesti disebut bersama pengumuman kejayaan, bukan
+sebagai nota kaki.
+
+### 21.6 🟠 `42703` semasa probe tambahan yang tidak diminta
+
+GPT melaporkan ralat `42703` (lajur tidak wujud) semasa "probe tambahan",
+memperbetulkannya sendiri, dan menyatakan ia tidak menjejaskan seed. Direkodkan;
+tiada tindakan diperlukan. **Perhatian proses:** probe tambahan yang tidak
+diminta menambah permukaan ralat dan menyukarkan pemadanan laporan. Prompt 8C
+akan menyatakan secara eksplisit: jalankan probe yang disenaraikan sahaja; jika
+anda percaya probe tambahan diperlukan, **cadangkan** ia dalam laporan, jangan
+jalankan.
+
+### 21.7 Pengajaran direkodkan
+
+61. **Semak transformasi VIEW sebelum membandingkan rentetan di klien.** Nilai
+    yang disimpan, nilai dalam jadual sumber, dan nilai yang **sampai ke UI**
+    boleh menjadi tiga bait berbeza. Di sini `btrim()` dalam view memisahkan
+    ketiganya, dan perbandingan tepat di klien gagal secara senyap.
+62. **Idempotensi ialah sifat per-DIMENSI, bukan per-skrip.** "Data idempoten,
+    audit tidak" ialah jawapan yang berguna; "ya/tidak" bukan.
+63. **Jawab ⏳ pihak lain dengan ukuran, bukan soalan semula.** K12 boleh
+    dijawab sepenuhnya dalam PGlite tanpa menyentuh live — lebih cepat, lebih
+    selamat, dan tidak menggunakan satu pusingan GPT.
+64. **Pendedahan sukarela layak dibalas dengan kawalan, bukan tuntutan.** GPT
+    mengaku memendekkan payload; jawapan yang berguna ialah "laporkan panjang
+    bait yang anda hantar", bukan "jangan lakukan lagi".
+65. **"Berjaya dipasang" ≠ "pengguna nampak sesuatu".** Status data live (sifar
+    nilai mentah) mesti diumumkan bersama kejayaan pemasangan, atau kejayaan itu
+    akan kelihatan seperti kerosakan kepada orang yang membuka halaman.
+
+### 21.8 🔴 Insiden persekitaran: `.git` direset ke titik cabang, fail kerja kekal
+
+Semasa mahu commit kerja DP-21, `git status` menunjukkan perubahan yang **bukan
+ Arena buat** pada giliran itu (`README.md`, `app/(auth)/login/page.tsx`,
+`components/security/mfa-guard.tsx` dipadam, dan puluhan fail lain).
+
+**Diagnosis (diukur, bukan diteka):**
+
+| Semakan | Keputusan |
+|---|---|
+| `git log --oneline -1` | `535fb13 Add files via upload` — **bukan** `385ae63` |
+| `git cat-file -t 385ae63` | `fatal: Not a valid object name` — stor objek tempatan kehilangan commit itu |
+| `git ls-remote origin arena/01a06274-masb-pms-v4` | `385ae6317ebf5813fdff6dde716461b83fe47e43` — **remote UTUH** |
+| `git ls-files \| wc -l` vs `git ls-tree -r FETCH_HEAD` | indeks **153** fail vs commit **219** fail |
+| `git merge-base --is-ancestor 535fb13 FETCH_HEAD` | **YA** |
+| fail di cakera (`wc -l`) | `PANEL-PAKAR-TPMS.md` 3128 · `alias-confirmation.tsx` 818 · `account-manager.ts` 359 — **semua terkini** |
+
+Maka: **HEAD + indeks direset ke titik cabang, tetapi fail kerja kekal.** Itulah
+sebabnya `git diff FETCH_HEAD` melaporkan 66 fail sebagai "dipadam" (29,800
+baris) — fail itu **wujud di cakera** tetapi **tiada dalam indeks**, dan
+`git diff <commit>` menyenaraikan fail mengikut indeks.
+
+**Pemulihan (fail kerja tidak disentuh):**
+
+```
+git fetch origin arena/01a06274-masb-pms-v4
+git diff --stat FETCH_HEAD          # sahkan skop SEBELUM bertindak
+git reset --mixed FETCH_HEAD        # HEAD + indeks <- 385ae63; working tree KEKAL
+git status --short                  # kini tepat: hanya kerja giliran ini
+```
+
+`--mixed` (bukan `--hard`) adalah penting: `--hard` akan **menimpa** fail kerja
+dengan pokok commit dan memusnahkan kerja DP-21 yang belum di-commit.
+
+**Nyaris bencana yang dielakkan:** `git add -A && git commit` secara buta pada
+keadaan itu akan menghasilkan satu commit yang **memadam 66 fail / 29,800 baris**
+— termasuk `docs/PANEL-PAKAR-TPMS.md` (2,950 baris ketika itu), semua
+`lib/supabase/*.sql` yang sudah dipasang di live, dan semua 21 fail ujian. Ia
+akan kelihatan seperti kerja sah kerana ia di-commit ke branch yang betul.
+
+**Pengajaran 66.** **Sahkan `HEAD` sebelum setiap commit, bukan selepas.**
+`git log --oneline -1` + `git status --short` mengambil satu saat. Apabila
+`git status` menunjukkan perubahan yang anda **tidak ingat membuat**, itu bukan
+bunyi latar — itu tanda sama ada (a) persekitaran berubah di bawah anda, atau
+(b) anda tersilap fail. Kedua-duanya memerlukan berhenti, bukan `git add -A`.
+
+**Pengajaran 67.** **`git diff <commit>` menyenaraikan fail mengikut INDEKS.**
+Fail yang wujud di cakera tetapi tiada dalam indeks dilaporkan sebagai
+**dipadam**, bukan sebagai tidak dijejak. Sebelum mempercayai "pemadaman besar",
+sahkan dengan `ls`/`wc -l` dan `git ls-files | wc -l` — tiga semakan yang
+membaca keadaan sebenar, bukan satu `diff` yang dibaca melalui indeks yang
+mungkin sudah lapuk.
+
+**Pengajaran 68.** **Remote ialah salinan keselamatan yang sebenar.** Semua
+commit giliran lepas sudah ditolak, jadi reset tempatan boleh dipulihkan
+sepenuhnya. Amalan mendorong setiap giliran — yang sebelum ini kelihatan seperti
+kebersihan sahaja — itulah yang menjadikan insiden ini boleh dipulihkan dalam
+empat arahan dan bukan kehilangan kerja.

@@ -81,6 +81,8 @@ import {
   revokeExternal,
 } from "@/lib/actions/account-manager-actions";
 import {
+  KEPUTUSAN_DP8,
+  KEPUTUSAN_DP9,
   isKeputusanPengguna,
   isMultiPersonRaw,
   kategoriLabel,
@@ -368,11 +370,66 @@ export function AliasConfirmation({
               Sedang membaca…
             </p>
           ) : visible.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              {rows.length === 0
-                ? "Tiada nilai mentah Account Manager dijumpai. Ini dijangka jika data invois/import belum mengandungi nilai dalam lajur itu."
-                : "Tiada nilai dalam penapis ini."}
-            </p>
+            rows.length === 0 ? (
+              // DP-21.5 — halaman ini AKAN kelihatan kosong pada live walaupun
+              // seed L4 berjaya, kerana live mempunyai SIFAR nilai `Account
+              // Manager` mentah (diukur: K9 `bilangan_nilai = 0`, K8 `[]`).
+              // Tanpa penjelasan ini, kosong kelihatan seperti kerosakan.
+              <div className="space-y-4 py-8">
+                <div className="flex items-start justify-center gap-2 text-sm text-muted-foreground">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div className="max-w-2xl space-y-1 text-center">
+                    <p className="font-medium text-foreground">
+                      Tiada nilai mentah Account Manager untuk disahkan — dan ini
+                      dijangka.
+                    </p>
+                    <p>
+                      Senarai ini diisi daripada lajur <code>account_manager</code>{" "}
+                      dalam <code>invoices</code> dan <code>import_staging</code>.
+                      Selagi tiada baris mengandungi nilai di situ, tiada apa yang
+                      perlu disahkan. Keputusan yang sudah direkodkan di bawah
+                      akan terpakai <strong>secara automatik</strong> sebaik sahaja
+                      data itu masuk (Fasa 8B/8D).
+                    </p>
+                  </div>
+                </div>
+                <div className="mx-auto max-w-2xl rounded-lg border border-dashed p-4">
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Keputusan manusia yang sudah pra-rekod (seed L4)
+                  </p>
+                  <ul className="space-y-1 text-sm">
+                    {[...KEPUTUSAN_DP8].map((v) => (
+                      <li key={v} className="flex items-center gap-2">
+                        <BadgeCheck className="h-4 w-4 shrink-0 text-emerald-600" />
+                        <span className="whitespace-pre-wrap font-mono text-xs">{v}</span>
+                        <span className="text-muted-foreground">→ Fuziah</span>
+                        <Badge variant="outline" className="ml-auto shrink-0 text-[10px]">
+                          DP-8
+                        </Badge>
+                      </li>
+                    ))}
+                    {[...KEPUTUSAN_DP9].map((v) => (
+                      <li key={v} className="flex items-center gap-2">
+                        <UserX className="h-4 w-4 shrink-0 text-sky-600" />
+                        <span className="whitespace-pre-wrap font-mono text-xs">{v}</span>
+                        <span className="text-muted-foreground">→ orang luar, kekal tidak diagih</span>
+                        <Badge variant="outline" className="ml-auto shrink-0 text-[10px]">
+                          DP-9
+                        </Badge>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Setiap keputusan ini boleh diaudit dan dibatalkan di sini
+                    apabila ia muncul pada baris data sebenar.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Tiada nilai dalam penapis ini.
+              </p>
+            )
           ) : (
             <div className="rounded-md border">
               <Table>
