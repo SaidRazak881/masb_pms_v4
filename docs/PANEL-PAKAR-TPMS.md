@@ -3185,3 +3185,123 @@ commit giliran lepas sudah ditolak, jadi reset tempatan boleh dipulihkan
 sepenuhnya. Amalan mendorong setiap giliran — yang sebelum ini kelihatan seperti
 kebersihan sahaja — itulah yang menjadikan insiden ini boleh dipulihkan dalam
 empat arahan dan bukan kehilangan kerja.
+
+---
+
+## DP-22 — Prinsip pengguna: data bermasalah ditonjolkan di **paparan utama**, dan cara termudah melaksanakannya bagi 8A (2026-09-05)
+
+**Arahan pengguna (verbatim):**
+
+> "Dalam syatem, data yang tidak lengkap atau bermasalah akan dihighlight pada
+> paparan utama sistem untuk user kemaskini dan membuat pwngesahan manual. So
+> cari pendekatan paling sesuai dan paling mudah untuk di apply bagi 8A"
+
+Ini **prinsip reka bentuk**, bukan pilihan susunan fasa. Ia mengubah satu
+andaian tersirat dalam reka bentuk 8A-2: bahawa pengguna akan **pergi** ke
+`/account-managers`. Pengguna sebenarnya mahu sistem **datang** kepada mereka —
+di halaman yang mereka buka setiap hari.
+
+### 22.1 Tiga syarat yang terkandung dalam arahan itu
+
+1. **Ditonjolkan di paparan utama** — bukan disembunyikan di halaman khusus.
+2. **Untuk user kemaskini** — pengguna yang bertindak, bukan sistem.
+3. **Pengesahan manual** — tiada pengesahan automatik; selaras dengan prinsip
+   asal DP-2 ("sistem mengingati keputusan manusia, ia tidak meneka") dan veto
+   Kewangan §2.4.
+
+Syarat (3) penting kerana "highlight untuk kemaskini" boleh disalah tafsir
+sebagai "sediakan butang baiki semua". Panel ini **tidak** menawarkan tindakan
+pukal: setiap nilai diputuskan satu per satu, dengan nota wajib bagi sel
+berbilang orang (DP-8).
+
+### 22.2 Kata putus — pendekatan termudah yang **sah**
+
+**Guna `am_unresolved_values()`, RPC yang SUDAH dipasang di live** (Langkah 3;
+disahkan L3-R S1/S3/S4 dan kini seed L4). Akibatnya:
+
+* **TIADA SQL baharu → TIADA migration → TIADA HARD GATE.**
+* **TIADA pusingan ChatGPT/Supabase** diperlukan untuk menghantar ciri ini.
+* **Kuasa kekal di pangkalan data.** RPC menolak sendiri (`42501`) dan
+  memulangkan kosong bagi peranan yang tidak dibenarkan; panel **menyembunyikan
+  dirinya** dalam kes itu dan tidak pernah menjadi pihak berkuasa.
+
+**Alternatif yang dipertimbang dan ditolak:**
+
+| Alternatif | Sebab ditolak |
+|---|---|
+| RPC ringkasan baharu `am_ringkasan_perlu_tindakan()` | Lebih murah satu baris SQL, tetapi memerlukan migration live + satu pusingan GPT + HARD GATE. Bertentangan terus dengan "paling mudah untuk di-apply". **Boleh dipertimbang semula** jika bacaan penuh menjadi mahal pada data besar. |
+| Panel sebagai komponen klien (`"use client"`) yang memanggil action sendiri | Menambah JavaScript ke pelayar, menambah satu lagi permintaan selepas muatan, dan membuka permukaan di mana tulisan boleh berlaku tanpa disedari. Tidak perlu — data sudah tersedia di pelayan. |
+| Mengira semula kategori di TS daripada baris mentah | Mencabari prinsip "pangkalan data ialah satu-satunya sumber kebenaran" dan mengulangi logik SQL di dua tempat (kelas ralat DP-13.2). |
+
+### 22.3 Reka bentuk yang dihantar
+
+`components/dashboard/data-attention-panel.tsx` + tiga baris wayar dalam
+`app/(dashboard)/dashboard/page.tsx`:
+
+* **Dua keadaan, bukan satu.** Ada tindakan → kad **amber** dengan kiraan
+  mengikut kategori, 5 nilai teratas (mengikut `jumlah_baris` terbesar), dan
+  butang "Sahkan sekarang". Tiada tindakan → satu baris **tenang** dengan
+  pautan kecil. Menonjol hanya apabila memang ada yang perlu diputuskan.
+* **Keadaan tenang menerangkan DP-21.5.** Kerana live hari ini mempunyai sifar
+  nilai `Account Manager` mentah, baris tenang itu menyatakan bahawa keputusan
+  DP-8/DP-9 **sudah pra-rekod** dan akan terpakai automatik apabila data
+  quotation/invoice masuk (8B/8D). Tanpa ayat ini, dashboard kosong kelihatan
+  seperti sistem rosak.
+* **Server Component, bukan klien.** Bukti: saiz route `/dashboard` **tidak
+  berubah** (3.71 kB) selepas panel ditambah — sifar bait JavaScript tambahan
+  dihantar ke pelayar.
+* **Ruang putih dikekalkan** (`whitespace-pre-wrap`) supaya `Fuzy / Sholihin `
+  kelihatan seperti bait Excel sebenar.
+* **Dua panggilan serentak** (`Promise.all`) kerana `loadDashboardData()` dan
+  `listUnresolvedValues()` tidak bersandaran antara satu sama lain.
+
+**Disahkan berkelakuan, bukan hanya dibina:** `curl /dashboard` dalam mod demo
+memulangkan HTTP 200 dengan teks "Perlu pengesahan anda", nilai `Fuzy / Dila`
+dan `Fuzy / Sholihin`, lencana "Berbilang orang", "Sahkan sekarang", "baris
+terjejas", "Mod demo", dan "tidak akan meneka".
+
+### 22.4 Ini menjadi corak bagi fasa seterusnya
+
+Prinsip pengguna ini bukan khusus 8A. Apabila 8B (quotation), 8D (invois) dan
+8E (pipeline) dibina, setiap satu akan mempunyai **jenis data bermasalahnya
+sendiri** (quotation tanpa pelanggan, invois tanpa program, tarikh tidak
+konsisten). Kata putus: **tambahkan jenis itu ke panel yang sama** di paparan
+utama — jangan bina halaman baharu yang pengguna perlu cari. Satu tempat untuk
+semua tindakan tertunda; setiap jenis membawa pautannya sendiri.
+
+### 22.5 🟠 Insiden persekitaran kedua dalam giliran yang sama
+
+Selepas insiden `.git` (DP-21.8), `node_modules` didapati **kosong dua kali**
+dalam satu giliran: pertama sebelum ujian PGlite (dipasang semula, 11 saat),
+kemudian sekali lagi selepas `npm ci` berjaya dan `next build` lulus — yang
+menjadikan pemeriksaan ikon `lucide-react` mustahil dan mematikan dev server.
+
+**Tindakan yang diambil:**
+
+* Nama ikon diputuskan berdasarkan **apa yang sudah terbukti dalam kodbase**
+  (`CheckCircle2`, digunakan di `dashboard-overview.tsx`) dan **bukan** nama
+  baharu yang tidak dapat disahkan (`CircleCheckBig`) — kerana versi tidak boleh
+  diperiksa semasa `node_modules` hilang.
+* `.gitignore` disahkan mengecualikan `/node_modules` dan `/.next/` **sebelum**
+  `git add -A`, supaya pemasangan semula tidak boleh masuk ke dalam commit
+  (berkaitan terus dengan nyaris-bencana DP-21.8).
+* Pengesahan (`tsc` + `build` + `curl`) dijalankan **sejurus** selepas setiap
+  pemasangan, dan commit dibuat awal.
+
+### 22.6 Pengajaran direkodkan
+
+69. **Arahan UX pengguna boleh dipenuhi tanpa menyentuh pangkalan data.**
+    Sebelum mereka bentuk RPC baharu, senaraikan RPC yang **sudah dipasang** —
+    di sini satu fungsi sedia ada mencukupi untuk seluruh ciri, jadi ia boleh
+    dihantar tanpa HARD GATE dan tanpa pusingan GPT.
+70. **Assertion kehadiran/ketiadaan token mesti menguji KOD, bukan prosa.**
+    Dokumentasi komponen yang baik menerangkan apa yang **sengaja tidak**
+    dibuat, dan dengan itu mengandungi token yang dilarang. Dua assertion gagal
+    pada kod yang betul kerana ia membaca komen. Penyelesaian: buang komen
+    sebelum memadankan token, dan — jika alternatif yang ditolak itu penting —
+    tambah assertion **positif** bahawa ia didokumentasikan.
+71. **Apabila persekitaran tidak stabil, pilih pilihan yang boleh disahkan
+    tanpa persekitaran.** `CheckCircle2` dipilih kerana ia sudah digunakan di
+    tempat lain dalam repo; `CircleCheckBig` mungkin betul tetapi tidak dapat
+    disahkan semasa `node_modules` hilang. Dalam ketidaktentuan, bukti dalam
+    repo mengalahkan anggapan tentang versi pakej.

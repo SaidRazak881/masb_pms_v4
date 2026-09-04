@@ -36,6 +36,7 @@
 - `components/account-managers/alias-confirmation.tsx`
 - `components/admin/user-management.tsx`
 - `components/dashboard/dashboard-overview.tsx`
+- `components/dashboard/data-attention-panel.tsx`
 - `components/governance/change-request-dialog.tsx`
 - `components/governance/change-request-history.tsx`
 - `components/governance/change-request-inbox.tsx`
@@ -203,6 +204,7 @@
 - `components/account-managers/alias-confirmation.tsx`
 - `components/admin/user-management.tsx`
 - `components/dashboard/dashboard-overview.tsx`
+- `components/dashboard/data-attention-panel.tsx`
 - `components/import/import-history.tsx`
 - `components/import/smart-excel-import.tsx`
 - `components/participants/participants-browser.tsx`

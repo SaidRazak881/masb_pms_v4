@@ -56,6 +56,8 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 const FAIL_TS = [
   'lib/account-manager.ts',
+  'components/dashboard/data-attention-panel.tsx',
+  'app/(dashboard)/dashboard/page.tsx',
   'lib/actions/account-manager-actions.ts',
   'app/(dashboard)/account-managers/page.tsx',
   'components/account-managers/alias-confirmation.tsx',
@@ -104,6 +106,23 @@ function rpcCalls(src) {
   }
   return out;
 }
+
+/**
+ * Buang komen daripada sumber TS/TSX.
+ *
+ * MENGAPA: dokumentasi komponen ini menerangkan apa yang SENGAJA tidak dibuat
+ * ("Komponen ini SENGAJA bukan \"use client\""; alternatif yang ditolak
+ * `am_ringkasan_perlu_tindakan`). Assertion yang mencari token dalam teks penuh
+ * akan "menangkap" prosa itu dan gagal pada kod yang betul — kelas kesilapan
+ * yang sama seperti keperluan menormalkan penekanan markdown sebelum memadankan.
+ * Jadi token kehadiran/ketiadaan diuji terhadap KOD sahaja.
+ */
+const tanpaKomen = (src) => src
+  .replace(/\/\*[\s\S]*?\*\//g, '')            // blok /* ... */
+  .replace(/(^|\n)\s*\/\/[^\n]*/g, '$1')        // baris // ...
+  .split('\n')
+  .filter((l) => !/^\s*\*/.test(l))                // baris * dalam JSDoc
+  .join('\n');
 
 const SQL = sqlFunctions();
 const ACTIONS = read('lib/actions/account-manager-actions.ts');
@@ -386,6 +405,64 @@ truthy(COMP.includes('KEPUTUSAN_DP8') && COMP.includes('KEPUTUSAN_DP9'),
 truthy(/8B\/8D|8B|8D/.test(COMP),
   'UI menyatakan bila nilai itu akan muncul (Fasa 8B/8D)');
 truthy(/pra-rekod|prarekod/i.test(COMP), 'UI menggunakan istilah "pra-rekod" bagi keputusan seed');
+
+/* ===================================================================== */
+section('BAHAGIAN H — panel paparan utama (DP-22)');
+// Prinsip pengguna 2026-09-05: "data yang tidak lengkap atau bermasalah akan
+// dihighlight pada paparan utama sistem untuk user kemaskini dan membuat
+// pengesahan manual." Ujian ini mengunci cara ia dilaksanakan: RPC yang SUDAH
+// dipasang (tiada SQL baharu), Server Component (tiada JS tambahan, tidak boleh
+// menulis), dan sembunyi diri apabila tiada kuasa.
+const PANEL = 'components/dashboard/data-attention-panel.tsx';
+const DASH = 'app/(dashboard)/dashboard/page.tsx';
+truthy(fs.existsSync(path.join(ROOT, PANEL)), 'panel data-attention-panel.tsx wujud');
+const panel = read(PANEL);
+const dash = read(DASH);
+
+// H1: pendekatan termudah - tiada RPC/SQL baharu
+eq((panel.match(/\.rpc\(/g) ?? []).length, 0,
+  'panel tidak memanggil RPC sendiri (ia membaca data yang dihantar halaman)');
+truthy(dash.includes('listUnresolvedValues'),
+  'dashboard membaca am_unresolved_values() melalui action yang SUDAH wujud');
+const panelKod = tanpaKomen(panel);
+truthy(!/am_ringkasan|am_dashboard|CREATE\s|migration/i.test(panelKod),
+  'KOD panel tidak memerlukan SQL/migration baharu (tiada HARD GATE untuk menghantarnya)');
+truthy(/am_ringkasan_perlu_tindakan/.test(panel),
+  'panel MENDOKUMENTASIKAN alternatif yang ditolak (supaya ia tidak dicadangkan semula)');
+
+// H2: Server Component - tidak boleh menulis, tiada JS tambahan
+truthy(!panelKod.includes('"use client"'),
+  'KOD panel BUKAN "use client" -> tiada JavaScript tambahan, tiada risiko menulis secara senyap');
+truthy(!/^\s*"use client"/m.test(panel),
+  'panel tidak mempunyai direktif "use client" pada baris pertama kodnya');
+for (const fn of ['confirmAlias', 'revokeAlias', 'confirmExternal', 'revokeExternal']) {
+  truthy(!panel.includes(fn), `panel tidak mempunyai keupayaan menulis (${fn})`);
+}
+
+// H3: kuasa kekal di pangkalan data - panel menyembunyikan dirinya
+truthy(/if \(error\) return null/.test(panel),
+  'panel menyembunyikan dirinya apabila tiada kuasa / RPC hilang (42501)');
+truthy(dash.includes('error={am.error}') || dash.includes('am.error'),
+  'dashboard menghantar ralat kepada panel (bukan menelannya)');
+
+// H4: hanya data bermasalah ditonjolkan
+truthy(panel.includes('perluTindakan'),
+  'panel menapis kepada nilai yang PERLU tindakan manusia sahaja');
+truthy(/href="\/account-managers"/.test(panel),
+  'panel memberi pautan ke halaman pengesahan (pengguna tidak perlu mencari halaman itu)');
+truthy(/whitespace-pre-wrap/.test(panel),
+  'panel mengekalkan ruang putih ("Fuzy / Sholihin ")');
+truthy(/Sahkan sekarang|Buka Pengurus Akaun/.test(panel),
+  'panel mempunyai seruan bertindak yang jelas');
+
+// H5: keadaan tenang menerangkan DP-21.5 (kosong = betul, bukan rosak)
+truthy(/pra-rekod/.test(panel),
+  'panel menerangkan keputusan pra-rekod apabila senarai kosong (DP-21.5)');
+truthy(/8B\/8D/.test(panel), 'panel menamakan fasa yang akan membawa data itu');
+
+// H6: pengesahan kekal MANUAL - panel tidak membuat keputusan
+truthy(/tidak akan meneka|tidak meneka/i.test(panel),
+  'panel menyatakan sistem tidak meneka (pengesahan manual oleh manusia)');
 
 /* ===================================================================== */
 section('BAHAGIAN G — kebersihan teks');

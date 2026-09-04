@@ -3,7 +3,9 @@ import Link from "next/link";
 import { Upload } from "lucide-react";
 
 import { DashboardOverview } from "@/components/dashboard/dashboard-overview";
+import { DataAttentionPanel } from "@/components/dashboard/data-attention-panel";
 import { Button } from "@/components/ui/button";
+import { listUnresolvedValues } from "@/lib/actions/account-manager-actions";
 import { loadDashboardData } from "@/lib/dashboard-data";
 
 export const metadata: Metadata = {
@@ -12,7 +14,18 @@ export const metadata: Metadata = {
 };
 
 export default async function DashboardPage() {
-  const data = await loadDashboardData();
+  // DP-22: data bermasalah ditonjolkan di PAPARAN UTAMA supaya pengguna tidak
+  // perlu tahu bahawa /account-managers wujud. Kedua-dua panggilan dibuat
+  // serentak kerana ia tidak bersandaran antara satu sama lain.
+  //
+  // `listUnresolvedValues()` TIDAK melontar ralat: ia memulangkan
+  // `{ rows: [], error }` apabila pengguna tiada kuasa (42501) atau RPC belum
+  // dipasang, dan panel menyembunyikan dirinya dalam kes itu. Kuasa tetap
+  // dikuatkuasakan oleh pangkalan data, bukan oleh halaman ini.
+  const [data, am] = await Promise.all([
+    loadDashboardData(),
+    listUnresolvedValues(),
+  ]);
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -32,6 +45,8 @@ export default async function DashboardPage() {
           </Button>
         </Link>
       </div>
+
+      <DataAttentionPanel rows={am.rows} isDemo={am.isDemo} error={am.error} />
 
       <DashboardOverview data={data} />
     </div>
