@@ -21,22 +21,22 @@
 ## BLOK 1 — PERSONA
 
 Baca fail persona di
-https://github.com/SaidRazak881/masb-pms-v4/blob/arena/01a06274-masb-pms-v4/docs/personas/PERSONA-SQL-ARCHITECT.md
+https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/docs/personas/PERSONA-SQL-ARCHITECT.md
 (klik **Raw**) dan **AMALKAN** persona itu sepanjang tugasan.
 
 Persona kedua (untuk kriteria keselamatan J4/J10): baca juga
-https://github.com/SaidRazak881/masb-pms-v4/blob/arena/01a06274-masb-pms-v4/docs/personas/PERSONA-SECURITY-REVIEW.md
+https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/docs/personas/PERSONA-SECURITY-REVIEW.md
 
 ## BLOK 2 — PETA KOD
 
 Baca peta kod terkini di
-https://github.com/SaidRazak881/masb-pms-v4/blob/arena/01a06274-masb-pms-v4/docs/CODEBASE-MAP.md
+https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/docs/CODEBASE-MAP.md
 (klik **Raw**). Gunakan sebagai konteks struktur sistem — modul mana yang wujud,
 jadual/RPC mana yang ada, fail mana masih mock/demo. **JANGAN** cadangkan perkara
 yang sudah wujud.
 
 Rekod keputusan panel yang mewajibkan fasa ini (konteks reka bentuk):
-https://github.com/SaidRazak881/masb-pms-v4/blob/arena/01a06274-masb-pms-v4/docs/PANEL-PAKAR-TPMS.md
+https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/docs/PANEL-PAKAR-TPMS.md
 — baca **DP-1** (roadmap 8A–8H), **DP-2** (reka bentuk induk pelanggan),
 **DP-2a** (peraturan token pertama), **DP-3** (penomboran semula),
 **DP-4** (allowlist W1), **DP-5** (tingkah laku fungsi `STABLE`).
@@ -226,7 +226,7 @@ SELECT 'J1h_raw_columns' AS check_name, c.table_name, c.column_name, c.data_type
 ### Langkah 1 — Ambil fail dan sahkan integriti
 
 Ambil fail daripada branch sesi:
-https://github.com/SaidRazak881/masb-pms-v4/blob/arena/01a06274-masb-pms-v4/lib/supabase/client-master.sql
+https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/lib/supabase/client-master.sql
 (klik **Raw**)
 
 **Sahkan SHA-256 fail yang anda ambil SEPADAN:**

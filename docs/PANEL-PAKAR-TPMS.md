@@ -1042,3 +1042,104 @@ asal-usul (provenance) yang boleh diaudit.
    menjalankan setiap query J0 dan K1–K12 sebenar daripada dokumen prompt
    terhadap PGlite — ia menemui (a) dan (b) di atas, kedua-duanya dalam
    artefak yang akan dihantar kepada ChatGPT.
+
+### 10.11 🔴 Nama repo GitHub dalam prompt adalah SALAH — pemasangan live TERSEKAT
+
+**Kelas ralat yang sama seperti 10.1, berulang.** Selepas 10.1 merakamkan
+pengajaran "jangan percaya konteks sesi sendiri untuk pengecam infrastruktur",
+Arena melakukan kesilapan yang sama terhadap pengecam yang **lebih besar**.
+
+| | Nilai |
+|---|---|
+| `git remote get-url origin` (autoritatif) | `https://github.com/SaidRazak881/masb_pms_v4.git` |
+| Nama repo sebenar | `SaidRazak881/masb_pms_v4` — **UNDERSCORE** |
+| Ditulis oleh Arena dalam 3 fail prompt | `SaidRazak881/masb-pms-v4` — **HYPHEN** |
+| Kemunculan | **14** (8 dalam PROMPT-8A3-INSTALL, 5 dalam PROMPT-8A-CLIENT-MASTER, 1 dalam PROMPT-8A-J1-READONLY) |
+| Dokumen lama yang betul | `ACTION-4C`, `DEPLOY-VERCEL`, `GPT-ASSISTANT-PROMPTS`, `PROMPT-2/4/4F/4H/5/6/6B…` — semuanya underscore |
+
+**Kesan yang diukur daripada laporan ChatGPT (8A-3, J0):**
+
+ChatGPT mematuhi larangan #8 (jangan reka bukti) dan **berhenti sebelum
+Langkah 1**. Ralat yang dilaporkan:
+
+```text
+1. Cuba baca PERSONA-SQL-ARCHITECT.md      -> 404 Not Found
+2. Cuba baca PERSONA-SECURITY-REVIEW.md    -> 404 Not Found
+3. Cuba baca PANEL-PAKAR-TPMS.md           -> 404 Not Found
+6. Cuba dapatkan client-master.sql         -> 404 Not Found
+```
+
+Keempat-empat fail itu **sememangnya wujud** di branch
+`arena/01a06274-masb-pms-v4` (disahkan melalui `gh api` selepas itu). 404
+berpunca semata-mata daripada nama repo. Kerana ChatGPT tidak dapat membaca
+fail SQL, ia tidak dapat mengira SHA-256 bebas — dan prompt mengarahkannya
+berhenti jika SHA tidak dapat disahkan. **Pemasangan yang sudah diluluskan
+pengguna tersekat sepenuhnya oleh satu typo.**
+
+Tingkah laku ChatGPT di sini adalah **betul dan patut dipuji**: ia tidak
+meneka kandungan fail, tidak menjalankan SQL tanpa pengesahan, dan melaporkan
+404 secara terbuka (larangan #10). Kegagalan ini milik Arena, bukan ChatGPT.
+
+**Pembetulan:**
+1. Ketiga-tiga fail prompt dibetulkan kepada `SaidRazak881/masb_pms_v4`.
+   Nama repo dibaca daripada `git remote get-url origin`, bukan ditaip.
+2. Baharu: `scripts/test-doc-references.mjs` (**25/25**) — penjaga kekal yang
+   membaca setiap pengecam daripada sumber autoritatif:
+   - nama repo ← `git remote get-url origin`
+   - branch ← `git ls-remote --heads origin` (mesti benar-benar wujud)
+   - laluan fail ← `fs.existsSync` (mesti benar-benar wujud)
+   - ref projek Supabase ← mesti 20 aksara; kemunculan bukan-kanonik hanya
+     dibenarkan pada baris yang menandakannya sebagai typo
+   - **SHA-256 keempat-empat fail pemasangan mesti sepadan fail semasa** —
+     inilah yang akan menangkap SHA lapuk sebelum ia menghantar ChatGPT
+     ke dalam jalan buntu yang sama
+
+**Kecacatan kecil lain yang turut dibaiki daripada laporan yang sama:**
+prompt J1 mendakwa "lapan query" tetapi mengandungi **J1a–J1j = 10 SELECT**.
+ChatGPT mengiranya dengan betul dan menjalankan kesemua 10. Teks kini
+"sepuluh query".
+
+### 10.12 Keputusan J0 live — pengesahan bahawa pembetulan 10.8(a) berfungsi
+
+J0 dijalankan terhadap live dan **bersih sepenuhnya**:
+
+| Query | Keputusan live | Tafsiran |
+|---|---|---|
+| J0a | **20 profil** disenaraikan dengan nama sebenar | 18 staf Excel + `Admin` (super_admin) + `test` (blocked) |
+| J0b | `[]` | tiada perlanggaran nama ternormal |
+| J0c | `[]` | **tiada perlanggaran token pertama** |
+| J0d | `bilangan=1`, `nama=Fuziah` | **unik** — Langkah 4 tidak akan berhenti |
+| J0e | `44 / 1124 / 6 / 12 / 14 / 20` | sepadan baseline J1 — tiada drift |
+
+**Bukti langsung bahawa pembetulan 10.8(a) perlu dan berkesan:**
+
+| Profil | J0c versi LAMA (tanpa buang gelaran) | J0c versi live (selepas pembetulan) |
+|---|---|---|
+| `Dr. Afiq` | `dr` | `afiq` |
+| `Dr. Ahmad Nizar` | `dr` | `ahmad` |
+
+Versi lama akan melaporkan **1 perlanggaran palsu** dan mencetuskan siasatan
+panel terhadap masalah hantu. Versi yang dihantar melaporkan `[]` — betul.
+
+Misteri `user_profiles = 20` (10.4) kini **terselesaikan dengan bukti**: dua
+profil tambahan itu ialah `Admin` (akaun Super Admin, `role=super_admin`) dan
+`test` (akaun ujian, `is_active=false`, `account_status=blocked`) — kedua-duanya
+bukan staf Excel. **Tiada perlanggaran, tiada nama baharu yang perlu diputuskan.**
+
+### 10.10 Pengajaran direkodkan (sambungan kedua)
+
+9.  **Pengajaran yang direkodkan tetapi tidak diuji akan diulang.** 10.1 sudah
+    merakamkan "salin pengecam daripada repo, bukan ingatan" — dan 10.11
+    melanggarnya dalam dokumen yang sama. Pengajaran prose tanpa penjaga
+    automatik adalah hiasan, bukan kawalan.
+10. **Nama repo dan ref projek ialah pengecam yang sama bahayanya.** Kedua-duanya
+    gagal secara senyap di hujung yang lain: satu memberi `ZodError`, satu lagi
+    memberi `404`. Tiada satu pun menyebut "anda salah menaip nama repo".
+11. **Larangan "jangan reka bukti" berfungsi seperti yang direka — dan itu
+    bermakna typo Arena menjadi blocker keras.** ChatGPT berhenti daripada
+    memasang SQL yang tidak dapat disahkannya. Ini betul. Kosnya ialah satu
+    pusingan tambahan, dan ia jauh lebih murah daripada memasang SQL yang
+    kandungannya tidak pernah dibaca.
+12. **Prompt mesti mengandungi SHA-256 yang semasa, dan sesuatu mesti
+    mengesahkannya.** Ujian baharu membandingkan SHA dalam prompt dengan hash
+    fail semasa setiap kali ia dijalankan.

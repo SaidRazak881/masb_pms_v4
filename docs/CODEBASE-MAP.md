@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-04 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: 1128fe2 DP-9: Ow Zi Qi = orang luar; semua 12 nilai kini ada keputusan manusia · arena/01a06274-masb-pms-v4
+> Git: 1ac1430 PROMPT-8A3-INSTALL: prompt pemasangan live 8A-3 (HARD GATE diluluskan) + 3 kecacatan ditemui & dibaiki · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 
@@ -247,6 +247,7 @@
 - `PROMPT-8A-CLIENT-MASTER.md`
 - `PROMPT-8A-J1-READONLY.md`
 - `PROMPT-8A3-INSTALL.md`
+- `PROMPT-8A3-SAMBUNGAN.md`
 - `PROMPT-TEMPLATE-FASA.md`
 - `SETUP-SUPABASE.md`
 - `SKILLS.md`

@@ -22,18 +22,18 @@
 ## 1. PERSONA
 
 Baca dan **AMALKAN** persona di
-https://github.com/SaidRazak881/masb-pms-v4/blob/arena/01a06274-masb-pms-v4/docs/personas/PERSONA-SQL-ARCHITECT.md
+https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/docs/personas/PERSONA-SQL-ARCHITECT.md
 (klik **Raw**).
 
 Untuk kriteria keselamatan (K4, K9): baca juga
-https://github.com/SaidRazak881/masb-pms-v4/blob/arena/01a06274-masb-pms-v4/docs/personas/PERSONA-SECURITY-REVIEW.md
+https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/docs/personas/PERSONA-SECURITY-REVIEW.md
 
 Peta kod:
-https://github.com/SaidRazak881/masb-pms-v4/blob/arena/01a06274-masb-pms-v4/docs/CODEBASE-MAP.md
+https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/docs/CODEBASE-MAP.md
 
 Rekod panel (DP-1 … DP-10) — **baca DP-10 terlebih dahulu**, ia mengandungi
 fakta live yang mengubah jangkaan:
-https://github.com/SaidRazak881/masb-pms-v4/blob/arena/01a06274-masb-pms-v4/docs/PANEL-PAKAR-TPMS.md
+https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/docs/PANEL-PAKAR-TPMS.md
 
 ---
 
@@ -226,7 +226,7 @@ SHA yang anda dapat, dan berhenti.
 
 ### Langkah 1 — `lib/supabase/client-master.sql`
 
-https://github.com/SaidRazak881/masb-pms-v4/blob/arena/01a06274-masb-pms-v4/lib/supabase/client-master.sql
+https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/lib/supabase/client-master.sql
 
 ```
 SHA-256: d394398dc075f92c61db13077be568e907fb77989ef1175146682ce251418542
@@ -236,7 +236,7 @@ Jalankan keseluruhan fail apa adanya, dalam satu pelaksanaan.
 
 ### Langkah 2 — `lib/supabase/external-account-managers.sql`
 
-https://github.com/SaidRazak881/masb-pms-v4/blob/arena/01a06274-masb-pms-v4/lib/supabase/external-account-managers.sql
+https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/lib/supabase/external-account-managers.sql
 
 ```
 SHA-256: a124b9cfa9f086b6079977b2fca1140a9d06aa565e24c553a3735bdecf772793
@@ -244,7 +244,7 @@ SHA-256: a124b9cfa9f086b6079977b2fca1140a9d06aa565e24c553a3735bdecf772793
 
 ### Langkah 3 — `lib/supabase/account-manager-resolution.sql`
 
-https://github.com/SaidRazak881/masb-pms-v4/blob/arena/01a06274-masb-pms-v4/lib/supabase/account-manager-resolution.sql
+https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/lib/supabase/account-manager-resolution.sql
 
 ```
 SHA-256: fb32d1d00f89322dd091f70df82984196c007b1b2040b79823c2ea5073752120
@@ -252,7 +252,7 @@ SHA-256: fb32d1d00f89322dd091f70df82984196c007b1b2040b79823c2ea5073752120
 
 ### Langkah 4 — `lib/supabase/seed-account-manager-aliases.sql`
 
-https://github.com/SaidRazak881/masb-pms-v4/blob/arena/01a06274-masb-pms-v4/lib/supabase/seed-account-manager-aliases.sql
+https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/lib/supabase/seed-account-manager-aliases.sql
 
 ```
 SHA-256: 0bcc03a80fbea51cfb0e8079a35c4be582b418c195e21020a636148e1c67f5df

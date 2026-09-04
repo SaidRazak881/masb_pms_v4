@@ -2,7 +2,7 @@
 
 > ## 🟢 INI BUKAN HARD GATE
 >
-> Prompt ini **READ-ONLY SEPENUHNYA**. Ia mengandungi **lapan query SELECT sahaja** —
+> Prompt ini **READ-ONLY SEPENUHNYA**. Ia mengandungi **sepuluh query SELECT sahaja (J1a–J1j)** —
 > tiada `INSERT`, `UPDATE`, `DELETE`, `DDL`, `GRANT` atau `REVOKE`. Ia **tidak
 > mengubah apa-apa** di pangkalan data `lmenmfsbjgxfhnykkgow`.
 >
@@ -22,7 +22,7 @@
 ## 1. PERSONA
 
 Baca fail persona di
-https://github.com/SaidRazak881/masb-pms-v4/blob/arena/01a06274-masb-pms-v4/docs/personas/PERSONA-SQL-ARCHITECT.md
+https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/docs/personas/PERSONA-SQL-ARCHITECT.md
 (klik **Raw**) dan **AMALKAN** persona itu sepanjang tugasan.
 
 ## 2. KONTEKS — apa yang kami ukur dalam fail sumber
@@ -238,7 +238,7 @@ SELECT 'J1j_trigger_vs_column' AS check_name,
 
 ## 4. APA YANG MESTI DILAPORKAN
 
-**Selepas menjalankan kesemua lapan query, BERHENTI.** Jangan pasang apa-apa.
+**Selepas menjalankan kesemua sepuluh query, BERHENTI.** Jangan pasang apa-apa.
 Jangan cadangkan SQL untuk dijalankan. Laporkan sahaja.
 
 ### Seksyen 1 — Konteks & Status
