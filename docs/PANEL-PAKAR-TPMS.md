@@ -3305,3 +3305,53 @@ menjadikan pemeriksaan ikon `lucide-react` mustahil dan mematikan dev server.
     tempat lain dalam repo; `CircleCheckBig` mungkin betul tetapi tidak dapat
     disahkan semasa `node_modules` hilang. Dalam ketidaktentuan, bukti dalam
     repo mengalahkan anggapan tentang versi pakej.
+
+### 22.7 🔴 Reset `.git` KEDUA — kali ini di tengah giliran, dan push ditolak
+
+Selepas DP-22 dibina, disahkan (22/22 ujian, `tsc`, `build`, `curl`) dan
+di-commit, `git push` **DITOLAK** sebagai *non-fast-forward*. Semakan
+menunjukkan `HEAD` telah direset semula ke `535fb13` **sebelum** commit dibuat,
+jadi commit itu (`acdd5b8`) terbina di atas titik cabang dan bukan di atas
+`1f820c4` yang sudah ditolak.
+
+**Apa yang penyelamatan itu cegah.** `acdd5b8` mengandungi **semua** kandungan
+kerja (kerana fail kerja tidak direset), jadi ia kelihatan "betul". Tetapi
+menolaknya memerlukan **force-push**, dan itu akan menggugurkan **lima commit**
+daripada sejarah branch — `2ae019a`, `633c14f`, `25254fa`, `385ae63`, `1f820c4`
+— iaitu keseluruhan rekod DP-18 hingga DP-21 dalam bentuk commit. Kandungan
+tidak hilang, tetapi **jejak audit** hilang, dan projek ini bergantung pada
+jejak itu.
+
+**Pemulihan yang digunakan (tanpa force-push):**
+
+```
+git log -1 --format=%B > /tmp/dp22.msg   # selamatkan mesej SEBELUM reset
+git fetch origin arena/01a06274-masb-pms-v4
+git reset --mixed FETCH_HEAD             # HEAD <- 1f820c4; working tree KEKAL
+git status --short                       # sahkan: hanya 6 item DP-22
+git add -A && git commit -F /tmp/dp22.msg
+git push origin arena/01a06274-masb-pms-v4   # fast-forward 1f820c4..32e1b7f
+```
+
+Hasil disahkan: `parent: 1f820c4`, remote `32e1b7f`, dan `git log --oneline -5`
+menunjukkan kelima-lima commit granular masih ada.
+
+**Pengajaran 72.** **Penolakan push ialah pengawal keselamatan, bukan halangan.**
+Apabila `git push` ditolak sebagai *non-fast-forward*, itu bermaksud sejarah
+tempatan dan remote telah **bercabang** — dan jawapannya hampir tidak pernah
+`--force`. Jawapannya: `fetch`, `reset --mixed` kepada commit remote, sahkan
+`git status` menunjukkan hanya kerja yang dimaksudkan, commit semula, push.
+Force-push menukar masalah kecil (commit tersilap induk) kepada kehilangan
+besar (sejarah granular seluruh fasa).
+
+**Pengajaran 73.** **Selamatkan mesej commit SEBELUM `reset`.** Selepas reset,
+commit asal menjadi tidak boleh dicapai dan mesejnya (77 baris, mengandungi
+bukti dan kata putus) perlu ditulis semula daripada ingatan — iaitu peluang
+untuk rekod itu menjadi kurang tepat. Satu arahan `git log -1 --format=%B`
+mengelakkannya.
+
+**Pengajaran 74.** **Dalam persekitaran yang boleh direset pada bila-bila masa,
+rapatkan jarak antara pengesahan dan push.** Semua pengesahan (ujian, `tsc`,
+`build`, `curl`) dijalankan dahulu, kemudian `git log` + `add` + `commit` +
+`push` dalam **satu** blok arahan. Jendela di mana reset boleh memisahkan
+commit daripada push adalah beberapa saat, bukan beberapa minit.
