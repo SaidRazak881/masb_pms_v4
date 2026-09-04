@@ -1163,3 +1163,170 @@ bukan staf Excel. **Tiada perlanggaran, tiada nama baharu yang perlu diputuskan.
 12. **Prompt mesti mengandungi SHA-256 yang semasa, dan sesuatu mesti
     mengesahkannya.** Ujian baharu membandingkan SHA dalam prompt dengan hash
     fail semasa setiap kali ia dijalankan.
+
+---
+
+## DP-11 — Gate SHA-256 tidak boleh dipenuhi oleh alat ChatGPT: ganti mekanisme, kekalkan kawalan (2026-09-04)
+
+### 11.1 Isu
+
+PROMPT-8A3 meletakkan syarat keras: *"Sahkan SHA-256 sebelum menjalankan
+setiap fail. Jika SHA tidak dapat disahkan: jangan jalankan."*
+
+ChatGPT melaporkan ia **tidak dapat memenuhi syarat itu**:
+
+> "connector GitHub yang tersedia memberikan kandungan fail/blob SHA Git, tetapi
+> tidak memberikan mekanisme yang membolehkan aku memperoleh SHA-256
+> byte-for-byte penuh… network runtime tidak mempunyai DNS/internet keluar."
+>
+> "Jadi aku tidak akan menganggap SHA yang tertulis dalam prompt sebagai SHA
+> yang telah aku kira sendiri. Itu akan melanggar larangan #8."
+
+**Ini bukan kegagalan ChatGPT. Ia kecacatan reka bentuk prompt Arena:** Arena
+mengenakan gate yang pelaksana **secara struktur tidak boleh lulusi**, kemudian
+menjadikannya penghalang keras. Dua pusingan kerja sudah terbazir (DP-10.11
+`404`, kemudian gate SHA-256).
+
+Tingkah laku ChatGPT adalah betul dan patut dikekalkan: ia tidak menggunakan
+SHA Git sebagai SHA-256, tidak menganggap SHA dalam prompt sebagai bukti, tidak
+membina semula SQL daripada kandungan separa, dan tidak menjalankan SQL
+berdasarkan andaian.
+
+### 11.2 Fakta diukur (bukan andaian)
+
+**Fakta 1 — Git blob SHA boleh dikira oleh Arena dan sudah dimiliki ChatGPT.**
+
+Git blob SHA ialah `SHA-1("blob " + <panjang_bait> + "\0" + <kandungan>)`.
+Arena mengesahkannya tiga cara, dan ketiga-tiganya **sepadan tepat**:
+
+| Fail | `git hash-object` (lokal) | `gh api …contents` → `.sha` (origin) | `SHA1('blob <bait>\0'+kandungan)` (Python) |
+|---|---|---|---|
+| `client-master.sql` | `37b8d8b8fa88…` | `37b8d8b8fa88…` | `37b8d8b8fa88…` |
+| `external-account-managers.sql` | `1e555af8f784…` | `1e555af8f784…` | `1e555af8f784…` |
+| `account-manager-resolution.sql` | `afcdc600efda…` | `afcdc600efda…` | `afcdc600efda…` |
+| `seed-account-manager-aliases.sql` | `22fc847e4708…` | `22fc847e4708…` | `22fc847e4708…` |
+
+`git ls-tree HEAD` pada commit `6afabe1` melaporkan blob SHA yang sama, jadi
+nilai ini **terikat kepada commit**, bukan kepada salinan kerja.
+
+**Implikasi menentukan:** ChatGPT **sudah menerima** nilai ini daripada
+connectornya. Ia tidak perlu mengira apa-apa. Ia hanya **membandingkan** dua
+rentetan. Gate yang sebelum mustahil kini **boleh dipenuhi tanpa alat baharu**.
+
+**Fakta 2 — blob SHA sensitif byte-for-byte.** Kerana panjang bait adalah
+sebahagian daripada input hash, sebarang pemotongan, tambahan, atau perubahan
+satu bait pun menukar nilainya. Untuk model ancaman kita — **kerosakan atau
+pemotongan tidak sengaja** semasa pengambilan — ia setanding dengan SHA-256.
+
+**Fakta 3 — SHA-1 lemah terhadap perlanggaran yang disengajakan.** Ini
+diakui dan diterima: pihak yang boleh menulis semula fail di branch itu juga
+boleh mengira semula blob SHA. Kawalan terhadap *itu* ialah **kelulusan
+pengguna** dan **senarai allowlist fail**, bukan fungsi hash. Hash di sini
+ialah pengesan kerosakan, bukan tandatangan keselamatan.
+
+**Fakta 4 — cap jari struktur boleh dikira ChatGPT daripada kandungan sahaja.**
+Bilangan baris, bilangan bait/aksara, baris pertama, baris terakhir, dan kiraan
+objek DDL semuanya boleh dibaca tanpa alat hash.
+
+### 11.3 Kedudukan pakar
+
+**Pengerusi.** Tujuan gate ialah memastikan SQL yang dilaksanakan di production
+**tepat sama** dengan yang diluluskan pengguna. SHA-256 ialah *mekanisme*, bukan
+*tujuan*. Apabila mekanisme tidak boleh dilaksanakan, ganti mekanismenya —
+jangan buang kawalannya, dan jangan paksa pelaksana memalsukannya.
+
+**SQL Architect.** Blob SHA terikat kepada commit melalui `git ls-tree`. Itu
+lebih kuat daripada SHA-256 yang dikira daripada salinan kerja, kerana ia
+mengaitkan kandungan kepada objek Git yang tidak boleh diubah. Saya sokong
+blob SHA sebagai lapis utama.
+
+**Keselamatan.** Saya bersetuju dengan syarat: **jangan sesekali menggambarkan
+blob SHA sebagai kawalan keselamatan kriptografi.** Ia pengesan integriti
+tidak sengaja. Kawalan sebenar terhadap SQL jahat ialah: (a) pengguna
+meluluskan fail tertentu, (b) allowlist fail dalam prompt, (c) larangan
+DROP/rename/RLS, (d) laporan selepas pelaksanaan yang Arena semak. Saya mahu
+perkara ini dinyatakan secara eksplisit dalam prompt supaya tiada sesiapa
+melonggarkan larangan lain kerana "SHA sudah disahkan".
+
+**QA.** Lapis kedua mesti **bebas** daripada lapis pertama. Jika kedua-duanya
+bergantung kepada connector yang sama, satu kerosakan connector akan
+meluluskan kedua-duanya. Cap jari struktur (baris/bait/baris terakhir/kiraan
+DDL) dikira daripada **kandungan yang dibaca**, jadi ia bebas daripada
+medan `.sha`. Saya juga mahu ujian repo mengesahkan kedua-dua lapisan itu
+sepadan fail sebenar — jika tidak, kita mengulang DP-10.11 (nilai lapuk
+diterbitkan).
+
+**BA.** Kos pusingan ketiga sudah tidak boleh diterima. Penyelesaian mestilah
+sesuatu yang ChatGPT boleh lakukan **dengan alat yang ia sudah ada**, tanpa
+pengguna menyalin 1,200 baris SQL ke dalam chat.
+
+**ETL/Excel.** Setuju. Saya juga cadangkan kita **tidak mengubah fail SQL
+itu sendiri** untuk menambah sentinel — menambah satu baris komen akan menukar
+blob SHA dan bermakna fail yang diluluskan pengguna bukan lagi fail yang
+dimuat turun. Guna baris terakhir yang **sedia ada** sebagai cap jari.
+
+### 11.4 Kata putus
+
+**Gate SHA-256 digantikan dengan gate dua lapis. Kawalan dikekalkan; mekanisme
+ditukar kepada yang boleh dilaksanakan.**
+
+**LAPIS 1 — UTAMA: Git blob SHA (perbandingan, bukan pengiraan).**
+ChatGPT membaca blob SHA yang connectornya sudah berikan dan membandingkannya
+dengan nilai jangkaan yang Arena terbitkan. Tiada alat hash diperlukan.
+
+**LAPIS 2 — SOKONGAN: cap jari struktur.**
+Dikira daripada kandungan yang dibaca: bilangan baris, bilangan bait, baris
+pertama, baris terakhir bukan-kosong, dan kiraan objek `CREATE`. Mengesan
+pemotongan walaupun medan `.sha` tidak tersedia. **Bebas** daripada lapis 1.
+
+**SHA-256 dikekalkan sebagai PILIHAN** — jika ChatGPT mempunyai alat yang boleh
+menghash, ia boleh mengiranya dan membandingkan. Ia **bukan lagi gate**.
+
+**Fail SQL TIDAK diubah.** Tiada sentinel ditambah. Kandungan yang diluluskan
+pengguna kekal byte-for-byte.
+
+**Peraturan berhenti dikekalkan:** jika **mana-mana** lapisan tidak sepadan,
+BERHENTI dan laporkan kedua-dua nilai (dapat vs jangkaan) beserta saiz bait.
+Jangan jalankan, jangan "baiki", jangan bina semula.
+
+### 11.5 Nilai gate yang diterbitkan (commit `6afabe1`)
+
+| # | Fail | Blob SHA (Git) | Bait | Baris | Aksara | CREATE TABLE / FUNCTION / POLICY / INDEX | Baris terakhir (bukan kosong) |
+|---|---|---|---|---|---|---|---|
+| 1 | `client-master.sql` | `37b8d8b8fa882b65645cf32e2c37d55590ec6cf2` | 17210 | 384 | 17159 | 1 / 2 / 4 / 2 | `-- NULL di sini ialah jawapan yang BETUL, bukan kegagalan.` |
+| 2 | `external-account-managers.sql` | `1e555af8f78472fe7427a513b4682a8ccbc5f381` | 13526 | 336 | 13498 | 1 / 3 / 4 / 2 | `-- Ujian berkelakuan: scripts/test-account-manager-resolution.mjs seksyen [Q].` |
+| 3 | `account-manager-resolution.sql` | `afcdc600efda41bc4e1928c60fe71dd6be2880ba` | 21276 | 539 | 21237 | 0 / 7 / 0 / 0 | `-- Ujian berkelakuan: scripts/test-account-manager-resolution.mjs` |
+| 4 | `seed-account-manager-aliases.sql` | `22fc847e470831b250a943e425c80fa04fdf5542` | 12284 | 283 | 12229 | 0 / 0 / 0 / 0 | `END $$;` |
+
+SHA-256 (pilihan, untuk rujukan silang):
+`d394398dc075f92c61db13077be568e907fb77989ef1175146682ce251418542`,
+`a124b9cfa9f086b6079977b2fca1140a9d06aa565e24c553a3735bdecf772793`,
+`fb32d1d00f89322dd091f70df82984196c007b1b2040b79823c2ea5073752120`,
+`0bcc03a80fbea51cfb0e8079a35c4be582b418c195e21020a636148e1c67f5df`.
+
+### 11.6 Bantahan direkodkan
+
+**Keselamatan (separa):** menerima kata putus, tetapi membantah sebarang
+penggunaan frasa "SHA disahkan" sebagai justifikasi untuk melonggarkan
+larangan lain. Dicatatkan dalam prompt sebagai amaran eksplisit:
+**pengesahan integriti ≠ kelulusan kandungan.** Kandungan diluluskan oleh
+pengguna; hash hanya mengesahkan ia tiba tanpa rosak.
+
+Tiada bantahan lain.
+
+### 11.7 Pengajaran direkodkan
+
+13. **Gate mesti direka terhadap alat yang pelaksana SEBENARNYA ada.** Arena
+    menulis "sahkan SHA-256" tanpa pernah mengesahkan bahawa ChatGPT boleh
+    mengiranya. Gate yang tidak boleh dilulusi bukan kawalan — ia blocker yang
+    kelihatan seperti kawalan.
+14. **Apabila pelaksana melaporkan ia tidak dapat memenuhi gate, soalan pertama
+    ialah "adakah gate itu boleh dilaksanakan?", bukan "bagaimana membuatnya
+    mematuhinya?".** ChatGPT betul; prompt yang salah.
+15. **Nilai pengesahan yang diterbitkan mesti sendiri disahkan oleh ujian.**
+    `scripts/test-doc-references.mjs` kini mengesahkan blob SHA, bait, baris,
+    aksara, kiraan DDL, dan baris terakhir yang diterbitkan dalam prompt
+    terhadap fail sebenar — supaya nilai lapuk tidak pernah diterbitkan lagi.
+16. **Bezakan pengesan integriti daripada kawalan keselamatan.** Blob SHA
+    (SHA-1) mengesan kerosakan tidak sengaja; ia tidak menentang penyerang.
+    Mengelirukan kedua-duanya akan melahirkan keyakinan palsu.

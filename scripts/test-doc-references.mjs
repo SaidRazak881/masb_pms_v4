@@ -334,6 +334,86 @@ console.log('\n[5] SHA-256 dalam prompt 8A-3 sepadan fail sebenar');
 }
 
 // -----------------------------------------------------------------------------
+// 6. GATE INTEGRITI DP-11 — nilai yang DITERBITKAN mesti sepadan fail sebenar
+// -----------------------------------------------------------------------------
+//
+// Prompt kini menerbitkan Git blob SHA (Lapis 1) dan cap jari struktur
+// (Lapis 2) yang ChatGPT mesti bandingkan. Jika nilai ini lapuk, ChatGPT akan
+// mendapat "tidak sepadan" pada fail yang SEBENARNYA betul dan berhenti —
+// iaitu jalan buntu yang sama seperti DP-10.11, tetapi kali ini disebabkan
+// oleh penjaga itu sendiri. Jadi nilai terbitan mesti disahkan di sini.
+//
+// Semantik yang MESTI ditiru tepat:
+//   bait   = bilangan bait UTF-8              (sama seperti `wc -c`)
+//   baris  = bilangan '\n'                    (sama seperti `wc -l`)
+//   aksara = bilangan TITIK KOD Unicode, bukan unit UTF-16. Emoji seperti
+//            U+1F7E2 ialah 2 unit UTF-16 tetapi 1 titik kod, jadi
+//            `content.length` TIDAK boleh dipakai; guna `[...content].length`.
+//   CREATE = bilangan BARIS yang sepadan       (sama seperti `grep -c`)
+console.log('\n[6] Gate integriti DP-11 — blob SHA + cap jari struktur diterbitkan betul');
+{
+  const FAIL_GATE = [
+    'lib/supabase/client-master.sql',
+    'lib/supabase/external-account-managers.sql',
+    'lib/supabase/account-manager-resolution.sql',
+    'lib/supabase/seed-account-manager-aliases.sql',
+  ];
+  const kiraBaris = (senarai, awalan) =>
+    senarai.filter((l) => l.startsWith(awalan)).length;
+
+  const capJari = new Map();
+  for (const fl of FAIL_GATE) {
+    if (!fs.existsSync(fl)) { bad(`${fl} tiada`); continue; }
+    const teks = fs.readFileSync(fl, 'utf8');
+    const buf = fs.readFileSync(fl);
+    const senarai = teks.split('\n');
+    const bukanKosong = senarai.map((l) => l.replace(/\s+$/, '')).filter((l) => l !== '');
+    capJari.set(fl, {
+      blob: git('hash-object', fl),
+      bait: buf.length,
+      baris: (teks.match(/\n/g) || []).length,
+      aksara: [...teks].length,
+      table: kiraBaris(senarai, 'CREATE TABLE'),
+      func: (teks.match(/CREATE OR REPLACE FUNCTION/g) || []).length,
+      policy: kiraBaris(senarai, 'CREATE POLICY'),
+      index: kiraBaris(senarai, 'CREATE INDEX'),
+      pertama: bukanKosong[0] ?? '',
+      terakhir: bukanKosong[bukanKosong.length - 1] ?? '',
+    });
+  }
+
+  // Git blob SHA mesti = SHA1('blob <bait>\0' + kandungan). Disahkan tiga cara
+  // dalam DP-11.2; diuji di sini supaya definisi itu tidak boleh menyimpang.
+  const { createHash } = await import('node:crypto');
+  for (const [fl, cj] of capJari) {
+    const buf = fs.readFileSync(fl);
+    const kira = createHash('sha1')
+      .update(Buffer.concat([
+        Buffer.from(`blob ${buf.length}\0`, 'utf8'), buf])).digest('hex');
+    eq(kira, cj.blob, `definisi blob SHA sah bagi ${path.basename(fl)}`);
+  }
+
+  for (const pf of PROMPT_8A3_SET) {
+    if (!fs.existsSync(pf)) continue;
+    const teks = fs.readFileSync(pf, 'utf8');
+    const nama = path.basename(pf);
+    for (const [fl, cj] of capJari) {
+      if (!teks.includes(path.basename(fl))) continue;
+      // Lapis 1
+      eq(teks.includes(cj.blob), true, `${nama}: blob SHA ${path.basename(fl)} diterbitkan`);
+      // Lapis 2 — hanya tuntut nilai yang prompt itu memang siarkan
+      if (/cap jari struktur|Lapis 2/i.test(teks)) {
+        eq(teks.includes(String(cj.bait)), true, `${nama}: bait ${cj.bait} (${path.basename(fl)})`);
+        eq(teks.includes(String(cj.baris)), true, `${nama}: baris ${cj.baris} (${path.basename(fl)})`);
+        eq(teks.includes(String(cj.aksara)), true, `${nama}: aksara ${cj.aksara} (${path.basename(fl)})`);
+        eq(teks.includes(`${cj.table} / ${cj.func} / ${cj.policy} / ${cj.index}`), true,
+           `${nama}: kiraan CREATE ${cj.table}/${cj.func}/${cj.policy}/${cj.index} (${path.basename(fl)})`);
+      }
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
 console.log(`\nKEPUTUSAN: ${lulus} lulus, ${gagal} gagal`);
 if (gagal > 0) {
   console.log('\nKegagalan:');

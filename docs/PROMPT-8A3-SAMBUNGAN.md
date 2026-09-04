@@ -101,27 +101,120 @@ https://raw.githubusercontent.com/SaidRazak881/masb_pms_v4/arena/01a06274-masb-p
 
 ---
 
-## 3. SAHKAN SHA-256 — WAJIB SEBELUM SETIAP LANGKAH
+## 3. SAHKAN INTEGRITI — gate dua lapis (DIGANTIKAN daripada SHA-256)
 
-Muat turun setiap fail, kira SHA-256, dan **bandingkan dengan jadual ini**.
+### 3.0 Mengapa bahagian ini berubah
 
-| # | Fail | URL raw | SHA-256 |
-|---|---|---|---|
-| 1 | `client-master.sql` | `https://raw.githubusercontent.com/SaidRazak881/masb_pms_v4/arena/01a06274-masb-pms-v4/lib/supabase/client-master.sql` | `d394398dc075f92c61db13077be568e907fb77989ef1175146682ce251418542` |
-| 2 | `external-account-managers.sql` | `https://raw.githubusercontent.com/SaidRazak881/masb_pms_v4/arena/01a06274-masb-pms-v4/lib/supabase/external-account-managers.sql` | `a124b9cfa9f086b6079977b2fca1140a9d06aa565e24c553a3735bdecf772793` |
-| 3 | `account-manager-resolution.sql` | `https://raw.githubusercontent.com/SaidRazak881/masb_pms_v4/arena/01a06274-masb-pms-v4/lib/supabase/account-manager-resolution.sql` | `fb32d1d00f89322dd091f70df82984196c007b1b2040b79823c2ea5073752120` |
-| 4 | `seed-account-manager-aliases.sql` | `https://raw.githubusercontent.com/SaidRazak881/masb_pms_v4/arena/01a06274-masb-pms-v4/lib/supabase/seed-account-manager-aliases.sql` | `0bcc03a80fbea51cfb0e8079a35c4be582b418c195e21020a636148e1c67f5df` |
+Anda melaporkan dengan betul bahawa anda **tidak dapat mengira SHA-256
+byte-for-byte**: connector GitHub memberikan *blob SHA Git*, dan runtime anda
+tiada DNS/internet keluar untuk mengambil raw dan menghashnya. Anda juga betul
+enggan menganggap SHA yang tertulis dalam prompt sebagai SHA yang anda kira
+sendiri.
 
-**Peraturan:**
+**Itu kecacatan reka bentuk prompt Arena, bukan kegagalan anda.** Arena
+mengenakan gate yang anda secara struktur tidak boleh lulusi. Ia kini
+digantikan. Direkodkan sebagai **DP-11**.
 
-- ✅ SHA sepadan ⇒ jalankan fail itu.
-- 🔴 SHA **tidak** sepadan ⇒ **BERHENTI**. Jangan jalankan. Laporkan SHA yang
-  anda kira, SHA yang dijangka, dan saiz fail dalam bait. Jangan cuba
-  "memperbaiki" fail itu sendiri.
+**Berita baiknya: anda SUDAH mempunyai nilai yang diperlukan.**
+
+Git blob SHA ialah `SHA-1("blob " + <panjang_bait> + "\0" + <kandungan>)`.
+Arena mengesahkannya tiga cara dan ketiga-tiganya sepadan tepat:
+`git hash-object` (lokal), `gh api …/contents` → `.sha` (origin), dan pengiraan
+SHA-1 langsung dalam Python. `git ls-tree` pada commit `6afabe1` melaporkan
+nilai yang sama, jadi ia **terikat kepada commit**.
+
+Oleh itu gate baharu ialah **perbandingan, bukan pengiraan**:
+
+> Baca blob SHA yang connector anda **sudah** berikan, dan bandingkan dengan
+> nilai jangkaan di bawah. **Tiada alat hash diperlukan.**
+
+Kerana panjang bait adalah sebahagian daripada input hash, sebarang pemotongan
+atau perubahan satu bait pun menukar nilainya — ia sensitif **byte-for-byte**.
+
+⚠️ **Pengesan integriti ≠ kawalan keselamatan.** Blob SHA ialah SHA-1 dan lemah
+terhadap perlanggaran yang *disengajakan*. Ia di sini untuk mengesan kerosakan
+atau pemotongan **tidak sengaja** semasa pengambilan. Kelulusan kandungan datang
+daripada **pengguna**, dan kawalan terhadap SQL jahat datang daripada allowlist
+fail + larangan DROP/rename/RLS + semakan Arena selepas pelaksanaan.
+**Jangan sesekali menggunakan "integriti disahkan" sebagai alasan untuk
+melonggarkan mana-mana larangan lain.**
+
+---
+
+### 3.1 LAPIS 1 (UTAMA) — bandingkan Git blob SHA
+
+| # | Fail | **Blob SHA Git (jangkaan)** |
+|---|---|---|
+| 1 | `client-master.sql` | `37b8d8b8fa882b65645cf32e2c37d55590ec6cf2` |
+| 2 | `external-account-managers.sql` | `1e555af8f78472fe7427a513b4682a8ccbc5f381` |
+| 3 | `account-manager-resolution.sql` | `afcdc600efda41bc4e1928c60fe71dd6be2880ba` |
+| 4 | `seed-account-manager-aliases.sql` | `22fc847e470831b250a943e425c80fa04fdf5542` |
+
+Ambil daripada branch `arena/01a06274-masb-pms-v4` pada commit `6afabe1`
+atau lebih baharu.
+
+### 3.2 LAPIS 2 (SOKONGAN) — cap jari struktur
+
+Lapis ini **bebas** daripada lapis 1: ia dikira daripada **kandungan yang anda
+baca**, bukan daripada medan `.sha`. Jika connector rosak pada satu medan,
+lapis ini masih menangkapnya.
+
+| # | Fail | Bait | Baris | Aksara | `CREATE` TABLE / FUNCTION / POLICY / INDEX |
+|---|---|---|---|---|---|
+| 1 | `client-master.sql` | 17210 | 384 | 17159 | 1 / 2 / 4 / 2 |
+| 2 | `external-account-managers.sql` | 13526 | 336 | 13498 | 1 / 3 / 4 / 2 |
+| 3 | `account-manager-resolution.sql` | 21276 | 539 | 21237 | 0 / 7 / 0 / 0 |
+| 4 | `seed-account-manager-aliases.sql` | 12284 | 283 | 12229 | 0 / 0 / 0 / 0 |
+
+**Baris pertama** keempat-empat fail ialah:
+
+```text
+-- =====================================================================
+```
+
+**Baris terakhir bukan-kosong** (ini mengesan pemotongan hujung fail):
+
+| # | Fail | Baris terakhir |
+|---|---|---|
+| 1 | `client-master.sql` | `-- NULL di sini ialah jawapan yang BETUL, bukan kegagalan.` |
+| 2 | `external-account-managers.sql` | `-- Ujian berkelakuan: scripts/test-account-manager-resolution.mjs seksyen [Q].` |
+| 3 | `account-manager-resolution.sql` | `-- Ujian berkelakuan: scripts/test-account-manager-resolution.mjs` |
+| 4 | `seed-account-manager-aliases.sql` | `END $$;` |
+
+> Nota: `bait` = bilangan bait UTF-8; `aksara` = bilangan aksara. Kedua-duanya
+> berbeza kerana fail mengandungi aksara bukan-ASCII (é, →, ⚠). Jika alat anda
+> hanya memberi satu daripada keduanya, laporkan yang mana anda ada.
+
+### 3.3 SHA-256 — PILIHAN, bukan lagi gate
+
+Jika anda mempunyai mana-mana alat yang boleh menghash (sandbox Python,
+`sha256sum`, dan sebagainya), kira SHA-256 dan bandingkan sebagai pengesahan
+silang:
+
+```text
+client-master.sql                d394398dc075f92c61db13077be568e907fb77989ef1175146682ce251418542
+external-account-managers.sql    a124b9cfa9f086b6079977b2fca1140a9d06aa565e24c553a3735bdecf772793
+account-manager-resolution.sql   fb32d1d00f89322dd091f70df82984196c007b1b2040b79823c2ea5073752120
+seed-account-manager-aliases.sql 0bcc03a80fbea51cfb0e8079a35c4be582b418c195e21020a636148e1c67f5df
+```
+
+**Jika anda tiada alat hash, itu BUKAN blocker.** Lapis 1 + Lapis 2 mencukupi.
+Tandakan SHA-256 sebagai `⏳ tidak dikira — tiada alat hash` dalam laporan dan
+**teruskan**.
+
+### 3.4 Peraturan
+
+- ✅ **Kedua-dua** Lapis 1 dan Lapis 2 sepadan ⇒ jalankan fail itu.
+- 🔴 **Mana-mana** lapisan tidak sepadan ⇒ **BERHENTI**. Jangan jalankan.
+  Laporkan: nilai yang anda dapat, nilai jangkaan, saiz bait, dan baris terakhir
+  yang anda lihat. **Jangan** cuba "memperbaiki" fail itu, **jangan** bina semula
+  daripada kandungan separa, **jangan** jalankan berdasarkan andaian.
+- 🔴 Jika anda tidak dapat membaca kandungan fail langsung ⇒ **BERHENTI** dan
+  laporkan. Jangan reka kandungan (larangan #8).
 - **Urutan WAJIB:** 1 → 2 → 3 → 4. Fail 3 bergantung pada jadual dari fail 2;
   fail 4 bergantung pada fungsi dari fail 1 dan 3.
 
-### Langkah 5 — LANGKAU
+### 3.5 Langkah 5 — LANGKAU
 
 `fix-import-staging-updated-at.sql` **tidak diperlukan di live**. J1i/J1j anda
 sendiri membuktikan `import_staging.updated_at` **WUJUD** (`timestamptz`,
@@ -236,8 +329,11 @@ jalankan backfill.
 
 ```text
 1. Baca persona + PROMPT-8A3-INSTALL.md + DP-10 (URL UNDERSCORE, Seksyen 2).
-2. Muat turun 4 fail SQL, kira SHA-256, bandingkan (Seksyen 3).
-   SHA tidak sepadan -> BERHENTI + lapor.
+2. Ambil 4 fail SQL. SAHKAN INTEGRITI dua lapis (Seksyen 3):
+   Lapis 1 = bandingkan Git blob SHA yang connector anda SUDAH beri.
+   Lapis 2 = bait/baris/aksara/kiraan CREATE/baris terakhir.
+   SHA-256 = PILIHAN sahaja; tiada alat hash BUKAN blocker.
+   Mana-mana lapisan tidak sepadan -> BERHENTI + lapor kedua-dua nilai.
 3. Jalankan Langkah 1 -> 2 -> 3 -> 4 dalam urutan itu.
    Langkah 4 = SATU pelaksanaan penuh. Langkah 5 = LANGKAU.
 4. Jalankan K1-K12 read-only + pengesahan baseline.

@@ -220,16 +220,49 @@ SELECT 'J0e_baseline' AS check_name, t.tbl,
 
 ## 5. TUGASAN 2 — Pasang 4 fail 🟢 DILULUSKAN
 
-Ambil setiap fail daripada branch sesi (klik **Raw**) dan sahkan SHA-256
-**SEBELUM** menjalankan. Jika SHA tidak sepadan: **JANGAN jalankan**, laporkan
-SHA yang anda dapat, dan berhenti.
+Ambil setiap fail daripada branch sesi dan **sahkan integritinya SEBELUM
+menjalankan** — gate **dua lapis** (DP-11):
+
+- **Lapis 1 (utama) — Git blob SHA.** Connector GitHub anda **sudah** memberikan
+  nilai ini. Git blob SHA = `SHA-1("blob " + <panjang_bait> + "\0" + <kandungan>)`,
+  jadi ia sensitif **byte-for-byte**: sebarang pemotongan atau perubahan satu
+  bait menukarnya. Anda **membandingkan**, bukan mengira — tiada alat hash
+  diperlukan.
+- **Lapis 2 (sokongan) — cap jari struktur.** Dikira daripada kandungan yang
+  anda baca: bait, baris, aksara, kiraan objek `CREATE`, dan baris terakhir
+  bukan-kosong. Lapis ini **bebas** daripada medan `.sha`, jadi satu kerosakan
+  connector tidak akan meluluskan kedua-duanya.
+- **SHA-256 = PILIHAN.** Jika anda ada alat hash, kira dan bandingkan sebagai
+  pengesahan silang. **Tiada alat hash BUKAN blocker** — tandakan
+  `⏳ tidak dikira` dan teruskan.
+
+🔴 Jika **mana-mana** lapisan tidak sepadan: **JANGAN jalankan**. Laporkan nilai
+yang anda dapat, nilai jangkaan, saiz bait, dan baris terakhir yang anda lihat.
+Jangan bina semula SQL daripada kandungan separa.
+
+⚠️ **Pengesan integriti ≠ kawalan keselamatan.** Blob SHA ialah SHA-1 dan lemah
+terhadap perlanggaran yang *disengajakan*; ia di sini untuk mengesan kerosakan
+*tidak sengaja*. Kelulusan kandungan datang daripada pengguna. **Jangan guna
+"integriti disahkan" sebagai alasan untuk melonggarkan mana-mana larangan lain.**
 
 ### Langkah 1 — `lib/supabase/client-master.sql`
 
 https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/lib/supabase/client-master.sql
 
 ```
-SHA-256: d394398dc075f92c61db13077be568e907fb77989ef1175146682ce251418542
+Lapis 1 — Git blob SHA (bandingkan dengan nilai connector anda):
+         37b8d8b8fa882b65645cf32e2c37d55590ec6cf2
+
+Lapis 2 — cap jari struktur (kira daripada kandungan yang anda baca):
+         bait      = 17210
+         baris     = 384
+         aksara    = 17159
+         CREATE TABLE / FUNCTION / POLICY / INDEX = 1 / 2 / 4 / 2
+         baris pertama        = -- =====================================================================
+         baris terakhir       = -- NULL di sini ialah jawapan yang BETUL, bukan kegagalan.
+
+Pilihan  — SHA-256 (hanya jika anda ada alat hash; BUKAN blocker):
+         d394398dc075f92c61db13077be568e907fb77989ef1175146682ce251418542
 ```
 
 Jalankan keseluruhan fail apa adanya, dalam satu pelaksanaan.
@@ -239,7 +272,19 @@ Jalankan keseluruhan fail apa adanya, dalam satu pelaksanaan.
 https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/lib/supabase/external-account-managers.sql
 
 ```
-SHA-256: a124b9cfa9f086b6079977b2fca1140a9d06aa565e24c553a3735bdecf772793
+Lapis 1 — Git blob SHA (bandingkan dengan nilai connector anda):
+         1e555af8f78472fe7427a513b4682a8ccbc5f381
+
+Lapis 2 — cap jari struktur (kira daripada kandungan yang anda baca):
+         bait      = 13526
+         baris     = 336
+         aksara    = 13498
+         CREATE TABLE / FUNCTION / POLICY / INDEX = 1 / 3 / 4 / 2
+         baris pertama        = -- =====================================================================
+         baris terakhir       = -- Ujian berkelakuan: scripts/test-account-manager-resolution.mjs seksyen [Q].
+
+Pilihan  — SHA-256 (hanya jika anda ada alat hash; BUKAN blocker):
+         a124b9cfa9f086b6079977b2fca1140a9d06aa565e24c553a3735bdecf772793
 ```
 
 ### Langkah 3 — `lib/supabase/account-manager-resolution.sql`
@@ -247,7 +292,19 @@ SHA-256: a124b9cfa9f086b6079977b2fca1140a9d06aa565e24c553a3735bdecf772793
 https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/lib/supabase/account-manager-resolution.sql
 
 ```
-SHA-256: fb32d1d00f89322dd091f70df82984196c007b1b2040b79823c2ea5073752120
+Lapis 1 — Git blob SHA (bandingkan dengan nilai connector anda):
+         afcdc600efda41bc4e1928c60fe71dd6be2880ba
+
+Lapis 2 — cap jari struktur (kira daripada kandungan yang anda baca):
+         bait      = 21276
+         baris     = 539
+         aksara    = 21237
+         CREATE TABLE / FUNCTION / POLICY / INDEX = 0 / 7 / 0 / 0
+         baris pertama        = -- =====================================================================
+         baris terakhir       = -- Ujian berkelakuan: scripts/test-account-manager-resolution.mjs
+
+Pilihan  — SHA-256 (hanya jika anda ada alat hash; BUKAN blocker):
+         fb32d1d00f89322dd091f70df82984196c007b1b2040b79823c2ea5073752120
 ```
 
 ### Langkah 4 — `lib/supabase/seed-account-manager-aliases.sql`
@@ -255,7 +312,19 @@ SHA-256: fb32d1d00f89322dd091f70df82984196c007b1b2040b79823c2ea5073752120
 https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/lib/supabase/seed-account-manager-aliases.sql
 
 ```
-SHA-256: 0bcc03a80fbea51cfb0e8079a35c4be582b418c195e21020a636148e1c67f5df
+Lapis 1 — Git blob SHA (bandingkan dengan nilai connector anda):
+         22fc847e470831b250a943e425c80fa04fdf5542
+
+Lapis 2 — cap jari struktur (kira daripada kandungan yang anda baca):
+         bait      = 12284
+         baris     = 283
+         aksara    = 12229
+         CREATE TABLE / FUNCTION / POLICY / INDEX = 0 / 0 / 0 / 0
+         baris pertama        = -- =====================================================================
+         baris terakhir       = END $$;
+
+Pilihan  — SHA-256 (hanya jika anda ada alat hash; BUKAN blocker):
+         0bcc03a80fbea51cfb0e8079a35c4be582b418c195e21020a636148e1c67f5df
 ```
 
 > 🔴 **Langkah 4 boleh GAGAL dengan sengaja.** `seed` menaikkan ralat jika
@@ -533,7 +602,7 @@ K4 → masih **12 baris**; K10 → data tidak berubah.
 
 ## 8. FORMAT LAPORAN (6 seksyen)
 
-**Seksyen 1 — Konteks & Status:** project ref yang digunakan, SHA-256 **penuh**
+**Seksyen 1 — Konteks & Status:** project ref yang digunakan, **Git blob SHA** dan **cap jari struktur** bagi setiap fail (Lapis 1 + Lapis 2), SHA-256 **penuh**
 yang anda sahkan bagi setiap fail, dan pengesahan kelulusan pengguna.
 
 **Seksyen 2 — J0 (mesti diisi DAHULU):** J0a (tampal **kesemua 20 baris**),
