@@ -206,6 +206,17 @@ eq(navTanpaSuper, [...sqlRoles].sort(),
 truthy(/super_admin/.test(navRolesRaw),
   'super_admin disenaraikan secara eksplisit (has_role mengembalikan true untuk super_admin — lihat test-c13-has-role-drift.mjs)');
 
+// Middleware mesti melindungi laluan yang sama - jika tidak, pelawat yang tidak
+// log masuk melihat "Akses Ditolak" dan bukannya dialih ke /login seperti setiap
+// halaman dashboard lain. DB tetap melindungi (RPC menjaga diri); ini lapisan
+// kedua + konsistensi UX.
+const MIDDLEWARE = read('lib/supabase/middleware.ts');
+const prefixes = [...MIDDLEWARE.matchAll(/^\s*"(\/[\w-]+)",$/gm)].map((m) => m[1]);
+truthy(prefixes.includes('/account-managers'),
+  'middleware: /account-managers ada dalam PROTECTED_PREFIXES');
+truthy(prefixes.includes('/dashboard') && prefixes.includes('/admin'),
+  'middleware: senarai prefix masih mengandungi laluan dashboard sedia ada');
+
 // Gate mesti MENANYA pangkalan data, bukan meneka daripada senarai peranan setempat
 truthy(PAGE.includes('can_resolve_account_managers'), 'page menyemak kuasa melalui RPC (sumber kebenaran = DB)');
 truthy(PAGE.includes('Akses Ditolak'), 'page memaparkan "Akses Ditolak" apabila RPC menolak');
