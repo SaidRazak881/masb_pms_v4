@@ -536,6 +536,95 @@ console.log('\n[8] DP-12 — prompt langkah sepadan output penjana (tiada drift)
 }
 
 // -----------------------------------------------------------------------------
+console.log('\n[9] DP-14 — pembetulan fixture rekonsiliasi DIKUNCI (tidak boleh regres)');
+{
+  // DP-14.2: versi pertama prompt rekonsiliasi meramalkan `test`/`Admin` ->
+  // NULL kerana fixture hanya menyemai 18 staf Excel sedangkan live ada 20
+  // profil (J0a). ChatGPT membenderanya sebagai 🔴. Ramalan Arena yang salah,
+  // BUKAN live yang rosak. Seksyen ini mengunci pembetulan itu supaya ramalan
+  // lapuk yang sama tidak boleh dihantar semula ke production.
+  const REK = 'docs/PROMPT-8A3-L1-REKONSILIASI.md';
+  if (!fs.existsSync(REK)) {
+    bad(`${REK} tiada`);
+  } else {
+    const d = fs.readFileSync(REK, 'utf8');
+    // (a) Jangkaan R2 mesti kini sepadan output live yang GPT laporkan.
+    eq(d.includes('| test | test |'), true,
+       'R2: jangkaan `test` -> `test` (sepadan laporan live GPT)');
+    eq(d.includes('| Admin | Admin |'), true,
+       'R2: jangkaan `Admin` -> `Admin` (sepadan laporan live GPT)');
+    // (b) Ramalan lapuk mesti TIADA lagi: test/Admin "dijangka NULL".
+    //     SKOP BARIS, bukan /s seluruh dokumen — `Fuzy` dan `Ow Zi Qi`
+    //     MEMANG sah "dijangka NULL" (L4 belum dijalankan), jadi padanan
+    //     rentas-dokumen akan memberi positif palsu terhadap dokumen yang betul.
+    const barisR2 = d.split('\n').filter((l) =>
+      (l.includes('`test`') || l.includes('`Admin`')) &&
+      /dijangka NULL|meramalkan `NULL`/.test(l) &&
+      !/BUKAN|salah|Versi pertama/.test(l));
+    eq(barisR2.length, 0,
+       'tiada baris meramalkan `test`/`Admin` -> NULL' +
+       (barisR2.length ? ` (jumpa: ${barisR2[0].slice(0, 60)}…)` : ''));
+    //     Frasa lapuk yang spesifik daripada versi pertama mesti hilang.
+    eq(d.includes('tiada nilai Excel yang sepatutnya menyelesaikan kepada akaun Super Admin'),
+       false, 'frasa lapuk versi pertama telah dibuang');
+    // (b2) Pengawal POSITIF: kenyataan pembetulan mesti wujud, supaya seksyen
+    //      ini tidak lulus hanya kerana anotasi dipadam tanpa diganti.
+    eq(/`test` → `test` dan `Admin` → `Admin` IALAH JANGKAAN YANG BETUL/.test(d), true,
+       'kenyataan pembetulan R2 (jangkaan yang betul) dinyatakan');
+    eq(d.includes('20 profil'), true,
+       'fixture 20 profil dinyatakan (sepadan J0a live)');
+    // (c) DP-14.1: R6b mesti 🟠 makluman + sebab versi PG 18 dinyatakan,
+    //     kerana ia menguji REPRESENTASI katalog, bukan kelakuan.
+    eq(/### R6b.*MAKLUMAN/.test(d), true, 'R6b ditandakan 🟠 MAKLUMAN');
+    eq(d.includes('PostgreSQL 18'), true,
+       'R6b: sebab versi (PostgreSQL 18) dinyatakan');
+    // (d) Empat kekangan yang wajib sepadan walau apa pun versi mesti kekal.
+    for (const k of ['account_manager_aliases_pkey',
+                     'account_manager_aliases_raw_unique',
+                     'account_manager_aliases_user_id_fkey',
+                     'account_manager_aliases_confirmed_by_fkey']) {
+      eq(d.includes(k), true, `R6b: kekangan wajib ${k} masih disenaraikan`);
+    }
+    // (e) DP-14.2 mesti dirujuk supaya ChatGPT tidak "memperbaiki" live.
+    eq(d.includes('DP-14.2'), true, 'prompt merujuk DP-14.2 (gate berasingan)');
+  }
+
+  // DP-14.3: fixture mesti setara live. Kedua-dua pengawal ini WAJIB wujud
+  // dalam penjana; tanpanya fixture boleh senyap-senyap kembali tidak setara
+  // (DP-6 muncul semula sebagai ramalan salah).
+  const PEN = 'scripts/generate-8a3-l1-reconciliation.mjs';
+  if (!fs.existsSync(PEN)) {
+    bad(`${PEN} tiada`);
+  } else {
+    const g = fs.readFileSync(PEN, 'utf8');
+    eq(g.includes('nEnum !== 8'), true,
+       'penjana: pengawal app_role = 8 (sepadan J1d live)');
+    eq(g.includes('nSemua !== 20'), true,
+       'penjana: pengawal 20 profil (sepadan J0a live)');
+    eq(g.includes('lib/supabase/user-management.sql'), true,
+       'penjana: user-management.sql (Fasa 6) DIPASANG dalam fixture');
+    // Enum yang ditadbir tangan akan mewujudkan drift ketiga — dilarang.
+    eq(/ALTER TYPE\s+public\.app_role\s+ADD VALUE/i.test(g), false,
+       'penjana: TIDAK mentadbir enum app_role dengan tangan (DP-14.3)');
+  }
+
+  // Kata putus mesti direkodkan dalam panel, bukan hanya dalam kod.
+  const PANEL = 'docs/PANEL-PAKAR-TPMS.md';
+  if (fs.existsSync(PANEL)) {
+    const pd = fs.readFileSync(PANEL, 'utf8');
+    eq(pd.includes('## DP-14 —'), true, 'panel: DP-14 direkodkan');
+    for (const sub of ['### 14.1', '### 14.2', '### 14.3', '### 14.4', '### 14.5']) {
+      eq(pd.includes(sub), true, `panel: ${sub} wujud`);
+    }
+    eq(/Kata putus 14\.2/.test(pd), true, 'panel: kata putus 14.2 dinyatakan');
+    eq(pd.includes('Bantahan direkodkan'), true,
+       'panel: bantahan posisi A direkodkan (protokol panel)');
+  } else {
+    bad(`${PANEL} tiada`);
+  }
+}
+
+// -----------------------------------------------------------------------------
 console.log(`\nKEPUTUSAN: ${lulus} lulus, ${gagal} gagal`);
 if (gagal > 0) {
   console.log('\nKegagalan:');

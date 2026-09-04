@@ -74,10 +74,45 @@ const STAFF = [
   ['Nur Aleeya', 'aleeya.amran@mimos.my'], ['Muhammad Yusuf', 'yusuf.zolkipli@mimos.my'],
 ];
 
+// DUA PROFIL TAMBAHAN LIVE yang tiada dalam Excel (DP-10.4 / J0a).
+//
+// Fixture asal hanya menyemai 18 staf Excel, jadi Arena MERAMALKAN
+// resolve_account_manager('test') dan ('Admin') -> NULL. Ramalan itu SALAH:
+// bukan kerana fungsi live rosak, tetapi kerana FIXTURE tidak sepadan data live.
+// Fungsi berkelakuan identik; DATAnya yang berbeza.
+//
+// Ini pengulangan tepat pengajaran DP-10.7(4) "ukur data live SEBELUM meramalkan
+// kesan pelaksanaan" - dan kali ini nama kedua-dua profil SUDAH diketahui daripada
+// J0a, jadi tiada alasan untuk meninggalkannya. Direkodkan sebagai DP-14.1.
+// Atribut diambil verbatim daripada J0a live yang ChatGPT laporkan.
+const PROFIL_TAMBAHAN_LIVE = [
+  // nama,   email,            role,          is_active, account_status
+  ['Admin', 'admin@mimos.my',  'super_admin', true,      'active'],
+  ['test',  'test@mimos.my',   'staff',       false,     'blocked'],
+];
+
 const BOOTSTRAP = `
 CREATE SCHEMA IF NOT EXISTS auth;
+-- Stub auth.users dipertingkatkan (dahulu hanya id+email).
+-- 'user-management.sql' (Fasa 6, DIPASANG di live) membaca
+-- raw_user_meta_data, encrypted_password, email_confirmed_at dan
+-- auth.identities. Tanpa lajur-jadual ini ia gagal dipasang, dan fixture
+-- tidak dapat menyemai role 'super_admin' (DP-6: schema-master.sql hanya ada
+-- 7 nilai app_role; live ada 8).
 CREATE TABLE IF NOT EXISTS auth.users (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text UNIQUE);
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  instance_id uuid, aud text, role text, email text UNIQUE,
+  encrypted_password text, email_confirmed_at timestamptz,
+  raw_app_meta_data jsonb, raw_user_meta_data jsonb,
+  created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(),
+  last_sign_in_at timestamptz);
+CREATE TABLE IF NOT EXISTS auth.identities (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  provider_id text, identity_data jsonb, provider text,
+  last_sign_in_at timestamptz,
+  created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(),
+  UNIQUE (provider_id, provider));
 CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE
   AS $$ SELECT '${UID}'::uuid $$;
 CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE
@@ -93,6 +128,9 @@ INSERT INTO auth.users (id, email) VALUES ('${UID}'::uuid, 'staff@mimos.my')
 `;
 
 const q = (v) => (v === null ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`);
+
+// Escape backtick untuk rentetan yang akan ditanam dalam template literal JS.
+const E = (t) => t.replace(/`/g, '\\`');
 
 // -----------------------------------------------------------------------------
 // Probe. `ketat` = MESTI sepadan; `maklumat` = boleh berbeza atas sebab platform.
@@ -151,7 +189,21 @@ const PROBE = [
 > 🟢 **\`Fuzy\`, \`Fuzy / Dila\`, \`Fuzy / Sholihin \` dan \`Ow Zi Qi\` dijangka NULL**
 > kerana L4 (seed alias) belum dijalankan. Selepas L4, tiga yang pertama
 > menyelesaikan kepada **Fuziah** dan \`Ow Zi Qi\` kekal NULL tetapi diklasifikasi
-> \`LUAR\`. Jangan "memperbaiki" NULL ini sekarang.`,
+> \`LUAR\`. Jangan "memperbaiki" NULL ini sekarang.
+>
+> 🟠 **\`test\` → \`test\` dan \`Admin\` → \`Admin\` IALAH JANGKAAN YANG BETUL.**
+> Versi pertama prompt ini meramalkan \`NULL\` kerana fixture PGlite Arena hanya
+> menyemai 18 staf Excel dan **tertinggal** dua profil tambahan live. Ramalan itu
+> **salah**; fixture kini menyemai **20 profil** supaya sepadan J0a/J0e live.
+> Fungsi live **tidak rosak** dan **tidak perlu diubah**.
+>
+> Pendedahan ini bagaimanapun membuka **persoalan tadbir urus sebenar** yang
+> direkodkan sebagai **DP-14.2**: patutkah \`resolve_account_manager()\` mengaitkan
+> data perniagaan kepada akaun **blocked** (\`test\`) atau kepada akaun Super Admin
+> (\`Admin\`)? Perhatikan \`am_list_staff()\` **sudah** menapis \`is_active = true\`
+> manakala \`resolve_account_manager()\` **tidak menapis apa-apa** —
+> ketidakselarasan dalam dua fail yang sama-sama diluluskan.
+> **Jangan selesaikan dalam rekonsiliasi ini**; ia gate berasingan (DP-14).`,
     sql: () => `SELECT v.raw,
        (SELECT up.full_name FROM public.user_profiles up
          WHERE up.id = public.resolve_account_manager(v.raw)) AS diselesaikan
@@ -221,8 +273,31 @@ const PROBE = [
  ORDER BY c.ordinal_position;`,
   },
   {
-    id: 'R6b', ketat: true,
+    id: 'R6b', ketat: false,
     tajuk: 'Kekangan `account_manager_aliases`',
+    sebab: '🟠 **MAKLUMAN — bukan ketat.** PGlite berjalan pada **PostgreSQL 18.3**, ' +
+           'dan PG 18 memperkenalkan kekangan `NOT NULL` **bernama** dalam ' +
+           '`pg_constraint` (`*_not_null`). Live Supabase menjalankan versi lebih ' +
+           'lama yang merepresentasikan `NOT NULL` sebagai metadata lajur sahaja. ' +
+           'Jadi bilangan baris probe ini **dijangka berbeza mengikut versi**, dan ' +
+           'perbezaan itu **BUKAN kecacatan**. Semantik `NOT NULL` sudah disahkan ' +
+           'secara ketat oleh **R6** (`is_nullable = NO`).',
+    nota: [
+      '> 🔴 **Yang WAJIB sepadan walaupun probe ini 🟠:**',
+      '> - `account_manager_aliases_pkey` → `PRIMARY KEY (id)`',
+      '> - `account_manager_aliases_raw_unique` → `UNIQUE (raw_text)`',
+      '> - `account_manager_aliases_user_id_fkey` → `FOREIGN KEY (user_id) REFERENCES user_profiles(id) ON DELETE CASCADE`',
+      '> - `account_manager_aliases_confirmed_by_fkey` → `FOREIGN KEY (confirmed_by) REFERENCES auth.users(id)`',
+      '>',
+      '> 🟠 **Yang DIJANGKA TIADA di live** (ciri PostgreSQL 18; PGlite 18.3 sahaja):',
+      '> `*_id_not_null`, `*_created_at_not_null`, `*_raw_text_not_null`,',
+      '> `*_user_id_not_null`, `*_confirmed_at_not_null`.',
+      '> Jika live **ada** kekangan bernama ini, laporkan — itu bermakna live juga',
+      '> PG 18 dan beberapa andaian lain perlu dikemas kini.',
+      '>',
+      '> **Jangan** tambah kekangan `NOT NULL` bernama di live untuk "menyamakan".',
+      '> Semantiknya sudah betul dan sudah disahkan oleh R6.',
+    ].join('\n'),
     sql: () => `SELECT conname, pg_get_constraintdef(oid) AS definisi
   FROM pg_constraint
  WHERE conrelid = 'public.account_manager_aliases'::regclass
@@ -255,10 +330,50 @@ const PROBE = [
 // -----------------------------------------------------------------------------
 const db = new PGlite();
 await db.exec(BOOTSTRAP);
+// SUSUNAN FAIL mesti meniru live, bukan hanya repo asas.
+//
+// 🔴 DP-6 (drift enum app_role) muncul semula di sini: `schema-master.sql`
+// mentakrifkan 7 nilai app_role TANPA 'super_admin', tetapi J1d live melaporkan
+// 8 nilai TERMASUK 'super_admin' — kerana Fasa 6 memasang `user-management.sql`
+// di live. Tanpa fail itu, fixture tidak boleh menyemai profil `Admin` dengan
+// role super_admin, dan fixture itu TIDAK SETARA live.
+//
+// Maka `user-management.sql` dipasang — fail Fasa 6 yang SEBENAR, bukan enum
+// yang ditadbir tangan (yang akan mewujudkan drift baharu).
+// pgcrypto: di Supabase sebenar ia tersedia sebagai extension. PGlite tiada,
+// jadi pasang extension jika boleh, jika tidak stub deterministik dengan
+// semantik yang sama (blok ini DISALIN dari test-user-management-sql.mjs
+// supaya kelakuan fixture tidak bercabang dua).
+try {
+  await db.exec('CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;');
+} catch {
+  await db.exec('CREATE SCHEMA IF NOT EXISTS extensions;');
+  await db.exec(`
+    CREATE OR REPLACE FUNCTION extensions.gen_salt(text) RETURNS text
+      LANGUAGE sql IMMUTABLE AS $$ SELECT 'STUBSALT' $$;
+    CREATE OR REPLACE FUNCTION extensions.crypt(text, text) RETURNS text
+      LANGUAGE plpgsql IMMUTABLE AS $$
+      DECLARE v_salt text; v_pos int;
+      BEGIN
+        IF $2 IS NULL OR $2 = '' THEN RETURN 'STUBSALT|' || md5($1); END IF;
+        v_pos := length($2) - position('|' in reverse($2)) + 1;
+        IF v_pos <= 1 OR v_pos > length($2) THEN v_salt := $2;
+        ELSE v_salt := substring($2 from 1 for v_pos - 1); END IF;
+        RETURN v_salt || '|' || md5($1);
+      END; $$;`);
+}
+
 for (const f of ['lib/supabase/schema-master.sql',
-                 'lib/supabase/schema-import-staging.sql']) {
+                 'lib/supabase/schema-import-staging.sql',
+                 'lib/supabase/user-management.sql']) {
   await db.exec(fs.readFileSync(f, 'utf8'));
 }
+// Sahkan fixture kini setara live pada dua titik yang DP-6/DP-10.4 kenalkan.
+const nEnum = (await db.query(
+  `SELECT count(*)::int n FROM pg_enum e
+     JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = 'app_role'`)).rows[0].n;
+if (nEnum !== 8) throw new Error(`jangkaan 8 nilai app_role seperti J1d live, dapat ${nEnum}`);
 let i = 0;
 for (const [name, email] of STAFF) {
   const uid = `22222222-2222-4222-8222-22222222${String(++i).padStart(4, '0')}`;
@@ -268,7 +383,23 @@ for (const [name, email] of STAFF) {
      ON CONFLICT (id) DO UPDATE SET full_name=EXCLUDED.full_name`, [uid, name, email]);
 }
 const nStaf = (await db.query(`SELECT count(*)::int n FROM public.user_profiles`)).rows[0].n;
-if (nStaf !== 18) throw new Error(`jangkaan 18 staf, dapat ${nStaf}`);
+if (nStaf !== 18) throw new Error(`jangkaan 18 staf Excel, dapat ${nStaf}`);
+
+// 2 profil tambahan live -> fixture kini 20, SEPADAN J0a/J0e live.
+let k = 0;
+for (const [nama, email, role, aktif, status] of PROFIL_TAMBAHAN_LIVE) {
+  const uid = `44444444-4444-4444-8444-44444444${String(++k).padStart(4, '0')}`;
+  await db.query(`INSERT INTO auth.users (id,email) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [uid, email]);
+  // `user-management.sql` dipasang di atas, jadi `account_status` KINI wujud
+  // dan boleh disemai verbatim seperti J0a live — fixture setia sepenuhnya.
+  await db.query(
+    `INSERT INTO public.user_profiles (id, full_name, email, role, is_active, account_status)
+     VALUES ($1,$2,$3,$4::app_role,$5,$6::account_status)
+     ON CONFLICT (id) DO UPDATE SET full_name=EXCLUDED.full_name`,
+    [uid, nama, email, role, aktif, status]);
+}
+const nSemua = (await db.query(`SELECT count(*)::int n FROM public.user_profiles`)).rows[0].n;
+if (nSemua !== 20) throw new Error(`jangkaan 20 profil (18 staf + Admin + test) seperti J0e live, dapat ${nSemua}`);
 
 await db.exec(fs.readFileSync(SQL_FILE, 'utf8'));
 
@@ -382,10 +513,15 @@ perbezaan kelakuan = perbezaan logik, bukan perbezaan format.
 > NULL** dalam R2. Selepas L4, tiga yang pertama akan menyelesaikan kepada
 > **Fuziah**. Jangan "memperbaiki" NULL ini sekarang.
 
-> 🟠 **Dua profil tambahan live** (\`Admin\`, \`test\`) tiada dalam fixture
-> PGlite. Probe R2 sengaja mengujinya: kedua-duanya **dijangka NULL** kerana
-> tiada nilai Excel yang sepatutnya menyelesaikan kepada akaun Super Admin atau
-> akaun ujian yang di-block.
+> 🟢 **Dua profil tambahan live** (\`Admin\`, \`test\`) **KINI ADA** dalam
+> fixture PGlite. Versi pertama prompt ini hanya menyemai 18 staf Excel dan
+> meramalkan \`NULL\` untuk kedua-duanya — ramalan itu **salah**, bukan
+> kelakuan live yang salah. Fixture kini menyemai **20 profil** (sepadan
+> J0a/J0e live), jadi R2 **dijangka** \`test\` → \`test\` dan
+> \`Admin\` → \`Admin\`. **Jangan ubah fungsi production** kerana versi
+> pertama ramalan itu.
+> Persoalan tadbir urus yang timbul daripadanya direkodkan sebagai **DP-14.2**
+> dan **BUKAN** sebahagian rekonsiliasi ini.
 
 ---
 

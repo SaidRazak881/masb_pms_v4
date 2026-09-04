@@ -64,10 +64,15 @@ perbezaan kelakuan = perbezaan logik, bukan perbezaan format.
 > NULL** dalam R2. Selepas L4, tiga yang pertama akan menyelesaikan kepada
 > **Fuziah**. Jangan "memperbaiki" NULL ini sekarang.
 
-> 🟠 **Dua profil tambahan live** (`Admin`, `test`) tiada dalam fixture
-> PGlite. Probe R2 sengaja mengujinya: kedua-duanya **dijangka NULL** kerana
-> tiada nilai Excel yang sepatutnya menyelesaikan kepada akaun Super Admin atau
-> akaun ujian yang di-block.
+> 🟢 **Dua profil tambahan live** (`Admin`, `test`) **KINI ADA** dalam
+> fixture PGlite. Versi pertama prompt ini hanya menyemai 18 staf Excel dan
+> meramalkan `NULL` untuk kedua-duanya — ramalan itu **salah**, bukan
+> kelakuan live yang salah. Fixture kini menyemai **20 profil** (sepadan
+> J0a/J0e live), jadi R2 **dijangka** `test` → `test` dan
+> `Admin` → `Admin`. **Jangan ubah fungsi production** kerana versi
+> pertama ramalan itu.
+> Persoalan tadbir urus yang timbul daripadanya direkodkan sebagai **DP-14.2**
+> dan **BUKAN** sebahagian rekonsiliasi ini.
 
 ---
 
@@ -114,6 +119,20 @@ Teras Fasa 8A. Termasuk dua probe DISKRIMINATIF (`Afiq`, `Ahmad Nizar`) yang han
 > kerana L4 (seed alias) belum dijalankan. Selepas L4, tiga yang pertama
 > menyelesaikan kepada **Fuziah** dan `Ow Zi Qi` kekal NULL tetapi diklasifikasi
 > `LUAR`. Jangan "memperbaiki" NULL ini sekarang.
+>
+> 🟠 **`test` → `test` dan `Admin` → `Admin` IALAH JANGKAAN YANG BETUL.**
+> Versi pertama prompt ini meramalkan `NULL` kerana fixture PGlite Arena hanya
+> menyemai 18 staf Excel dan **tertinggal** dua profil tambahan live. Ramalan itu
+> **salah**; fixture kini menyemai **20 profil** supaya sepadan J0a/J0e live.
+> Fungsi live **tidak rosak** dan **tidak perlu diubah**.
+>
+> Pendedahan ini bagaimanapun membuka **persoalan tadbir urus sebenar** yang
+> direkodkan sebagai **DP-14.2**: patutkah `resolve_account_manager()` mengaitkan
+> data perniagaan kepada akaun **blocked** (`test`) atau kepada akaun Super Admin
+> (`Admin`)? Perhatikan `am_list_staff()` **sudah** menapis `is_active = true`
+> manakala `resolve_account_manager()` **tidak menapis apa-apa** —
+> ketidakselarasan dalam dua fail yang sama-sama diluluskan.
+> **Jangan selesaikan dalam rekonsiliasi ini**; ia gate berasingan (DP-14).
 
 ```sql
 SELECT v.raw,
@@ -140,8 +159,8 @@ SELECT v.raw,
 | Afiq | Dr. Afiq |
 | Ahmad Nizar | Dr. Ahmad Nizar |
 | Siti Nurhaliza | Siti Sarah |
-| test | **NULL** |
-| Admin | **NULL** |
+| test | test |
+| Admin | Admin |
 
 ### R3 — Definisi penuh 4 polisi RLS — `qual` dan `with_check` 🔴 MESTI SEPADAN
 
@@ -250,7 +269,24 @@ SELECT c.column_name, c.data_type, c.is_nullable,
 | confirmed_at | timestamp with time zone | NO | now() |
 | notes | text | YES | (tiada) |
 
-### R6b — Kekangan `account_manager_aliases` 🔴 MESTI SEPADAN
+### R6b — Kekangan `account_manager_aliases` 🟠 MAKLUMAN
+
+🟠 **MAKLUMAN — bukan ketat.** PGlite berjalan pada **PostgreSQL 18.3**, dan PG 18 memperkenalkan kekangan `NOT NULL` **bernama** dalam `pg_constraint` (`*_not_null`). Live Supabase menjalankan versi lebih lama yang merepresentasikan `NOT NULL` sebagai metadata lajur sahaja. Jadi bilangan baris probe ini **dijangka berbeza mengikut versi**, dan perbezaan itu **BUKAN kecacatan**. Semantik `NOT NULL` sudah disahkan secara ketat oleh **R6** (`is_nullable = NO`).
+
+> 🔴 **Yang WAJIB sepadan walaupun probe ini 🟠:**
+> - `account_manager_aliases_pkey` → `PRIMARY KEY (id)`
+> - `account_manager_aliases_raw_unique` → `UNIQUE (raw_text)`
+> - `account_manager_aliases_user_id_fkey` → `FOREIGN KEY (user_id) REFERENCES user_profiles(id) ON DELETE CASCADE`
+> - `account_manager_aliases_confirmed_by_fkey` → `FOREIGN KEY (confirmed_by) REFERENCES auth.users(id)`
+>
+> 🟠 **Yang DIJANGKA TIADA di live** (ciri PostgreSQL 18; PGlite 18.3 sahaja):
+> `*_id_not_null`, `*_created_at_not_null`, `*_raw_text_not_null`,
+> `*_user_id_not_null`, `*_confirmed_at_not_null`.
+> Jika live **ada** kekangan bernama ini, laporkan — itu bermakna live juga
+> PG 18 dan beberapa andaian lain perlu dikemas kini.
+>
+> **Jangan** tambah kekangan `NOT NULL` bernama di live untuk "menyamakan".
+> Semantiknya sudah betul dan sudah disahkan oleh R6.
 
 ```sql
 SELECT conname, pg_get_constraintdef(oid) AS definisi

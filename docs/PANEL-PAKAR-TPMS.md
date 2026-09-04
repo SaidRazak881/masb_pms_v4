@@ -1727,3 +1727,181 @@ spec sistem.
 25. **Jangan perketat peraturan tanpa mengukur kadar ralatnya.** Dua peraturan
     ketat yang kelihatan jelas kedua-duanya memecahkan kes sebenar. Dengan sifar
     nilai live, tiada asas empirikal untuk memilih. Tangguh sehingga ada data.
+
+---
+
+## DP-14 — Rekonsiliasi L1: kedua-dua perbezaan ialah artifak, dan persoalan tadbir urus yang ia dedahkan (2026-09-04)
+
+**Pencetus:** Laporan ChatGPT `L1-R` diterima. 6 daripada 8 probe 🟢; dua dibendera:
+**R2 🔴** (`test`→`test`, `Admin`→`Admin` sedangkan fixture meramalkan `NULL`) dan
+**R6b 🟠** (live ada 4 kekangan bernama, PGlite ada 9). ChatGPT **berhenti dengan
+betul**, tidak mengubah apa-apa di production, dan menyerahkan persoalan itu
+kepada Arena: *"jangan ubah fungsi production berdasarkan probe ini."*
+
+Panel bersidang untuk menetapkan punca sebelum sebarang pembetulan ditulis.
+
+### 14.1 🟢 R6b — artifak VERSI PostgreSQL, bukan kecacatan
+
+**Fakta diukur (bukan diandaikan):**
+
+| Perkara | Nilai | Sumber |
+|---|---|---|
+| Versi PGlite | **PostgreSQL 18.3** | `SHOW server_version` dalam penjana |
+| Kekangan bernama `*_not_null` dalam `pg_constraint` | ciri **PG 18** | 5 baris ekstra hanya wujud di PGlite |
+| Kekangan bernama di live | **4** — pkey, raw_unique, 2 fkey | laporan GPT R6b |
+| `is_nullable = NO` bagi lajur yang sama | **lulus 🟢** | laporan GPT R6 |
+
+Kekangan `NOT NULL` **bernama** diperkenalkan dalam PostgreSQL 18; versi lebih
+lama merepresentasikannya sebagai metadata lajur sahaja. Live menjalankan versi
+lebih lama. Maka perbezaan bilangan baris R6b **dijangka mengikut versi**.
+
+**Yang penting:** semantik `NOT NULL` sudah disahkan **secara ketat** oleh R6
+(`is_nullable = NO`, 🔴 MESTI SEPADAN, dan live **lulus**). R6b hanya mengira
+nama kekangan — ia menguji *representasi katalog*, bukan *kelakuan*.
+
+**Kata putus 14.1:** R6b **diturunkan** daripada 🔴 ketat kepada 🟠 makluman.
+Empat kekangan yang **mesti** sepadan walau apa pun versi (pkey, `raw_unique`,
+`user_id_fkey`, `confirmed_by_fkey`) dikekalkan 🔴 dan **live lulus semuanya**.
+Lima `*_not_null` ditandai *"DIJANGKA TIADA di live"* dengan arahan: jika live
+ada juga, laporkan — itu bermakna andaian versi lain perlu dikemas kini.
+
+### 14.2 🔴 R2 — fixture TIDAK LENGKAP, dan ia mendedahkan ketidakselarasan reka bentuk sebenar
+
+**Punca R2:** fixture PGlite hanya menyemai **18 staf Excel**. Live ada **20
+profil** (J0a): 18 staf + `Admin` (super_admin, aktif) + `test` (staff,
+**blocked**). Fungsi live **betul**; **ramalan Arena yang salah**.
+
+Fixture dibaiki: 20 profil, dan pengawal ditambah (`count = 20` atau penjana
+gagal). Jangkaan R2 kini `test` → `test` dan `Admin` → `Admin` — **tepat sama
+dengan output live yang GPT laporkan**. Maka R2 **terpenuhi secara retroaktif**;
+**tiada keperluan menjalankan semula rekonsiliasi di live**.
+
+**Tetapi pendedahan itu membuka isu tadbir urus yang sebenar.** Diukur pada
+dua fail yang **sama-sama diluluskan**:
+
+| Fungsi | Menapis `is_active`? | Menapis `role`? |
+|---|---|---|
+| `am_list_staff()` | ✅ **YA** (`WHERE is_active = true`) | tidak |
+| `resolve_account_manager()` | ❌ **TIDAK** | ❌ **TIDAK** |
+
+Kedua-duanya dalam `client-master.sql` yang sudah dipasang. Maka sistem boleh
+**menyenaraikan** satu set staf dan **menyelesaikan** kepada set yang lebih
+besar — termasuk akaun blocked dan akaun Super Admin.
+
+**Kedudukan yang dibenarkan:**
+
+- **A — Tadbir urus/Kewangan:** pengikat data perniagaan kepada akaun **blocked**
+  ialah lubang tadbir urus; kepada **Super Admin** pula salah secara semantik
+  (akaun pentadbiran, bukan AM perniagaan). Resolver **mesti** menapis.
+- **B — Kejuruteraan data:** jangan ubah semantik sekarang. Kesan live **sifar**
+  (tiada nilai `account_manager_id` diisi; backfill masih di-gate). Memperketat
+  tanpa mengukur kadar ralat **mengulangi kesilapan DP-13.3** (Siti Nurhaliza).
+  Tangguh ke 8C apabila data wujud.
+- **C — Tengah:** jangan sempitkan *carian*; kawal *penulisan*. Resolver ialah
+  carian nama→identiti yang tulen; **tindakan tadbir urus ialah WRITE**, jadi
+  pengawal milik fungsi backfill, bukan resolver.
+
+**Kata putus 14.2:** **Kedudukan C**, dengan tiga sebab diukur:
+
+1. **Jangan edit `client-master.sql` yang sudah dipasang** (preseden DP-13.2 +
+   larangan berdiri). Sebarang perubahan mesti **migration aditif** pada gate
+   yang betul.
+2. **Menyempitkan resolver menyembunyikan masalah.** Jika resolver mula
+   memulangkan `NULL` untuk `test`, nilai Excel yang merujuk kepada akaun
+   blocked akan **senyap-senyap hilang**. Jika backfill yang menolak, nilai itu
+   muncul dalam **laporan pengecualian** — boleh dilihat, boleh dibetulkan.
+   Data yang salah mesti **bising**, bukan senyap.
+3. **Kesan kini sifar, jadi ini bukan kecemasan.** Ia mesti diikat kepada gate
+   backfill (**8C**), di mana risiko itu benar-benar wujud, dan diuji dengan
+   data sebenar.
+
+**Tindakan berjadual (BUKAN sekarang):**
+- 8C: `am_backfill_account_manager()` **MESTI** menolak `user_id` yang profilnya
+  `is_active = false` **atau** `role = 'super_admin'`, dan **melaporkannya**
+  sebagai pengecualian (bukan NULL senyap).
+- 8A-2 UI: paparan pengesahan alias **MESTI** menandai calon yang blocked /
+  Super Admin, kerana `am_list_staff()` tidak akan menyenaraikannya tetapi
+  resolver boleh menjananya.
+- Ketidakselarasan `am_list_staff()` ↔ `resolve_account_manager()` **direkodkan
+  dan diterima buat masa ini** — ia sengaja, kerana kedua-duanya menjawab
+  soalan berbeza ("siapa boleh dipilih" vs "nama ini milik siapa").
+
+**Bantahan direkodkan:** Posisi A berpendapat lubang tadbir urus tidak patut
+dibiarkan terbuka walaupun kesannya sifar, kerana backfill boleh dijalankan
+orang lain kelak. **Diterima sebagai risiko terkawal:** gate 8C ialah HARD GATE
+dan tidak boleh dilangkau tanpa kata putus baharu; DP-14.2 dirujuk secara
+eksplisit dalam prompt 8C supaya ia tidak boleh dilupakan.
+
+### 14.3 🟠 DP-6 muncul semula — kali ini di dalam fixture
+
+Membaiki 14.2 mendedahkan drift lama. Untuk menyemai `Admin` sebagai
+`super_admin`, fixture memerlukan nilai enum itu — tetapi:
+
+- `schema-master.sql` (repo) mentakrifkan **7** nilai `app_role`:
+  `viewer, executive, manager, admin, staff, finance, head_governance`
+- Live ada **8** (J1d) — termasuk `super_admin`
+- `super_admin` ditambah oleh **`user-management.sql`** (Fasa 6, memang
+  dipasang di live)
+
+Fixture rekonsiliasi hanya memasang `schema-master.sql` +
+`schema-import-staging.sql`, jadi ia **tidak setara live**. Ini **DP-6**
+(drift enum `app_role`) muncul semula dalam bentuk baharu: bukan sebagai
+masalah production, tetapi sebagai **punca ramalan ujian yang salah**.
+
+**Kata putus 14.3:** fixture rekonsiliasi **MESTI** memasang
+`user-management.sql` — fail Fasa 6 yang **sebenar** — dan **BUKAN** mentadbir
+enum dengan tangan (`ALTER TYPE ... ADD VALUE`), kerana enum yang ditadbir
+tangan akan mewujudkan **drift ketiga**. Tiga pengawal kekal ditambah dalam
+penjana supaya kegagalan ini **tidak boleh berulang senyap**:
+
+1. `count(*) app_role = 8` — sepadan J1d live (atau penjana gagal)
+2. `count(*) user_profiles = 20` — sepadan J0a live (atau penjana gagal)
+3. stub `auth.users`/`auth.identities` diperkayakan + pgcrypto (atau stub
+   deterministik yang **disalin** dari `test-user-management-sql.mjs`, supaya
+   kelakuan fixture tidak bercabang dua)
+
+### 14.4 Status rekonsiliasi selepas pembetulan
+
+| Probe | Ketat? | Laporan GPT (live) | Jangkaan dibaiki | Status |
+|---|---|---|---|---|
+| R1 `normalize_person_name` | 🔴 11 | 11/11 | 11 | 🟢 |
+| R2 `resolve_account_manager` | 🔴 16 | `test`→`test`, `Admin`→`Admin` | **sama** | 🟢 retroaktif |
+| R3 polisi RLS | 🔴 4 | 4/4 | 4 | 🟢 |
+| R4 indeks | 🟠 2 | 2/2 | 2 | 🟢 |
+| R5 lajur `organizers` | 🔴 6 | 6/6 | 6 | 🟢 |
+| R6 lajur alias (`is_nullable`) | 🔴 7 | lulus | 7 | 🟢 |
+| R6b kekangan bernama | 🟠 (dahulu 🔴 9) | 4 bernama | **4 wajib + 5 dijangka tiada** | 🟢 |
+| R7 kekangan FK | 🔴 2 | 2/2 | 2 | 🟢 |
+
+**Kata putus 14.4:** **L1 DISAHKAN TERPASANG DAN SETARA dengan SQL yang
+diluluskan.** Semua 8 probe kini dipenuhi oleh laporan GPT yang **sudah ada** —
+**tiada** keperluan menjalankan semula rekonsiliasi di live. Ini disimpulkan
+daripada bukti, bukan andaian: setiap baris 🔴 dalam jadual di atas dipadankan
+baris-demi-baris dengan nilai yang GPT laporkan.
+
+### 14.5 Pengajaran direkodkan
+
+26. **Sebelum mempercayai ramalan ujian, sahkan fixture setara dengan
+    production.** R2 🔴 kelihatan seperti kecacatan live; ia sebenarnya
+    kekurangan fixture. Jika Arena "memperbaiki" production mengikut ramalan
+    itu, fungsi yang betul akan dirosakkan. **Ramalan yang salah lebih
+    berbahaya daripada tiada ramalan.**
+27. **Bezakan *kelakuan* daripada *representasi katalog*.** R6 menguji
+    `is_nullable` (kelakuan, stabil merentas versi); R6b menguji nama kekangan
+    (representasi, berubah pada PG 18). Probe yang menguji representasi **mesti**
+    ditanda 🟠, bukan 🔴, atau ia akan menghasilkan positif palsu setiap kali
+    versi berbeza.
+28. **Drift repo↔live tidak hilang selepas ia direkodkan — ia berpindah.**
+    DP-6 direkodkan sebagai drift enum; ia muncul semula sebagai punca fixture
+    tidak setara. Satu-satunya pertahanan ialah **pasang fail yang sebenarnya
+    dipasang di live** dalam fixture, dan **kunci** kesetaraan itu dengan
+    pengawal (`= 8`, `= 20`).
+29. **Apabila dua fungsi diluluskan tidak selaras, tanya dahulu sama ada ia
+    sengaja.** `am_list_staff()` menapis `is_active`, resolver tidak. Itu
+    **bukan** ralat semudah itu: keduanya menjawab soalan berbeza. Tindakan
+    yang betul ialah mengawal **WRITE** (tempat risiko sebenar), bukan
+    menyelaraskan dua carian secara kosmetik.
+30. **Data yang salah mesti bising.** Menapis keluar akaun blocked di dalam
+    resolver akan menukarkan masalah tadbir urus menjadi `NULL` yang senyap.
+    Menolaknya di backfill menghasilkan **laporan pengecualian**. Pilih reka
+    bentuk yang mendedahkan, bukan yang menyembunyikan.
