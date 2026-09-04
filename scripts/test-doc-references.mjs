@@ -414,6 +414,74 @@ console.log('\n[6] Gate integriti DP-11 — blob SHA + cap jari struktur diterbi
 }
 
 // -----------------------------------------------------------------------------
+// 7. DP-12 — SQL inline dalam 4 prompt langkah mesti BYTE-IDENTIK dengan fail
+// -----------------------------------------------------------------------------
+//
+// Prompt langkah dibina oleh scripts/generate-8a3-install-prompts.mjs, yang
+// menulis bait fail terus ke markdown. Seksyen ini membuktikan hasilnya:
+// kandungan yang diekstrak semula mesti menghasilkan blob SHA, SHA-256, bait,
+// baris, aksara dan kiraan CREATE yang SAMA dengan fail asal.
+//
+// Jika penyalinan (atau penyuntingan tangan) mengubah walau satu bait — termasuk
+// ruang kosong atau newline terakhir — blob SHA akan berbeza dan ujian ini gagal.
+// Inilah yang menutup rantai integriti DP-12.4(6).
+console.log('\n[7] DP-12 — SQL inline dalam prompt langkah byte-identik dengan fail');
+{
+  const { createHash } = await import('node:crypto');
+  const PAGAR = '`'.repeat(4);
+  const LANGKAH = [
+    ['docs/PROMPT-8A3-L1-CLIENT-MASTER.md', 'lib/supabase/client-master.sql'],
+    ['docs/PROMPT-8A3-L2-EXTERNAL-ACCOUNT-MANAGERS.md', 'lib/supabase/external-account-managers.sql'],
+    ['docs/PROMPT-8A3-L3-ACCOUNT-MANAGER-RESOLUTION.md', 'lib/supabase/account-manager-resolution.sql'],
+    ['docs/PROMPT-8A3-L4-SEED-ALIASES.md', 'lib/supabase/seed-account-manager-aliases.sql'],
+  ];
+  // Pengekstrak: dari pagar pembuka 4-backtick ke pagar penutup 4-backtick.
+  // Bukan-tamak, jadi ia berhenti pada penutup pertama.
+  const RE_PAGAR = new RegExp(PAGAR + 'sql\\n([\\s\\S]*?)' + PAGAR);
+
+  for (const [pf, fl] of LANGKAH) {
+    const nama = path.basename(pf);
+    if (!fs.existsSync(pf)) { bad(`${pf} belum dijana — jalankan scripts/generate-8a3-install-prompts.mjs`); continue; }
+    if (!fs.existsSync(fl)) { bad(`${fl} tiada`); continue; }
+
+    const dokumen = fs.readFileSync(pf, 'utf8');
+    const m = dokumen.match(RE_PAGAR);
+    if (!m) { bad(`${nama}: tiada blok SQL berpagar ${PAGAR}`); continue; }
+    const inline = m[1];
+    const asal = fs.readFileSync(fl, 'utf8');
+
+    // 1. Perbandingan bait langsung — ujian paling kuat.
+    eq(inline === asal, true, `${nama}: SQL inline === bait fail ${path.basename(fl)}`);
+
+    // 2. blob SHA + SHA-256 mesti sepadan (mengesan perbezaan yang tidak
+    //    kelihatan, contohnya trailing newline atau CRLF).
+    const blobKira = createHash('sha1').update(
+      Buffer.concat([Buffer.from(`blob ${Buffer.byteLength(inline, 'utf8')}\0`, 'utf8'),
+                     Buffer.from(inline, 'utf8')])).digest('hex');
+    const blobAsal = git('hash-object', fl);
+    eq(blobKira, blobAsal, `${nama}: blob SHA inline sepadan fail`);
+
+    const shaInline = createHash('sha256').update(Buffer.from(inline, 'utf8')).digest('hex');
+    const shaAsal = createHash('sha256').update(fs.readFileSync(fl)).digest('hex');
+    eq(shaInline, shaAsal, `${nama}: SHA-256 inline sepadan fail`);
+
+    // 3. Nilai cap jari yang DITERBITKAN dalam prompt mesti sepadan fail.
+    eq(dokumen.includes(blobAsal), true, `${nama}: blob SHA diterbitkan`);
+    eq(dokumen.includes(shaAsal), true, `${nama}: SHA-256 diterbitkan`);
+    const bait = Buffer.byteLength(asal, 'utf8');
+    const barisN = (asal.match(/\n/g) || []).length;
+    const aksara = [...asal].length;
+    eq(dokumen.includes(`**${bait}**`), true, `${nama}: bait ${bait} diterbitkan`);
+    eq(dokumen.includes(`**${barisN}**`), true, `${nama}: baris ${barisN} diterbitkan`);
+    eq(dokumen.includes(`**${aksara}**`), true, `${nama}: aksara ${aksara} diterbitkan`);
+
+    // 4. Prompt mesti merujuk branch + repo semasa (DP-10.11).
+    eq(dokumen.includes(BRANCH_SEMASA), true, `${nama}: merujuk branch semasa`);
+    eq(dokumen.includes(REPO_PENUH), true, `${nama}: merujuk nama repo betul`);
+  }
+}
+
+// -----------------------------------------------------------------------------
 console.log(`\nKEPUTUSAN: ${lulus} lulus, ${gagal} gagal`);
 if (gagal > 0) {
   console.log('\nKegagalan:');

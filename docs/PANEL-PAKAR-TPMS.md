@@ -1330,3 +1330,179 @@ Tiada bantahan lain.
 16. **Bezakan pengesan integriti daripada kawalan keselamatan.** Blob SHA
     (SHA-1) mengesan kerosakan tidak sengaja; ia tidak menentang penyerang.
     Mengelirukan kedua-duanya akan melahirkan keyakinan palsu.
+
+---
+
+## DP-12 — Tiada laluan selamat "fail GitHub disahkan → teks SQL penuh": benamkan SQL dalam prompt (2026-09-04)
+
+### 12.1 Isu
+
+DP-11 menyelesaikan gate integriti. ChatGPT melaporkannya dan **Lapis 1 LULUS**:
+connector GitHub memberikan blob SHA yang tepat dan keempat-empatnya sepadan.
+Tetapi pemasangan **masih tidak berlaku**, atas sebab yang berbeza dan lebih
+asas:
+
+> "Aku masih tidak mempunyai mekanisme selamat untuk menghantar **kandungan
+> penuh fail yang telah disahkan** daripada GitHub connector ke
+> `Supabase.apply_migration`. Tool Supabase menerima SQL sebagai teks penuh; ia
+> tidak menerima GitHub file reference/path."
+>
+> "connector mengehadkan kandungan fail panjang. Ia tidak memberi aku
+> byte-stream penuh yang boleh aku ukur secara bebas."
+>
+> "Kalau aku bina semula SQL daripada potongan connector, itu tepat-tepat
+> melanggar arahan: *Jangan bina semula SQL daripada kandungan separa.*"
+
+**ChatGPT betul sepenuhnya.** Ini bukan masalah disiplin — ia **masalah
+seni bina alat**: pengesahan (blob SHA) berjaya, tetapi **pengangkutan**
+kandungan penuh ke alat pelaksanaan tidak wujud. Gate yang lulus tidak berguna
+jika bait yang disahkan tidak boleh sampai ke `apply_migration`.
+
+Tiga pusingan kini telah digunakan: `404` (DP-10.11) → gate SHA-256 (DP-11) →
+pengangkutan kandungan (DP-12). **Pusingan keempat tidak boleh berlaku.**
+
+### 12.2 Fakta diukur
+
+| Fakta | Nilai | Sumber |
+|---|---|---|
+| Lapis 1 di hujung ChatGPT | **LULUS** — keempat-empat blob SHA sepadan | laporan ChatGPT |
+| Lapis 2 di hujung ChatGPT | **⏳ tidak boleh** — connector memotong fail panjang | laporan ChatGPT |
+| Baris pertama/terakhir | boleh dibaca | laporan ChatGPT |
+| `apply_migration` | menerima **teks SQL penuh**, bukan rujukan fail | laporan ChatGPT |
+| Runtime ChatGPT | tiada DNS/internet keluar | laporan ChatGPT |
+| Persona + PROMPT-8A3 + Panel | **berjaya dibaca** (dokumen ~26–55 KB) | laporan ChatGPT |
+
+**Fakta yang diukur Arena dalam repo (menentukan kebolehlaksanaan):**
+
+| Fail SQL | pagar ` ``` ` | baris ber-backtick tunggal | penghujung | CRLF |
+|---|---|---|---|---|
+| `client-master.sql` | **0** | 22 | newline | tiada |
+| `external-account-managers.sql` | **0** | 16 | newline | tiada |
+| `account-manager-resolution.sql` | **0** | 13 | newline | tiada |
+| `seed-account-manager-aliases.sql` | **0** | 27 | newline | tiada |
+
+**Tiada fail mengandungi pagar ` ``` `** — hanya backtick tunggal dalam komen
+(contoh `` `organizers` ``). Maka keempat-empat fail **boleh dibenamkan dalam
+blok berpagar tanpa mengubah satu bait pun**, dan kerana semuanya LF serta
+berakhir dengan newline, pengekstrakan semula adalah **byte-tepat**.
+
+**Saiz (menentukan 1 prompt vs 4):**
+
+| Komponen | Bait |
+|---|---|
+| `client-master.sql` | 17,210 |
+| `external-account-managers.sql` | 13,526 |
+| `account-manager-resolution.sql` | 21,276 |
+| `seed-account-manager-aliases.sql` | 12,284 |
+| **Jumlah 4 fail SQL** | **64,296** |
+| Seksyen 6 PROMPT-8A3 (K1–K12) | 9,417 |
+| Seksyen 7 (Larangan) | 1,880 |
+| Seksyen 8 (Format laporan) | 2,764 |
+
+ChatGPT **sudah berjaya membaca** dokumen bersaiz 26 KB (`PROMPT-8A3-INSTALL`)
+dan 55 KB (`PANEL-PAKAR-TPMS`), jadi sasaran **≤ ~30 KB setiap prompt** adalah
+dalam lingkungan yang terbukti boleh dibaca.
+
+### 12.3 Kedudukan pakar
+
+**Pengerusi.** Kita telah menukar gate (DP-11) tetapi tidak pernah mempersoalkan
+**laluan penghantaran**. Soalan sebenar: bagaimana bait yang diluluskan sampai
+ke alat pelaksanaan tanpa melalui pengangkutan yang memotongnya? Jawapan paling
+ringkas ialah **jangan guna pengangkutan itu** — hantar baitnya bersama prompt.
+
+**SQL Architect.** Saya sokong benamkan inline, dengan syarat **satu penjana
+deterministik** yang menulisnya, bukan tangan manusia atau model. Saya telah
+melihat model menyalin SQL dan "memperbaiki" ruang kosong. Penjana yang membaca
+bait fail dan menulisnya terus ke markdown menghilangkan kelas ralat itu, dan
+ujian boleh membuktikan hasilnya byte-identik.
+
+**Keselamatan.** Benamkan SQL dalam prompt **tidak melemahkan** kawalan — ia
+sebenarnya mengukuhkannya. Rantai baharu: fail diluluskan → penjana menulis bait
+tepat → **ujian mengesahkan kandungan inline menghasilkan blob SHA yang sama** →
+pengguna menampal → ChatGPT mengira cap jari daripada teks penuh yang kini ia
+pegang → `apply_migration`. Setiap mata boleh disahkan. Saya juga mahu ChatGPT
+diberitahu secara eksplisit: **jika teks yang diterima tidak sepadan cap jari,
+BERHENTI** — jangan "lengkapkan" bahagian yang hilang.
+
+**QA.** Saya mahu **4 prompt berasingan**, bukan satu prompt 64 KB. Tiga sebab:
+(1) tampalan kecil kurang berisiko terpotong; (2) satu gate per langkah padan
+urutan wajib 1→2→3→4 dengan titik berhenti semula jadi; (3) jika Langkah 3
+gagal, Langkah 1–2 sudah dipasang dan direkodkan — kita tidak kehilangan semua
+kerja. Saya juga mahu Lapis 2 **akhirnya boleh dikira**: dengan teks penuh dalam
+konteks, ChatGPT boleh menulisnya ke sandbox dan mengira bait/aksara/baris/
+CREATE **dan** SHA-256.
+
+**ETL/Excel.** Setuju. Dan saya tekankan: **fail SQL itu sendiri mesti kekal
+tidak diubah.** Jangan tambah sentinel, jangan "kemas kini" komen. Kandungan
+yang diluluskan pengguna mesti kekal byte-for-byte, supaya blob SHA yang sudah
+LULUS di Lapis 1 terus sah.
+
+**BA.** Kos kepada pengguna ialah **empat tampalan**, bukan satu. Itu boleh
+diterima berbanding pusingan keempat yang gagal. Setiap prompt mesti
+**berdiri sendiri** — pengguna tidak sepatutnya perlu membuka tiga dokumen lain.
+
+**Frontend.** Tiada kesan UI. Saya hanya mahu memastikan kita tidak memperkenalkan
+tabiat "benamkan semua perkara dalam prompt" sebagai pola umum — ia wajar di
+sini kerana ada gate pelaksanaan production, bukan untuk kerja rutin.
+
+### 12.4 Kata putus
+
+**SQL dibenamkan secara inline dalam 4 prompt pemasangan berasingan, dijana oleh
+skrip deterministik, dan diuji byte-identik dengan fail yang diluluskan.**
+
+1. **Penjana:** `scripts/generate-8a3-install-prompts.mjs` membaca bait fail SQL
+   dan menulisnya ke dalam prompt. **Tiada penyalinan oleh manusia atau model.**
+2. **4 fail prompt**, satu per langkah, dalam urutan wajib:
+   - `docs/PROMPT-8A3-L1-CLIENT-MASTER.md`
+   - `docs/PROMPT-8A3-L2-EXTERNAL-ACCOUNT-MANAGERS.md`
+   - `docs/PROMPT-8A3-L3-ACCOUNT-MANAGER-RESOLUTION.md`
+   - `docs/PROMPT-8A3-L4-SEED-ALIASES.md`
+3. **Setiap prompt berdiri sendiri:** konteks, keputusan J0 (supaya tidak
+   diulang), jadual pengesahan (blob SHA + SHA-256 + bait/baris/aksara/CREATE +
+   baris pertama/terakhir), SQL penuh inline, arahan `apply_migration`, larangan,
+   format laporan.
+4. **L4 membawa K1–K12 penuh** (seksyen 6 dipindahkan apa adanya) kerana ia
+   langkah terakhir; L1–L3 membawa semakan objek minimum spesifik langkah.
+5. **Fail SQL TIDAK diubah.** Sifar bait berbeza. Blob SHA Lapis 1 yang sudah
+   LULUS kekal sah.
+6. **Gelung integriti ditutup oleh ujian:** `test-doc-references.mjs` seksyen [7]
+   mengekstrak SQL daripada setiap prompt inline dan menegaskan blob SHA,
+   SHA-256, bait, baris, aksara dan kiraan CREATE **sama dengan fail sebenar**.
+7. **Lapis 2 kini boleh dikira oleh ChatGPT** kerana ia memegang teks penuh.
+   Prompt mengarahkannya menulis teks itu ke sandbox (jika ada) dan mengira
+   semua cap jari — termasuk SHA-256 yang sebelum ini mustahil.
+
+### 12.5 Peraturan berhenti yang dikekalkan
+
+🔴 Jika teks SQL yang ChatGPT terima **tidak sepadan** mana-mana cap jari:
+**BERHENTI**. Laporkan nilai dapat vs jangkaan. **Jangan** lengkapkan bahagian
+yang hilang, **jangan** bina semula, **jangan** jalankan SQL separa.
+
+🔴 Jika `42501 tiada kuasa` muncul semasa L4: **BERHENTI dan laporkan** teks
+ralat penuh. **Jangan** longgarkan RLS, **jangan** tukar `SECURITY DEFINER`,
+**jangan** guna `service_role`.
+
+### 12.6 Bantahan direkodkan
+
+**Frontend (separa):** menerima kata putus tetapi membantahnya dijadikan pola
+umum. Dicatatkan: benamkan inline wajar **hanya** di mana ada gate pelaksanaan
+production dan pengangkutan yang memotong kandungan. Untuk kerja pembangunan
+rutin, rujukan fail kekal cara biasa.
+
+Tiada bantahan lain.
+
+### 12.7 Pengajaran direkodkan
+
+17. **Gate integriti dan laluan penghantaran ialah dua masalah berbeza.** DP-11
+    menyelesaikan "adakah bait ini betul?" tetapi tidak bertanya "bagaimana bait
+    ini sampai ke alat pelaksanaan?". Mengesahkan sesuatu yang tidak boleh
+    dihantar adalah sia-sia.
+18. **Apabila pelaksana berkata "aku tidak boleh", percaya laporannya dan ukur
+    persekitarannya — jangan tambah lagi syarat.** Tiga pusingan berturut-turut
+    berpunca daripada Arena mereka-reka keadaan alat ChatGPT tanpa mengukurnya.
+19. **Saiz dokumen ialah kekangan kejuruteraan yang boleh diukur.** ChatGPT
+    sudah membuktikan ia boleh membaca ~26–55 KB. Sasaran ≤ ~30 KB setiap prompt
+    berasal daripada bukti itu, bukan daripada tekaan.
+20. **Penjanaan deterministik + ujian byte-identik lebih selamat daripada
+    penyalinan teliti.** Manusia dan model kedua-duanya "memperbaiki" ruang
+    kosong semasa menyalin. Skrip tidak.

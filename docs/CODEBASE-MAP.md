@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-04 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: 6afabe1 DP-10.11: rekod perangkap repo=UNDERSCORE vs branch=HYPHEN · arena/01a06274-masb-pms-v4
+> Git: 27268f0 DP-11: gate SHA-256 tidak boleh dilulusi ChatGPT - ganti dengan gate dua lapis blob SHA Git · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 
@@ -247,6 +247,10 @@
 - `PROMPT-8A-CLIENT-MASTER.md`
 - `PROMPT-8A-J1-READONLY.md`
 - `PROMPT-8A3-INSTALL.md`
+- `PROMPT-8A3-L1-CLIENT-MASTER.md`
+- `PROMPT-8A3-L2-EXTERNAL-ACCOUNT-MANAGERS.md`
+- `PROMPT-8A3-L3-ACCOUNT-MANAGER-RESOLUTION.md`
+- `PROMPT-8A3-L4-SEED-ALIASES.md`
 - `PROMPT-8A3-SAMBUNGAN.md`
 - `PROMPT-TEMPLATE-FASA.md`
 - `SETUP-SUPABASE.md`
