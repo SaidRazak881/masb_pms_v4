@@ -2441,3 +2441,167 @@ berasingan akan **drift antara satu sama lain**, dan kedua-duanya akan kelihatan
     jurang sebenar yang ditemui semasa menjawabnya.** Menjawab soalan
     keselamatan dengan jujur sering mendedahkan lebih banyak daripada yang
     ditanya.
+
+---
+
+## DP-18 — L3-R: S2 🔴 `anon = true`; bukti mekanikal bahawa jangkaan Arena yang salah, dan mengapa ia tetap belum diputuskan (2026-09-04)
+
+**Pencetus:** Laporan ChatGPT `L3-R` diterima. **5 daripada 6 probe 🟢** —
+S1 (pendedahan minimum §2.8: `am_list_staff` = `TABLE(id uuid, full_name text)`),
+S3 (pengawal kuasa 4/4 + errcode tepat), S4 (deny-by-default 0 baris),
+S5 (**42501** verbatim, `PL/pgSQL function am_confirm_alias(text,uuid,text) line 11 at RAISE`),
+S6 (alias 0, external 0, **audit 44 → 44**). **S2 🔴:**
+`has_function_privilege('anon', …, 'EXECUTE') = **true** bagi 7/7 fungsi`,
+sedangkan jangkaan PGlite `false`.
+
+ChatGPT **menyekat Langkah 4**, tidak `REVOKE`/`GRANT`/`ALTER`, dan membezakan
+dengan tepat: *"Ini bukan bermakna S5 boleh bypass — S5 menunjukkan ia tidak
+boleh. Tetapi prinsip least-privilege … tidak dipenuhi."*
+
+### 18.1 Bukti mekanikal — diukur dalam PGlite, bukan dihujahkan
+
+| Keadaan | `anon` ada EXECUTE |
+|---|---|
+| **A.** Fixture PGlite tanpa *default privileges* | **0 / 7** ← jangkaan yang Arena kira |
+| **B.** A + `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated` | **7 / 7** ← **tepat seperti live** |
+| **C.** Dalam B, `REVOKE ALL ON FUNCTION … FROM PUBLIC` **diulang** | **masih `true`** |
+| **D.** Dalam C, `REVOKE ALL ON FUNCTION … FROM **anon**` | **`false`** |
+
+`pg_default_acl` bagi `defaclobjtype = 'f'` dalam keadaan B:
+`{authenticated=X/postgres,anon=X/postgres}` — `X` = EXECUTE.
+
+**Dua kesimpulan mengikuti:**
+
+1. **`REVOKE ALL … FROM PUBLIC` tidak membuang grant langsung kepada `anon`.**
+   `PUBLIC` ialah pseudo-role; `anon` peranan berasingan. Hanya `REVOKE … FROM
+   anon` membuangnya (D).
+2. Maka **fail yang diluluskan pun, jika dilaksanakan byte-for-byte di Supabase,
+   tetap menghasilkan `anon = true`** — *jika* projek itu mempunyai *default
+   privileges* yang memberi EXECUTE kepada `anon` bagi fungsi baharu dalam
+   `public`.
+
+**Sokongan daripada repo (diukur):**
+* **Tiada `ALTER DEFAULT PRIVILEGES` dalam mana-mana `lib/supabase/*.sql`.**
+  Jadi jika ia wujud di live, ia datang daripada **platform Supabase**, bukan
+  repo — dan **fixture PGlite tidak boleh menirunya daripada fail repo sahaja**.
+  Inilah punca S2: **fixture ≠ live**, kali **keempat**.
+* **Tiada kod aplikasi memanggil mana-mana daripada 7 fungsi** (`grep` dalam
+  `app/`, `lib/`, `components/` = kosong).
+* `user-management.sql`: **19 fungsi, 17 dengan `REVOKE ALL ON FUNCTION`** —
+  corak **sama persis** dengan Langkah 3.
+
+### 18.2 🔴 Mengapa panel **TIDAK** terus membatalkan S2
+
+Eksperimen 18.1 membuktikan mekanisme itu **mencukupi** untuk menghasilkan
+`anon = true`. Ia **tidak** membuktikan mekanisme itu **punca sebenar** di live.
+Mengisytiharkan "artifak, teruskan" berdasarkan PGlite sahaja ialah **tepat
+kesilapan yang panel ini wujud untuk elak** — dan ia akan menjadi kali keempat
+Arena membuat kesimpulan tentang live tanpa mengukurnya.
+
+**Kata putus 18.2:** keluarkan **`docs/PROMPT-8A3-S2F-ANON-PRIVILEGE-DIAGNOSTIK.md`**
+(4 query read-only). **Langkah 4 KEKAL DISEKAT** sehingga ia kembali. Kos:
+satu pusingan; nilai: menukar "hipotesis kuat" kepada "fakta diukur".
+
+**F2 ialah pembeza paling kuat.** Jika fungsi **pra-L3** (17 fungsi Fasa 6 dengan
+corak `REVOKE FROM PUBLIC` yang sama) **juga** `anon = true`, maka ia
+**sistemik** — keadaan seluruh projek, bukan kesan pemasangan L3, dan S2 **tidak
+boleh** dijadikan bukti ketidaksetiaan L3. Jika pra-L3 `anon = false` tetapi
+L3 `7/7 true`, maka cara L3 dipasang **berbeza** daripada fail yang diluluskan
+dan S2 🔴 ialah penemuan sebenar.
+
+### 18.3 Kesimpulan PRA-DAFTAR (direkodkan SEBELUM data live dilihat)
+
+Supaya kata putus tidak boleh direka selepas melihat hasil, panel mengikat
+dirinya sekarang:
+
+* **A — artifak platform** (F1 ada `anon=X`, **atau** F2 menunjukkan pra-L3 juga
+  `true`): S2 **diturunkan** 🔴 → 🟠 dengan sebab diukur. Fixture PGlite
+  **ditambah** `ALTER DEFAULT PRIVILEGES` supaya setara live, dengan pengawal
+  baharu. **L3-R diisytiharkan DIPUASKAN** (S1, S3, S4, S5, S6 🟢) dan
+  **Langkah 4 dibuka**.
+* **B — khusus L3** (pra-L3 `false`, L3 `7/7 true`): **L3-R kekal 🔴**; Arena
+  mengeluarkan fail pembetulan yang diluluskan; **Langkah 4 kekal disekat**.
+* **C — tidak dapat ditentukan:** kekal disekat, punca diselidik semula.
+
+### 18.4 🟠 Soalan *least-privilege* DIASINGKAN daripada soalan kesetiaan
+
+Ini pemisahan yang ChatGPT buat dengan betul, dan panel mengekalkannya:
+
+1. **"Adakah L3 dipasang setia?"** — soalan **rekonsiliasi**. Dijawab oleh S2-F.
+2. **"Adakah postur privilej ini yang kita mahu?"** — soalan **tadbir urus**.
+   **Tidak** ditutup oleh mana-mana jawapan kepada (1).
+
+Fakta untuk (2), diukur:
+
+* **Kesan semasa: tiada kebocoran ditunjukkan.** S4 membuktikan ketiga-tiga
+  fungsi baca memulangkan **0 baris** tanpa identiti; S5 membuktikan fungsi tulis
+  **menolak dengan 42501** dan S6 membuktikan **tiada** baris alias/external/audit
+  terhasil. Oleh kerana `anon` tiada JWT, `auth.uid()` juga NULL bagi `anon` —
+  jadi S4 **sudah memodelkan** pandangan `anon`.
+* **Yang dilanggar ialah prinsip, bukan data:** `anon` boleh **memanggil**
+  (EXECUTE) walaupun ia tidak boleh **mendapatkan** apa-apa.
+* **Risiko sistemik sebenar:** *default privileges* bermakna **setiap fungsi
+  baharu** dalam `public` automatik boleh dipanggil oleh `anon`. Fungsi masa
+  depan yang **lupa** pengawal dalaman akan mewarisi capaian itu. Pertahanan
+  kini bergantung **sepenuhnya** kepada disiplin pengawal dalaman, bukan kepada
+  privilej.
+
+**Kedudukan yang dibenarkan:**
+
+* **Keselamatan:** `REVOKE EXECUTE … FROM anon` bagi 7 fungsi ini sekarang, dan
+  pertimbangkan untuk seluruh `public`. *Least privilege* ialah pertahanan
+  berlapis; bergantung pada satu lapisan (pengawal dalaman) ialah rapuh.
+* **Kejuruteraan:** jangan lakukan REVOKE satu-per-satu — *default privileges*
+  akan memberi semula grant pada **setiap fungsi baharu**, jadi ia menjadi
+  kerja berulang tanpa penyelesaian. Pembetulan yang betul ialah di **punca**:
+  `ALTER DEFAULT PRIVILEGES … REVOKE` **atau** `REVOKE … FROM anon` yang
+  eksplisit dalam **setiap fail pemasangan** sebagai konvensyen.
+* **Kewangan/BA:** tiada kesan fungsian — tiada pemanggil aplikasi hari ini.
+
+**Kata putus 18.4 (tertakluk kepada 18.3):**
+1. **Jangan** `REVOKE` sekarang. Ia **migration** yang menyentuh permukaan
+   privilej **17 fungsi Fasa 6** jika dilakukan secara sistemik, dan ia mesti
+   pergi sebagai **fail aditif yang diluluskan**, bukan tindakan sampingan
+   semasa rekonsiliasi.
+2. **Bundel dengan gate 8C** bersama DP-14.2 dan DP-17.4(a)(b) — ketiga-tiganya
+   ialah *hardening* yang menyentuh objek yang sudah dipasang, dan ketiga-tiganya
+   mempunyai **sifar kesan semasa**. Satu migration aditif, satu ujian penuh,
+   satu gate.
+3. **Konvensyen baharu direkodkan sekarang** supaya ia tidak perlu diputuskan
+   semula: **setiap** fungsi baharu dalam `public` mesti mengandungi
+   `REVOKE ALL … FROM PUBLIC` **dan** `REVOKE ALL … FROM anon` **dan**
+   `GRANT EXECUTE … TO authenticated` — kerana yang pertama **tidak**
+   meliputi yang kedua (diukur, 18.1 C/D).
+4. `REVOKE … FROM anon` **selamat hari ini** (tiada pemanggil aplikasi), tetapi
+   **mesti mengekalkan** grant kepada `authenticated` — UI 8A-2 akan memanggil
+   `am_list_staff()` sebagai pengguna `authenticated`.
+5. **Bantahan Keselamatan direkodkan:** ia berpendapat menunggu sehingga 8C
+   meninggalkan jendela di mana fungsi baharu boleh ditambah tanpa penolakan
+   `anon`. **Diterima sebagai risiko terkawal** kerana (i) tiada kebocoran
+   ditunjukkan (S4/S5/S6), (ii) tiada fungsi baharu akan ditambah sebelum 8C —
+   L4 hanya *seed*, dan (iii) konvensyen dalam (3) sudah direkodkan dan akan
+   diuji oleh pengawal.
+
+### 18.5 Pengajaran direkodkan
+
+46. **`REVOKE … FROM PUBLIC` bukan `REVOKE … FROM <peranan>`.** `PUBLIC` ialah
+    pseudo-role. Grant langsung kepada `anon` tidak tersentuh olehnya. Ramalan
+    privilej yang mengabaikan perbezaan ini akan salah pada **setiap** platform
+    yang mempunyai *default privileges*.
+47. **Fixture yang dibina daripada fail repo sahaja tidak boleh meniru
+    *default privileges* platform.** Ia bukan kekurangan fail repo — tiada fail
+    repo mengandungi `ALTER DEFAULT PRIVILEGES`. Ini kelas **kelima** jurang
+    fixture↔live (selepas versi PG, data profil, enum, trigger), dan semuanya
+    berkongsi satu punca: **fixture dibina daripada repo, tetapi live dibina
+    daripada repo + platform.**
+48. **Bukti bahawa mekanisme itu MENCUKUPI bukan bukti bahawa ia PUNCA.**
+    PGlite menunjukkan `anon = 7/7` boleh dihasilkan oleh *default privileges*.
+    Ia tidak menunjukkan live mempunyai *default privileges*. Perbezaan itu
+    ialah seluruh sebab probe F1/F2 wujud.
+49. **Pra-daftarkan kesimpulan sebelum data tiba.** DP-18.3 mengikat A/B/C
+    **sebelum** laporan S2-F dilihat. Tanpa itu, mudah untuk memilih tafsiran
+    yang membolehkan kerja diteruskan — dan itu cara projek mati.
+50. **Asingkan "adakah ia dipasang setia?" daripada "adakah reka bentuk ini yang
+    kita mahu?".** ChatGPT membuat pemisahan ini sendiri dan dengan tepat.
+    Menjawab yang pertama "ya" **tidak** menjawab yang kedua, dan menjawap yang
+    kedua "tidak memuaskan" **tidak** bermakna yang pertama gagal.

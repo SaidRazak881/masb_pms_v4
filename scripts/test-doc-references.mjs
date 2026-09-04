@@ -712,6 +712,96 @@ console.log('\n[10] DP-17 — rekonsiliasi L3: pengawal keselamatan DIKUNCI');
 }
 
 // -----------------------------------------------------------------------------
+console.log('\n[11] DP-18 — diagnostik anon: READ-ONLY dan kesimpulan PRA-DAFTAR');
+{
+  // L3-R melaporkan S2 🔴 (anon = true bagi 7/7 fungsi). Arena mempunyai bukti
+  // mekanikal bahawa jangkaan itu sendiri mungkin artifak fixture, tetapi
+  // MENOLAK untuk mengisytiharkannya berdasarkan PGlite sahaja. Prompt S2-F
+  // mesti (a) read-only sepenuhnya - kerana "memperbaiki" privilej sebelum punca
+  // disahkan akan memusnahkan bukti dan boleh memecahkan 17 fungsi Fasa 6, dan
+  // (b) mengandungi kesimpulan PRA-DAFTAR supaya kata putus tidak boleh direka
+  // selepas melihat data.
+  const F = 'docs/PROMPT-8A3-S2F-ANON-PRIVILEGE-DIAGNOSTIK.md';
+  if (!fs.existsSync(F)) {
+    bad(`${F} tiada`);
+  } else {
+    const d = fs.readFileSync(F, 'utf8');
+    for (const id of ['F1', 'F2', 'F3', 'F4']) {
+      eq(new RegExp(`### ${id} — `).test(d), true, `S2-F: probe ${id} hadir`);
+    }
+    // (a) READ-ONLY: tiada kenyataan pengubah privilej dalam mana-mana blok sql.
+    //     Prosa prompt MEMANG menyebut REVOKE/GRANT (sebagai larangan dan sebagai
+    //     analisis), jadi pemeriksaan mesti diskopkan kepada blok ```sql sahaja.
+    const sql = d.split('```sql').slice(1).map((b) => b.split('```')[0]).join('\n');
+    eq(sql.length > 0, true, 'S2-F: blok sql ditemui untuk diperiksa');
+    for (const lar of ['REVOKE', 'GRANT', 'ALTER ', 'DROP ', 'CREATE ', 'INSERT',
+                       'UPDATE', 'DELETE']) {
+      eq(new RegExp(`\\b${lar.trim()}\\b`, 'i').test(sql), false,
+         `S2-F: tiada '${lar.trim()}' dalam mana-mana blok sql (read-only)`);
+    }
+    // F4 guna SET ROLE untuk mengukur kesan sebenar - dibenarkan, tetapi mesti
+    // dipulihkan supaya sesi tidak ditinggalkan sebagai anon.
+    eq(sql.includes('SET ROLE anon'), true, 'S2-F: F4 mengukur pandangan anon sebenar');
+    eq(sql.includes('RESET ROLE'), true, 'S2-F: peranan dipulihkan (RESET ROLE)');
+    // Bukti utama ialah pg_default_acl.
+    eq(sql.includes('pg_default_acl'), true, 'S2-F: F1 membaca pg_default_acl (bukti langsung)');
+    eq(sql.includes("defaclobjtype = 'f'"), true, 'S2-F: ditapis kepada fungsi');
+    // F2 = pembeza sistemik vs khusus-L3.
+    eq(sql.includes('pra-L3'), true, 'S2-F: F2 memisah pra-L3 daripada L3 (pembeza utama)');
+    eq(sql.includes('pg_auth_members'), true, 'S2-F: F3 menutup penjelasan keahlian peranan');
+
+    // (b) Larangan mengubah apa-apa mesti eksplisit.
+    eq(d.includes('JANGAN ubah apa-apa'), true, 'S2-F: melarang sebarang perubahan');
+    eq(d.includes('Jangan `REVOKE`'), true, 'S2-F: melarang REVOKE secara khusus');
+    eq(d.includes('ALTER DEFAULT PRIVILEGES'), true,
+       'S2-F: melarang ALTER DEFAULT PRIVILEGES');
+
+    // (c) Kesimpulan PRA-DAFTAR: A/B/C dengan syarat yang boleh diuji.
+    eq(d.includes('A — artifak platform'), true, 'S2-F: kesimpulan A pra-daftar');
+    eq(d.includes('B — penemuan sebenar khusus L3'), true, 'S2-F: kesimpulan B pra-daftar');
+    eq(d.includes('C — tidak dapat ditentukan'), true, 'S2-F: kesimpulan C pra-daftar');
+    // Normalisasi penekanan markdown: dokumen menulis '**bukan** dicipta selepas
+    // melihat data', jadi padanan literal terhadap 'bukan dicipta' akan gagal.
+    // Buang '*' sebelum memadankan - pengawal mesti menguji MAKSUD, bukan tanda.
+    // ...dan ruang putih: dokumen membungkus baris, jadi 'dicipta' dan
+    // 'selepas' dipisahkan oleh newline. Runtuhkan kepada satu ruang.
+    const dRata = d.replace(/\*/g, ' ').replace(/\s+/g, ' ');
+    eq(dRata.includes('bukan dicipta selepas melihat data'), true,
+       'S2-F: menyatakan kesimpulan pra-daftar, bukan direka selepas data');
+    eq(dRata.includes('Direkodkan lebih awal'), true,
+       'S2-F: kesimpulan direkodkan lebih awal');
+
+    // (d) Langkah 4 mesti kekal disekat sehingga S2-F kembali.
+    eq(d.includes('Jangan mula Langkah 4'), true, 'S2-F: Langkah 4 kekal disekat');
+    // (e) Pemisahan dua soalan (kesetiaan vs postur privilej) mesti wujud.
+    eq(d.includes('least-privilege'), true,
+       'S2-F: soalan least-privilege diasingkan, tidak ditutup oleh S2');
+    eq(d.includes('DP-18.4'), true, 'S2-F: merujuk DP-18.4 (gate tadbir urus)');
+  }
+
+  // Panel mesti merekodkan DP-18 dengan bukti mekanikal + pra-daftar.
+  const PANEL = 'docs/PANEL-PAKAR-TPMS.md';
+  if (fs.existsSync(PANEL)) {
+    const pd = fs.readFileSync(PANEL, 'utf8');
+    eq(pd.includes('## DP-18 —'), true, 'panel: DP-18 direkodkan');
+    for (const sub of ['### 18.1', '### 18.2', '### 18.3', '### 18.4', '### 18.5']) {
+      eq(pd.includes(sub), true, `panel: ${sub} wujud`);
+    }
+    // Bukti mekanikal mesti mengandungi kedua-dua keadaan yang diukur.
+    eq(pd.includes('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon'),
+       true, 'panel: eksperimen default privileges direkodkan');
+    eq(pd.includes('REVOKE ALL … FROM PUBLIC'), true,
+       'panel: penemuan bahawa REVOKE FROM PUBLIC tidak membuang grant anon');
+    eq(pd.includes('PRA-DAFTAR'), true, 'panel: kesimpulan pra-daftar direkodkan');
+    eq(/Kata putus 18\.4/.test(pd), true, 'panel: kata putus 18.4 dinyatakan');
+    eq(pd.includes('Bantahan Keselamatan direkodkan'), true,
+       'panel: bantahan direkodkan (protokol panel)');
+  } else {
+    bad(`${PANEL} tiada`);
+  }
+}
+
+// -----------------------------------------------------------------------------
 console.log(`\nKEPUTUSAN: ${lulus} lulus, ${gagal} gagal`);
 if (gagal > 0) {
   console.log('\nKegagalan:');
