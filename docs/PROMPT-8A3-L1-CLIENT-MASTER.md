@@ -594,8 +594,22 @@ SELECT 'L1e' AS check_name, tablename, indexname
 
 ## 8. FORMAT LAPORAN (6 seksyen)
 
-**Seksyen 1 — Konteks & Status:** project ref yang digunakan, **Git blob SHA** dan **cap jari struktur** bagi setiap fail (Lapis 1 + Lapis 2), SHA-256 **penuh**
-yang anda sahkan bagi setiap fail, dan pengesahan kelulusan pengguna.
+**Seksyen 1 — Konteks & Status:** project ref yang digunakan, **Git blob SHA** dan **cap jari struktur** bagi setiap fail (Lapis 1 + Lapis 2), SHA-256 bagi setiap fail
+(**jika** anda dapat mengiranya), dan pengesahan kelulusan pengguna.
+
+> 🟢 **DP-11 — kriteria K1 yang SAH.** Gate integriti ialah **Lapis 1 (Git blob
+> SHA) + Lapis 2 (cap jari struktur)**. **SHA-256 ialah PILIHAN**, kerana telah
+> dibuktikan bahawa runtime anda tidak mempunyai byte-stream fail tempatan untuk
+> mengiranya. Maka:
+> - blob SHA **sepadan** + baris pertama/terakhir **sepadan** ⇒ **K1 = 🟢 LULUS**.
+> - Laporan `⏳ SHA-256 tidak dikira` **BUKAN** pengurangan markah dan **BUKAN**
+>   sebab menjadikan K1 🟠. Menandakan 🟠 untuk kriteria yang sudah digantikan
+>   ialah **positif palsu** — ia menyembunyikan isyarat sebenar.
+> - Yang **wajib** 🟠/🔴 ialah jika blob SHA **tidak sepadan**, atau cap jari
+>   struktur **berbeza**, atau kandungan kelihatan **terpotong**.
+>
+> Melaporkan `⏳` dan **tidak mereka** nilai ialah pematuhan penuh terhadap
+> larangan #8. Terima kasih — teruskan begitu.
 
 **Seksyen 2 — J0 (mesti diisi DAHULU):** J0a (tampal **kesemua 20 baris**),
 J0b, J0c, J0d, J0e. **J0b dan J0c adalah kritikal** — jika ada perlanggaran,
@@ -605,7 +619,7 @@ K6 akan berbeza dan anda mesti menjelaskan mengapa.
 
 **Seksyen 4 — Keputusan K1–K12 (jadual):**
 `Kriteria | Status ✅/❌/⏳ | Jangkaan | Bukti verbatim | Catatan`.
-Untuk **K6**, tampal **kesemua 12 baris** — jangan ringkaskan.
+Untuk **K6**, laporkan `⏳ tidak dijalankan pada Langkah 1` — query K6 memanggil `is_external_account_manager()` yang hanya wujud SELEPAS Langkah 2. **JANGAN** bina semula 12 baris itu daripada ingatan atau daripada probe rekonsiliasi L1; `Afiq` dan `Ahmad Nizar` **BUKAN** nilai Account Manager Excel.
 
 **Seksyen 5 — Isu / Blocker / penemuan:** 🔴/🟠/🟢 + bukti + cadangan.
 **Wajib nyatakan secara eksplisit:**

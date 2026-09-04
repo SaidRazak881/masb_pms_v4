@@ -493,6 +493,85 @@ SELECT 'L2e' AS check_name, tablename, indexname
 
 ---
 
+### K6 — 🔴 kriteria paling penting: 12 nilai SEBENAR
+
+> **TAFSIRAN BERGANTUNG KEPADA J0.** Jangkaan di bawah berasal daripada
+> **18 staf** `User Profiles Mapping.xlsx`. Jika J0a/J0b/J0c menunjukkan live
+> berbeza (nama penuh berbeza, atau perlanggaran token), beberapa nilai yang
+> dijangka selesai akan kembali **NULL** kerana **syarat keunikan** menolaknya.
+> Itu tingkah laku **BETUL**, bukan ralat.
+>
+> **JANGAN ubah jangkaan secara senyap.** Laporkan kedua-duanya: nilai sebenar
+> **dan** perbezaan daripada jangkaan, dengan merujuk baris J0 yang
+> menjelaskannya.
+
+```sql
+WITH kes(raw_text, jangkaan_18_staf) AS (VALUES
+  ('Abu Said',          'Abu Sa''id'),
+  ('Abu said',          'Abu Sa''id'),
+  ('Adilah',            'Adilah'),
+  ('Farrah',            'Farrah'),
+  ('Fuziah',            'Fuziah'),
+  ('Fuzy',              'Fuziah'),
+  ('Fuzy / Dila',       'Fuziah'),
+  ('Fuzy / Sholihin ',  'Fuziah'),
+  ('Omar',              'Omar'),
+  ('Ow Zi Qi',          NULL),
+  ('Sholihin',          'Sholihin'),
+  ('Zalina',            'Zalina Sayuti'))
+SELECT 'K6' AS k, kes.raw_text AS nilai_mentah,
+       up.full_name            AS diselesaikan_kepada,
+       kes.jangkaan_18_staf    AS jangkaan_pglite,
+       CASE WHEN up.full_name IS NOT DISTINCT FROM kes.jangkaan_18_staf
+            THEN 'SEPADAN' ELSE '⚠️ BEZA' END AS keputusan,
+       public.is_external_account_manager(kes.raw_text) AS diklasifikasi_luar
+  FROM kes
+  LEFT JOIN LATERAL (
+        SELECT p.full_name FROM public.user_profiles p
+         WHERE p.id = public.resolve_account_manager(kes.raw_text) LIMIT 1) up ON true
+ ORDER BY kes.raw_text;
+```
+
+**Jangkaan SELEPAS seed Langkah 4 (11 selesai + 1 luar):**
+
+| nilai | jangkaan | sebab |
+|---|---|---|
+| `Abu Said`, `Abu said` | `Abu Sa'id` | token pertama `abu` unik |
+| `Adilah`, `Farrah`, `Fuziah`, `Omar`, `Sholihin` | nama sendiri | padanan tepat |
+| `Zalina` | `Zalina Sayuti` | token pertama `zalina` unik |
+| `Fuzy` | **`Fuziah`** | alias DP-8 |
+| `Fuzy / Dila`, `Fuzy / Sholihin ` | **`Fuziah`** | alias DP-8 (keputusan pengguna) |
+| `Ow Zi Qi` | **NULL** + `diklasifikasi_luar = true` | DP-9: orang luar |
+
+**Nota penting:** `'Fuzy / Dila'` dan `'Fuzy / Sholihin '` menyelesaikan kepada
+`Fuziah` **hanya kerana** alias DP-8 wujud. **Tanpa** Langkah 4, kedua-duanya
+**NULL** — itu bukti veto Kewangan §2.4 masih hidup untuk nilai yang belum
+diputuskan manusia.
+
+> 🔴 **K6 PADA LANGKAH INI — L4 (seed) BELUM dijalankan.** Jadual "Jangkaan
+> SELEPAS seed Langkah 4" di atas ialah rujukan untuk L4, **BUKAN** jangkaan
+> anda sekarang. Jangkaan SEBENAR pada langkah ini:
+>
+> - `Abu Said` dan `Abu said` → `Abu Sa'id` (token pertama `abu` unik)
+> - `Adilah`, `Farrah`, `Fuziah`, `Omar`, `Sholihin` → nama sendiri (padanan tepat)
+> - `Zalina` → `Zalina Sayuti` (token pertama `zalina` unik)
+> - `Fuzy`, `Fuzy / Dila`, `Fuzy / Sholihin ` → **NULL** — alias DP-8 belum
+>   disemai, jadi veto Kewangan §2.4 **masih hidup**. Ini **betul**, bukan kegagalan.
+> - `Ow Zi Qi` → **NULL** dan `diklasifikasi_luar` = **false** — jadual
+>   `external_account_managers` masih kosong; L4 yang mengisinya (DP-9).
+>
+> **Laporkan 12 baris itu VERBATIM sebagaimana query mengembalikannya.**
+> **JANGAN** bina semula senarai daripada ingatan, **JANGAN** gabungkan baris,
+> **JANGAN** tambah nilai yang tiada dalam `VALUES` query di atas.
+> Khususnya: `Abu Said` dan `Abu said` ialah **DUA baris berasingan** (bukti
+> kes-kepekaan), dan `Afiq` / `Ahmad Nizar` **BUKAN** nilai Account Manager
+> Excel — kedua-duanya probe diskriminatif rekonsiliasi L1 (DP-13.2).
+> Jika anda tidak dapat menjalankan query K6 pada langkah ini, laporkan
+> `⏳ K6 tidak dijalankan pada langkah ini` — **jangan** gantikannya dengan
+> senarai yang dibina semula.
+
+---
+
 ## 7. Larangan
 
 1. **JANGAN** jalankan mana-mana fail SQL selain empat (atau lima, jika anda
@@ -531,8 +610,22 @@ SELECT 'L2e' AS check_name, tablename, indexname
 
 ## 8. FORMAT LAPORAN (6 seksyen)
 
-**Seksyen 1 — Konteks & Status:** project ref yang digunakan, **Git blob SHA** dan **cap jari struktur** bagi setiap fail (Lapis 1 + Lapis 2), SHA-256 **penuh**
-yang anda sahkan bagi setiap fail, dan pengesahan kelulusan pengguna.
+**Seksyen 1 — Konteks & Status:** project ref yang digunakan, **Git blob SHA** dan **cap jari struktur** bagi setiap fail (Lapis 1 + Lapis 2), SHA-256 bagi setiap fail
+(**jika** anda dapat mengiranya), dan pengesahan kelulusan pengguna.
+
+> 🟢 **DP-11 — kriteria K1 yang SAH.** Gate integriti ialah **Lapis 1 (Git blob
+> SHA) + Lapis 2 (cap jari struktur)**. **SHA-256 ialah PILIHAN**, kerana telah
+> dibuktikan bahawa runtime anda tidak mempunyai byte-stream fail tempatan untuk
+> mengiranya. Maka:
+> - blob SHA **sepadan** + baris pertama/terakhir **sepadan** ⇒ **K1 = 🟢 LULUS**.
+> - Laporan `⏳ SHA-256 tidak dikira` **BUKAN** pengurangan markah dan **BUKAN**
+>   sebab menjadikan K1 🟠. Menandakan 🟠 untuk kriteria yang sudah digantikan
+>   ialah **positif palsu** — ia menyembunyikan isyarat sebenar.
+> - Yang **wajib** 🟠/🔴 ialah jika blob SHA **tidak sepadan**, atau cap jari
+>   struktur **berbeza**, atau kandungan kelihatan **terpotong**.
+>
+> Melaporkan `⏳` dan **tidak mereka** nilai ialah pematuhan penuh terhadap
+> larangan #8. Terima kasih — teruskan begitu.
 
 **Seksyen 2 — J0 (mesti diisi DAHULU):** J0a (tampal **kesemua 20 baris**),
 J0b, J0c, J0d, J0e. **J0b dan J0c adalah kritikal** — jika ada perlanggaran,

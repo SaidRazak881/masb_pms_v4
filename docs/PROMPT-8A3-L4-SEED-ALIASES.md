@@ -651,6 +651,25 @@ K4 → masih **12 baris**; K10 → data tidak berubah.
 
 ---
 
+### L4v — versi platform (read-only, 🔴 LAPORKAN)
+```sql
+SELECT 'versi' AS check_name, current_setting('server_version') AS server_version,
+       version() AS versi_penuh,
+       current_setting('server_version_num')::int AS versi_num,
+       (SELECT count(*) FROM pg_constraint
+         WHERE connamespace = 'public'::regnamespace AND contype = 'n') AS kekangan_not_null_bernama;
+```
+**Jangkaan:** `kekangan_not_null_bernama` = **0** jika live lebih lama daripada
+PostgreSQL 18, dan **> 0** jika live PG 18. Kedua-duanya SAH — yang penting ialah
+nilai itu **direkodkan**, kerana ia menentukan sama ada perbezaan katalog seperti
+R6b (DP-14.1) ialah artifak versi atau kecacatan sebenar.
+> 🟢 **Laporkan nombor versi ini walaupun ia kelihatan tidak relevan.** Ia bukan
+> kriteria lulus/gagal; ia fakta platform yang Arena perlukan untuk mentafsir
+> sebarang perbezaan katalog pada langkah seterusnya.
+
+
+---
+
 ## 7. Larangan
 
 1. **JANGAN** jalankan mana-mana fail SQL selain empat (atau lima, jika anda
@@ -689,8 +708,22 @@ K4 → masih **12 baris**; K10 → data tidak berubah.
 
 ## 8. FORMAT LAPORAN (6 seksyen)
 
-**Seksyen 1 — Konteks & Status:** project ref yang digunakan, **Git blob SHA** dan **cap jari struktur** bagi setiap fail (Lapis 1 + Lapis 2), SHA-256 **penuh**
-yang anda sahkan bagi setiap fail, dan pengesahan kelulusan pengguna.
+**Seksyen 1 — Konteks & Status:** project ref yang digunakan, **Git blob SHA** dan **cap jari struktur** bagi setiap fail (Lapis 1 + Lapis 2), SHA-256 bagi setiap fail
+(**jika** anda dapat mengiranya), dan pengesahan kelulusan pengguna.
+
+> 🟢 **DP-11 — kriteria K1 yang SAH.** Gate integriti ialah **Lapis 1 (Git blob
+> SHA) + Lapis 2 (cap jari struktur)**. **SHA-256 ialah PILIHAN**, kerana telah
+> dibuktikan bahawa runtime anda tidak mempunyai byte-stream fail tempatan untuk
+> mengiranya. Maka:
+> - blob SHA **sepadan** + baris pertama/terakhir **sepadan** ⇒ **K1 = 🟢 LULUS**.
+> - Laporan `⏳ SHA-256 tidak dikira` **BUKAN** pengurangan markah dan **BUKAN**
+>   sebab menjadikan K1 🟠. Menandakan 🟠 untuk kriteria yang sudah digantikan
+>   ialah **positif palsu** — ia menyembunyikan isyarat sebenar.
+> - Yang **wajib** 🟠/🔴 ialah jika blob SHA **tidak sepadan**, atau cap jari
+>   struktur **berbeza**, atau kandungan kelihatan **terpotong**.
+>
+> Melaporkan `⏳` dan **tidak mereka** nilai ialah pematuhan penuh terhadap
+> larangan #8. Terima kasih — teruskan begitu.
 
 **Seksyen 2 — J0 (mesti diisi DAHULU):** J0a (tampal **kesemua 20 baris**),
 J0b, J0c, J0d, J0e. **J0b dan J0c adalah kritikal** — jika ada perlanggaran,

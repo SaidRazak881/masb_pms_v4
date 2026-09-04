@@ -412,6 +412,98 @@ eq(Number(K9v?.[0]?.bilangan_nilai), 0, 'K9 (viewer): 0 nilai dilihat');
 await asUser(null);
 await db.close();
 
+// -----------------------------------------------------------------------------
+console.log('\n[11] DP-15 — 12 nilai K6 MESTI tersenarai di setiap langkah yang menuntutnya');
+{
+  // Kecacatan yang diukur dalam laporan L2 ChatGPT: FORMAT LAPORAN (dikongsi
+  // semua langkah) mengarah "Untuk K6, tampal kesemua 12 baris - jangan
+  // ringkaskan", tetapi 12 nilai itu HANYA ada dalam SEKSYEN_K yang disuntik ke
+  // langkah kPenuh (L4). L2/L3 diminta melaporkan baris yang tidak pernah
+  // diberikan, jadi ChatGPT membina semula daripada ingatan: `Abu said`
+  // (varian huruf kecil - satu-satunya bukti kes-kepekaan) DIGUGURKAN dan
+  // `Afiq / Ahmad Nizar` (probe rekonsiliasi L1, BUKAN nilai Excel) DIREKA lalu
+  // digabung menjadi satu baris. Seksyen ini mengunci pembetulan itu.
+  const NILAI_12 = [
+    "'Abu Said'", "'Abu said'", "'Adilah'", "'Farrah'", "'Fuziah'", "'Fuzy'",
+    "'Fuzy / Dila'", "'Fuzy / Sholihin '", "'Omar'", "'Ow Zi Qi'",
+    "'Sholihin'", "'Zalina'",
+  ];
+  const LANGKAH = [
+    ['L1-CLIENT-MASTER',                 { k6: false, praseed: false, versi: false }],
+    ['L2-EXTERNAL-ACCOUNT-MANAGERS',     { k6: true,  praseed: true,  versi: false }],
+    ['L3-ACCOUNT-MANAGER-RESOLUTION',    { k6: true,  praseed: true,  versi: true  }],
+    ['L4-SEED-ALIASES',                  { k6: true,  praseed: false, versi: true  }],
+  ];
+  for (const [kod, j] of LANGKAH) {
+    const f = `docs/PROMPT-8A3-${kod}.md`;
+    if (!fs.existsSync(f)) { bad(`${f} tiada`); continue; }
+    const d = fs.readFileSync(f, 'utf8');
+    const minta = d.includes('kesemua 12 baris');
+
+    if (j.k6) {
+      // (a) Semua 12 nilai mesti hadir VERBATIM - tiada ruang untuk membina semula.
+      const hilang = NILAI_12.filter((v) => !d.includes(v));
+      eq(hilang.length, 0, `${kod}: 12 nilai K6 hadir verbatim` +
+         (hilang.length ? ` (hilang: ${hilang.join(', ')})` : ''));
+      // (b) `Abu said` ialah baris yang ChatGPT gugurkan - kunci ia khusus.
+      eq(d.includes("'Abu said'"), true,
+         `${kod}: varian huruf kecil 'Abu said' hadir (bukti kes-kepekaan)`);
+    } else {
+      // L1: query K6 memanggil is_external_account_manager() yang HANYA wujud
+      // selepas L2. Menyuntiknya ke L1 akan menghasilkan query yang ralat.
+      // Penanda QUERY (bukan sekadar nama fungsi - arahan L1 memang menyebut
+      // nama fungsi itu untuk menjelaskan MENGAPA K6 dilangkau).
+      eq(d.includes('WITH kes(raw_text'), false,
+         `${kod}: query K6 TIDAK disuntik (fungsi itu belum wujud pada L1)`);
+      eq(d.includes("SELECT 'K6' AS k"), false, `${kod}: tiada blok SELECT K6`);
+      // Ayat K6 mesti dikhususkan, bukan dibiarkan menuntut 12 baris yang L1
+      // tidak boleh kembalikan (percanggahan FORMAT, kelas DP-15.2).
+      eq(d.includes('tidak dijalankan pada Langkah 1'), true,
+         `${kod}: FORMAT mengarah '⏳ tidak dijalankan pada Langkah 1'`);
+      eq(d.includes('kesemua 12 baris'), false,
+         `${kod}: FORMAT TIDAK menuntut 12 baris yang tidak boleh dipenuhi`);
+    }
+
+    // (c) Peraturan umum: jika prompt menuntut 12 baris, ia MESTI menyenaraikannya.
+    if (minta) {
+      eq(d.includes("'Abu said'"), true,
+         `${kod}: menuntut "kesemua 12 baris" DAN menyenaraikannya (tiada percanggahan)`);
+    }
+
+    if (j.praseed) {
+      // (d) Sebelum L4, `Fuzy*` -> NULL dan Ow Zi Qi -> luar=false. Tanpa nota
+      //     ini, jangkaan "SELEPAS seed" akan dibaca sebagai jangkaan semasa.
+      eq(d.includes('K6 PADA LANGKAH INI'), true, `${kod}: nota pra-seed K6 hadir`);
+      eq(d.includes('BUKAN** nilai Account Manager'), true,
+         `${kod}: nota menyebut Afiq/Ahmad Nizar bukan nilai Excel`);
+      eq(d.includes('diklasifikasi_luar` = **false**'), true,
+         `${kod}: nota menyatakan Ow Zi Qi luar=false sebelum seed`);
+    }
+
+    // (e2) DP-16.3: probe versi PostgreSQL live. DP-14.1 (R6b) berlaku kerana
+    //      Arena buta versi; probe read-only ini menutup punca itu. Hanya untuk
+    //      langkah yang BELUM dijalankan - prompt L1/L2 yang sudah dilaksanakan
+    //      mesti kekal tidak berubah supaya laporan lepas masih boleh dipadan.
+    eq(d.includes('versi platform (read-only'), j.versi,
+       `${kod}: probe versi platform ${j.versi ? 'HADIR' : 'tidak hadir (sudah dilaksanakan)'}`);
+    if (j.versi) {
+      eq(d.includes("current_setting('server_version')"), true,
+         `${kod}: probe membaca server_version`);
+      eq(d.includes('kekangan_not_null_bernama'), true,
+         `${kod}: probe mengira kekangan NOT NULL bernama (punca R6b/DP-14.1)`);
+      eq(/### L\dv — versi platform/.test(d), true,
+         `${kod}: tajuk probe mengikut kod langkah (bukan 'Lx')`);
+    }
+
+    // (e) DP-11: K1 mesti jelas bahawa SHA-256 ialah PILIHAN. Tanpanya GPT
+    //     menandakan K1 🟠 selama-lamanya untuk kriteria yang sudah digantikan.
+    eq(d.includes('DP-11 — kriteria K1'), true,
+       `${kod}: kriteria K1 (DP-11) dijelaskan - SHA-256 pilihan, blob SHA = gate`);
+    eq(d.includes('K1 = 🟢 LULUS'), true,
+       `${kod}: keadaan LULUS K1 dinyatakan secara eksplisit`);
+  }
+}
+
 console.log(`\n${'='.repeat(62)}`);
 console.log(`KEPUTUSAN: ${pass} lulus, ${fail} gagal`);
 console.log(`${'='.repeat(62)}\n`);

@@ -182,8 +182,102 @@ const potong = (mula, tamat) => {
   return induk.slice(i, j).trimEnd();
 };
 const SEKSYEN_K = potong('## 6. Kriteria K', '## 7. Larangan');
+
+// -----------------------------------------------------------------------------
+// DP-15.2 — Blok K6 MESTI hadir di setiap langkah yang diminta melaporkannya.
+//
+// Kecacatan yang diukur: FORMAT LAPORAN (dikongsi semua langkah) mengarah
+// "Untuk K6, tampal kesemua 12 baris - jangan ringkaskan", tetapi 12 nilai itu
+// hanya wujud dalam SEKSYEN_K, dan SEKSYEN_K hanya disuntik ke langkah
+// `kPenuh` (L4). Maka L2/L3 diminta melaporkan 12 baris yang TIDAK PERNAH
+// diberikan kepada mereka.
+//
+// Akibatnya nyata dalam laporan L2 ChatGPT: ia membina semula senarai daripada
+// ingatan dan tersilap - `Abu said` (varian huruf kecil, satu-satunya bukti
+// kes-kepekaan) DIGUGURKAN, dan `Afiq / Ahmad Nizar` (probe diskriminatif
+// rekonsiliasi L1, BUKAN nilai Account Manager Excel) DIREKA lalu digabung
+// menjadi satu baris. Ini melanggar larangan #13.
+//
+// Pembetulan: ekstrak blok K6 daripada induk (bukan salin tangan - mengelak
+// drift transkripsi) dan suntik ke langkah yang tidak `kPenuh`.
+const BLOK_K6_INDUK = potong('### K6 — ', '### K6b — ');
+
+// Nota pra-seed dibina sebagai array single-quoted supaya backtick markdown
+// tidak perlu di-escape (rentetan single-quoted tidak boleh merentasi baris,
+// jadi join('\n') dipakai - pengajaran daripada ralat R6b sebelumnya).
+const NOTA_K6_PRASEED = [
+  '> 🔴 **K6 PADA LANGKAH INI — L4 (seed) BELUM dijalankan.** Jadual "Jangkaan',
+  '> SELEPAS seed Langkah 4" di atas ialah rujukan untuk L4, **BUKAN** jangkaan',
+  '> anda sekarang. Jangkaan SEBENAR pada langkah ini:',
+  '>',
+  "> - `Abu Said` dan `Abu said` → `Abu Sa'id` (token pertama `abu` unik)",
+  '> - `Adilah`, `Farrah`, `Fuziah`, `Omar`, `Sholihin` → nama sendiri (padanan tepat)',
+  '> - `Zalina` → `Zalina Sayuti` (token pertama `zalina` unik)',
+  '> - `Fuzy`, `Fuzy / Dila`, `Fuzy / Sholihin ` → **NULL** — alias DP-8 belum',
+  '>   disemai, jadi veto Kewangan §2.4 **masih hidup**. Ini **betul**, bukan kegagalan.',
+  '> - `Ow Zi Qi` → **NULL** dan `diklasifikasi_luar` = **false** — jadual',
+  '>   `external_account_managers` masih kosong; L4 yang mengisinya (DP-9).',
+  '>',
+  '> **Laporkan 12 baris itu VERBATIM sebagaimana query mengembalikannya.**',
+  '> **JANGAN** bina semula senarai daripada ingatan, **JANGAN** gabungkan baris,',
+  '> **JANGAN** tambah nilai yang tiada dalam `VALUES` query di atas.',
+  '> Khususnya: `Abu Said` dan `Abu said` ialah **DUA baris berasingan** (bukti',
+  '> kes-kepekaan), dan `Afiq` / `Ahmad Nizar` **BUKAN** nilai Account Manager',
+  '> Excel — kedua-duanya probe diskriminatif rekonsiliasi L1 (DP-13.2).',
+  '> Jika anda tidak dapat menjalankan query K6 pada langkah ini, laporkan',
+  '> `⏳ K6 tidak dijalankan pada langkah ini` — **jangan** gantikannya dengan',
+  '> senarai yang dibina semula.',
+].join('\n');
+
+const BLOK_K6 = BLOK_K6_INDUK + '\n\n' + NOTA_K6_PRASEED;
 const LARANGAN = potong('## 7. Larangan', '## 8. FORMAT LAPORAN');
 const FORMAT = potong('## 8. FORMAT LAPORAN', '## Nota untuk Arena');
+
+// Ayat K6 dalam FORMAT ialah arahan TERKONGSI. Jika dibiarkan sama untuk semua
+// langkah, L1 akan diminta "tampal kesemua 12 baris" sedangkan query K6
+// memanggil `is_external_account_manager()` yang HANYA wujud selepas Langkah 2 —
+// iaitu percanggahan yang sama kelasnya dengan DP-15.2. Maka ayat itu
+// dikhususkan mengikut langkah.
+// -----------------------------------------------------------------------------
+// DP-16.3 — Probe versi PostgreSQL live.
+//
+// DP-14.1 berlaku kerana Arena TIDAK TAHU versi PostgreSQL live: PGlite berjalan
+// 18.3 dan menghasilkan kekangan NOT NULL bernama, lalu R6b kelihatan seperti
+// kecacatan live. Punca itu ialah KEBUTAAN VERSI, dan ia boleh ditutup dengan
+// satu query read-only yang murah. Ia juga membolehkan perbezaan katalog masa
+// depan DIRAMAL, bukan disalah tafsir selepas berlaku.
+//
+// Read-only sepenuhnya: tiada DDL/DML, tiada kelulusan diperlukan.
+const BLOK_VERSI = [
+  '### Lx — versi platform (read-only, 🔴 LAPORKAN)',
+  '```sql',
+  "SELECT 'versi' AS check_name, current_setting('server_version') AS server_version,",
+  "       version() AS versi_penuh,",
+  "       current_setting('server_version_num')::int AS versi_num,",
+  "       (SELECT count(*) FROM pg_constraint",
+  "         WHERE connamespace = 'public'::regnamespace AND contype = 'n') AS kekangan_not_null_bernama;",
+  '```',
+  '**Jangkaan:** `kekangan_not_null_bernama` = **0** jika live lebih lama daripada',
+  'PostgreSQL 18, dan **> 0** jika live PG 18. Kedua-duanya SAH — yang penting ialah',
+  'nilai itu **direkodkan**, kerana ia menentukan sama ada perbezaan katalog seperti',
+  'R6b (DP-14.1) ialah artifak versi atau kecacatan sebenar.',
+  '> 🟢 **Laporkan nombor versi ini walaupun ia kelihatan tidak relevan.** Ia bukan',
+  '> kriteria lulus/gagal; ia fakta platform yang Arena perlukan untuk mentafsir',
+  '> sebarang perbezaan katalog pada langkah seterusnya.',
+].join('\n');
+const AYAT_K6_PENUH = 'Untuk **K6**, tampal **kesemua 12 baris** — jangan ringkaskan.';
+const AYAT_K6_L1 = [
+  'Untuk **K6**, laporkan `⏳ tidak dijalankan pada Langkah 1` — query K6',
+  'memanggil `is_external_account_manager()` yang hanya wujud SELEPAS Langkah 2.',
+  '**JANGAN** bina semula 12 baris itu daripada ingatan atau daripada probe',
+  'rekonsiliasi L1; `Afiq` dan `Ahmad Nizar` **BUKAN** nilai Account Manager Excel.',
+].join(' ');
+if (!FORMAT.includes(AYAT_K6_PENUH)) {
+  throw new Error('ayat K6 dalam FORMAT tidak ditemui - penjana perlu dikemas kini');
+}
+const formatUntuk = (L) => (L.kPenuh || L.k6Boleh)
+  ? FORMAT
+  : FORMAT.replace(AYAT_K6_PENUH, AYAT_K6_L1);
 
 const urlBlob = (p) =>
   `https://github.com/${REPO}/blob/${BRANCH}/${p}`;
@@ -212,6 +306,10 @@ const LANGKAH = [
   {
     n: 2, kod: 'L2',
     fail: 'external-account-managers.sql',
+    // K6 boleh dijalankan mulai langkah INI: query K6 memanggil
+    // `is_external_account_manager()` yang dicipta oleh fail ini.
+    // L1 TIDAK boleh — fungsi itu belum wujud, jadi query akan ralat.
+    k6Boleh: true,
     out: 'docs/PROMPT-8A3-L2-EXTERNAL-ACCOUNT-MANAGERS.md',
     tajuk: 'Langkah 2 — `external-account-managers.sql` (DP-9)',
     ringkas: 'Jadual `external_account_managers` + 3 fungsi + 4 polisi RLS + 2 indeks. ' +
@@ -225,6 +323,14 @@ const LANGKAH = [
   {
     n: 3, kod: 'L3',
     fail: 'account-manager-resolution.sql',
+    // Langkah ini BELUM dijalankan, jadi probe versi platform (DP-16.3)
+    // boleh ditambah di sini. L1/L2 sudah selesai - jangan ubah prompt
+    // yang telah dilaksanakan, supaya laporan lepas kekal boleh dipadan.
+    versiProbe: true,
+    // K6 boleh dijalankan mulai langkah INI: query K6 memanggil
+    // `is_external_account_manager()` yang dicipta oleh fail ini.
+    // L1 TIDAK boleh — fungsi itu belum wujud, jadi query akan ralat.
+    k6Boleh: true,
     out: 'docs/PROMPT-8A3-L3-ACCOUNT-MANAGER-RESOLUTION.md',
     tajuk: 'Langkah 3 — `account-manager-resolution.sql` (Fasa 8A-2)',
     ringkas: '7 fungsi: permukaan untuk manusia mengesahkan alias ' +
@@ -251,6 +357,10 @@ const LANGKAH = [
   {
     n: 4, kod: 'L4',
     fail: 'seed-account-manager-aliases.sql',
+    // Langkah ini BELUM dijalankan, jadi probe versi platform (DP-16.3)
+    // boleh ditambah di sini. L1/L2 sudah selesai - jangan ubah prompt
+    // yang telah dilaksanakan, supaya laporan lepas kekal boleh dipadan.
+    versiProbe: true,
     out: 'docs/PROMPT-8A3-L4-SEED-ALIASES.md',
     tajuk: 'Langkah 4 — `seed-account-manager-aliases.sql` (keputusan DP-8 + DP-9)',
     ringkas: 'Merekodkan keputusan manusia sebagai **data**: 3 alias DP-8 ' +
@@ -424,15 +534,24 @@ ${cj.teks}${PAGAR}
 
 ## 5. Pengesahan SELEPAS pemasangan (read-only)
 
-${semakan}
+${semakan}${L.versiProbe ? `
 
+---
+
+${BLOK_VERSI.replace('### Lx', '### ' + L.kod + 'v')}
+` : ''}
+${(!L.kPenuh && L.k6Boleh) ? `
+---
+
+${BLOK_K6}
+` : ''}
 ---
 
 ${LARANGAN}
 
 ---
 
-${FORMAT}
+${formatUntuk(L)}
 
 **Tambahan wajib untuk langkah ini:** nyatakan dengan jelas sama ada
 \`${L.fail}\` **sudah dipasang**, dan sertakan cap jari yang anda sahkan

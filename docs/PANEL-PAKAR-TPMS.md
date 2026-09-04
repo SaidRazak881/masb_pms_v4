@@ -1905,3 +1905,272 @@ baris-demi-baris dengan nilai yang GPT laporkan.
     resolver akan menukarkan masalah tadbir urus menjadi `NULL` yang senyap.
     Menolaknya di backfill menghasilkan **laporan pengecualian**. Pilih reka
     bentuk yang mendedahkan, bukan yang menyembunyikan.
+
+---
+
+## DP-15 — Langkah 2 dipasang; dan dua kecacatan PROMPT Arena yang laporan itu dedahkan (2026-09-04)
+
+**Pencetus:** Laporan ChatGPT `L2` diterima — `external-account-managers.sql`
+dipasang, migration `8a3_l2_external_account_managers` `{"success":true}`.
+ChatGPT berhenti selepas L2 seperti diarahkan.
+
+### 15.1 🟢 L2 DISAHKAN — pemasangan betul
+
+| Perkara | Laporan live | Jangkaan | Keputusan |
+|---|---|---|---|
+| Git blob SHA | `1e555af8f78472fe7427a513b4682a8ccbc5f381` | sama | 🟢 **Lapis 1 LULUS** |
+| L2b jadual + RLS | `rls_aktif: true` | wujud + RLS | 🟢 |
+| L2c fungsi | 3/3 (`am_confirm_external`, `am_revoke_external`, `is_external_account_manager`) + senarai argumen tepat | 3 | 🟢 |
+| L2d polisi | 4/4 (`ext_am_read`/`write`/`update`/`delete`) | 4 | 🟢 |
+| L2e indeks | 2/2 (`idx_ext_am_display`, `idx_ext_am_raw_lower`) | 2 | 🟢 |
+| K11 inventori | `public_tables = 20` | 18 + L1 + L2 = 20 | 🟢 |
+| K10 data perniagaan | 44 / 1124 / 6 / 12 / 14 / 20 | tidak berubah | 🟢 **audit_logs +0** |
+| K8 nilai AM live | 0 baris | 0 | 🟢 |
+| K12 / L4 seed | `external_account_managers = 0` | belum | ⏳ **betul** |
+| Larangan 1–14 | semua ✅ | — | 🟢 |
+
+`am_backfill_account_manager()` **tidak dipanggil**; tiada seed; tiada
+klasifikasi `Ow Zi Qi`. **L2 diterima.**
+
+### 15.2 🔴 Kecacatan K6 — dan puncanya ialah PROMPT ARENA, bukan ChatGPT
+
+ChatGPT melaporkan jadual "K6 — 12 nilai Account Manager" yang **tidak sepadan**
+senarai sah:
+
+| | Senarai sah (12 rentetan unik, 265 baris) | Jadual ChatGPT |
+|---|---|---|
+| `Abu Said` (3 baris) | ✅ ada | ✅ ada |
+| **`Abu said`** (1 baris, huruf kecil) | ✅ **ada — satu-satunya bukti kes-kepekaan** | 🔴 **DIGUGURKAN** |
+| `Afiq`, `Ahmad Nizar` | ❌ **BUKAN nilai Excel** (probe diskriminatif rekonsiliasi L1, DP-13.2) | 🔴 **DIREKA**, digabung jadi 1 baris `Afiq / Ahmad Nizar` |
+
+Ini melanggar **larangan #13** ("JANGAN ubah jangkaan K6") dan arahan FORMAT
+("tampal **kesemua 12 baris** — jangan ringkaskan").
+
+**Tetapi panel menetapkan punca sebenar ialah Arena.** Diukur pada penjana:
+
+* `FORMAT` diekstrak dari prompt induk dan **dikongsi semua langkah** — ia
+  menuntut 12 baris K6.
+* 12 nilai itu **hanya** wujud dalam `SEKSYEN_K`, dan `SEKSYEN_K` hanya disuntik
+  ke langkah `kPenuh` — iaitu **L4 sahaja**.
+* Maka **L2 dan L3 diminta melaporkan 12 baris yang tidak pernah diberikan
+  kepada mereka.** `grep -c "'Abu Said'"` pada prompt L2 sebelum pembetulan = **0**.
+
+ChatGPT tidak mereka bukti secara sengaja (larangan #8 dipatuhi — ia menanda `⏳`
+pada cap jari yang tidak dapat dikira). Ia **membina semula** senarai daripada
+konteks, dan tersilap. **Arahan yang tidak boleh dipenuhi daripada kandungan
+prompt itu sendiri ialah kecacatan prompt** — kelas yang sama dengan DP-10.11
+(nama repo hyphen/underscore) dan DP-12 (connector memotong fail).
+
+**Kata putus 15.2:**
+1. Blok K6 **diekstrak daripada prompt induk** (`potong('### K6 — ', '### K6b — ')`)
+   — **bukan** disalin tangan, supaya tiada drift transkripsi — dan disuntik ke
+   langkah yang boleh menjalankannya.
+2. **L1 dikecualikan**: query K6 memanggil `is_external_account_manager()` yang
+   hanya dicipta oleh L2. Menyuntiknya ke L1 akan menghasilkan query yang ralat.
+   Ayat FORMAT untuk L1 dikhususkan: laporkan `⏳ tidak dijalankan pada Langkah 1`.
+3. **Nota pra-seed** ditambah pada L2/L3, kerana jadual "Jangkaan SELEPAS seed
+   Langkah 4" akan dibaca sebagai jangkaan semasa: `Fuzy*` → **NULL** (veto §2.4
+   masih hidup), `Ow Zi Qi` → NULL dengan `diklasifikasi_luar = **false**`
+   (jadual external masih kosong sehingga L4).
+4. Nota itu **menamakan kesilapan yang telah berlaku** (`Abu said` dua baris
+   berasingan; `Afiq`/`Ahmad Nizar` bukan nilai Excel) dan mengarah: jika tidak
+   dapat menjalankan query, laporkan `⏳` — **jangan** ganti dengan senarai binaan.
+5. **Prompt L1 dan L2 yang sudah dilaksanakan dikekalkan tidak berubah saiz**
+   (29,077 / 28,584 bait) supaya laporan lepas masih boleh dipadan; probe baharu
+   hanya masuk ke L3/L4 yang belum dijalankan.
+
+### 15.3 🟠 K1 ditanda 🟠 untuk kriteria yang SUDAH DIGANTIKAN (DP-11)
+
+ChatGPT menanda K1 🟠 kerana SHA-256/bait/baris/aksara `⏳`. **Ia betul tidak
+mereka nilai** — tetapi DP-11 sudah menetapkan bahawa **gate ialah Lapis 1 (blob
+SHA) + Lapis 2 (cap jari struktur)**, dan **SHA-256 ialah PILIHAN** kerana
+runtime ChatGPT terbukti tiada byte-stream fail tempatan.
+
+Blob SHA **sepadan**, baris pertama/terakhir **sepadan** ⇒ **K1 sepatutnya 🟢.**
+
+Punca: FORMAT masih berbunyi "SHA-256 **penuh** yang anda sahkan" — kedengaran
+wajib, dan bercanggah dengan label "Pilihan — SHA-256" dalam jadual cap jari.
+Ini menghasilkan **🟠 kekal yang palsu**, iaitu isyarat yang mengganggu: jika
+setiap laporan ada 🟠 yang tidak bermakna, 🟠 yang sebenar akan diabaikan.
+
+**Kata putus 15.3:** FORMAT dinyatakan semula — blob SHA + baris pertama/terakhir
+sepadan ⇒ **K1 = 🟢 LULUS**; `⏳ SHA-256` **bukan** pengurangan markah; 🟠/🔴
+hanya jika blob SHA tidak sepadan, cap jari struktur berbeza, atau kandungan
+kelihatan terpotong.
+
+### 15.4 Pengajaran direkodkan
+
+31. **Setiap arahan dalam prompt mesti boleh dipenuhi daripada kandungan prompt
+    itu sendiri.** "Tampal kesemua 12 baris" tanpa menyenaraikan 12 baris itu
+    bukan arahan — ia jemputan untuk mereka. Penjana kini diuji untuk
+    percanggahan ini (seksyen [11]: jika prompt menuntut 12 baris, ia mesti
+    menyenaraikannya).
+32. **Model yang patuh akan mengisi jurang dengan binaan semula, dan binaan
+    semula itu kelihatan sah.** Jadual ChatGPT mempunyai 12 baris dan lajur
+    yang betul; hanya perbandingan baris-demi-baris dengan senarai sah
+    mendedahkan `Abu said` hilang dan `Afiq / Ahmad Nizar` direka. **Mengira
+    baris tidak mencukupi — kandungannya mesti dipadan.**
+33. **Kriteria yang sudah digantikan mesti dibuang daripada format laporan.**
+    DP-11 menggantikan SHA-256 dengan blob SHA, tetapi FORMAT tidak dikemas
+    kini, jadi setiap laporan kini membawa 🟠 palsu. Amaran yang sentiasa
+    berbunyi akan dilatih untuk diabaikan.
+34. **Jangan suntik probe ke langkah yang belum mempunyai objeknya.** K6 pada
+    L1 akan ralat kerana `is_external_account_manager()` belum wujud. Kebolehlaksanaan
+    probe mengikut langkah mesti ditentukan, bukan diandaikan.
+
+---
+
+## DP-16 — Penilaian cadangan MCP/connector untuk sistem ini (2026-09-04)
+
+**Pencetus:** Pengguna mengemukakan senarai cadangan MCP skills/connectors
+(Azure Databricks, Dataverse, Dynamics 365, SharePoint, Power Platform,
+Monday.com, Skyvia, K2view, Vectara, Notion, Google Workspace, Slack, n8n,
+Docusign, Lucid, Smartsheet, ClickHouse, Redis, MySQL/MariaDB, Prisma,
+JPA/Hibernate, Multi-Tenant, Zero-Downtime Migrations, PostgreSQL Optimization,
+Supabase Patterns, GitHub MCP) berserta seni bina "Skills Control Plane"
+(Skill Registry + RBAC/ABAC Policy Engine + Audit Logs), dengan arahan
+*"sekiranya sesuai dan dapat membantu"*.
+
+Panel menilai **berdasarkan bukti repo dan persekitaran yang diukur**, bukan
+berdasarkan kecenderungan.
+
+### 16.1 Bukti yang diukur
+
+**(a) Stack sebenar repo** — `package.json` dependencies:
+`next`, `react`, `react-dom`, `@supabase/supabase-js`, `@supabase/ssr`,
+`xlsx`, `@radix-ui/*`, `tailwindcss-animate`, `class-variance-authority`,
+`clsx`, `tailwind-merge`, `lucide-react`.
+
+Jejak teknologi yang dicadangkan, dikira dengan `grep -rli` (kecualikan
+`node_modules`/`package-lock`):
+
+| Teknologi dicadangkan | Fail dalam repo |
+|---|---|
+| Prisma, Redis, ClickHouse, MySQL, MariaDB, Hibernate | **0** setiap satu |
+| Notion, Slack, Dataverse, Dynamics, Databricks | **0** setiap satu |
+| Skyvia, Vectara, Docusign | **0** setiap satu |
+| n8n | 1 — **positif palsu** (subrentetan dalam `lib/supabase/migrations/v4-raw-data-inserts.sql`, bukan dependensi) |
+
+**(b) Sumber data sebenar** — `V4 RAW/`: `00. Quotation Tracker (1).xlsx`,
+`R1 MIMOS_Academy_INCOME_STATEMENT.xlsx`, `R2 Overall Report 2026 (1).xlsx`,
+`R3 Group 2026 Funnel Tracker.xlsx`, `User Profiles Mapping.xlsx`,
+`cost_of_sales_2026.xlsx`, `invoice_2026.xlsx`. **Fail Excel tempatan.**
+Tiada SaaS sumber, tiada API masuk.
+
+**(c) Rangkaian sandbox Arena — diukur, bukan diandaikan:**
+
+```
+curl https://lmenmfsbjgxfhnykkgow.supabase.co/rest/v1/  -> (35) SSL_ERROR_SYSCALL
+curl https://example.com                               -> (35) SSL_ERROR_SYSCALL
+curl https://api.github.com                            -> HTTP 200
+```
+
+`example.com` **pun** gagal. Maka sandbox ini **tiada TLS keluar langsung**
+kecuali proksi GitHub yang dibenarkan. **Sebarang MCP berasaskan rangkaian —
+PostgreSQL, Supabase, Skyvia, Notion, Slack, n8n — tidak boleh dicapai dari
+sisi Arena**, walau apa pun yang dikonfigurasikan.
+
+**(d) Tadbir urus sedia ada** — sistem ini **sudah** mempunyai ketiga-tiga
+lapisan yang "Control Plane" itu cadangkan, dalam bentuk yang lebih kuat kerana
+ia diikat pada pangkalan data dan bukan pada alat luaran:
+
+| Lapisan dicadangkan | Padanan sedia ada (lebih kuat) |
+|---|---|
+| Skill Registry (versi, pemilik, persekitaran) | Git + blob SHA gate (DP-11) + `test-doc-references.mjs` (146 pengawal) |
+| RBAC/ABAC Policy Engine | RLS Supabase + `public.has_role()` + **DB-level governance lock** |
+| Audit Logs & Trace Correlation | `audit_logs` **tidak boleh diubah** + panel kata putus DP-1…DP-15 |
+
+### 16.2 Kata putus
+
+**TOLAK senarai connector itu untuk sistem ini.** Alasan mengikut kumpulan:
+
+1. **Stack tidak wujud (bukti 16.1a/b):** MySQL/MariaDB, Prisma, JPA/Hibernate,
+   ClickHouse, Redis, SQLite, Azure Databricks, Dataverse, Dynamics 365,
+   Power Platform, SharePoint/OneDrive, Monday.com, Smartsheet — **sifar fail
+   dalam repo** dan tiada dalam `package.json`. Menambah connector kepada
+   sistem yang tidak wujud ialah **scope creep** yang menambah permukaan
+   kredensial tanpa menambah keupayaan.
+2. **Bercanggah dengan rantai pengawal sedia ada:** Notion / Google Workspace /
+   Slack sebagai tempat dokumen akan **memecahkan** `test-doc-references.mjs`,
+   yang mengesahkan SHA-256, blob SHA, dan SQL terbenam **dalam repo**.
+   Rekod keputusan (DP-1…DP-15) mesti kekal boleh-diff dan boleh-uji.
+3. **Tidak boleh dicapai dari sisi Arena (bukti 16.1c):** semua MCP rangkaian
+   gagal pada lapisan TLS. Ini **penghalang teknikal**, bukan pilihan dasar.
+4. **Bercanggah dengan larangan berdiri:** Skyvia/K2view/n8n/Zapier memegang
+   kredensial DB dan boleh menulis — sedangkan larangan berdiri melarang
+   `service_role`, RPC tulis perniagaan, dan sebarang perubahan skema tanpa
+   kelulusan. Vectara (RAG) pula akan meletakkan penghalaan keputusan pada
+   carian semantik, sedangkan spesifikasi menetapkan **AI tidak pernah
+   memutuskan gabungan kewangan / Bumiputera / padam / kunci**.
+5. **Spekulatif:** Docusign — Fasa 8G ialah `certificate_no` (medan **nombor**),
+   bukan tandatangan elektronik. Lucid — rekod seni bina ialah markdown dalam
+   repo. Multi-Tenant — sistem ini **satu** akademi, 20 pengguna.
+6. **Control Plane = over-engineering:** ia akan menjadi lapisan tadbir urus
+   **kedua** dengan mod kegagalannya sendiri, sedangkan lapisan pertama sudah
+   diikat pada DB dan diuji 146 kali setiap perubahan.
+
+**Satu-satunya kelas yang genuinely bernilai — dan mengapa ia tetap ditolak
+buat masa ini:** MCP **PostgreSQL/Supabase baca-sahaja untuk Arena** akan
+menyelesaikan mod kegagalan paling mahal yang diukur dalam sesi ini, iaitu
+**kebutaan terhadap keadaan live**. Ia punca langsung DP-14.2 (fixture 18 vs 20
+profil → R2 🔴 palsu) dan punca DP-6 berulang (enum `app_role` 7 vs 8). **Tetapi
+bukti 16.1c menunjukkan ia tidak boleh bersambung dari sandbox ini.** Maka ia
+ditolak atas sebab teknikal, dan **akan dinilai semula serta-merta jika**
+persekitaran Arena memperoleh laluan rangkaian ke Supabase.
+
+### 16.3 Tindakan yang dilaksanakan (tanpa MCP)
+
+Kerana punca sebenar ialah **kebutaan versi dan keadaan live**, panel memilih
+tindakan yang **boleh** dilaksanakan sekarang:
+
+1. **Probe versi PostgreSQL live (DP-16.3, DILAKSANAKAN).** Satu query
+   read-only ditambah ke L3 dan L4 (`### L3v`, `### L4v`):
+   `server_version`, `version()`, `server_version_num`, dan kiraan
+   `pg_constraint contype = 'n'` (kekangan `NOT NULL` bernama). Ia menutup
+   punca DP-14.1 secara kekal: selepas L3, **versi live akan diketahui**, jadi
+   perbezaan katalog masa depan boleh **diramal** dan bukan disalah tafsir
+   sebagai kecacatan. Kos: satu query. Risiko: sifar (read-only).
+2. **ChatGPT kekal sebagai satu-satunya penderia live Arena.** Corak J0/J1/L2b–L2e
+   yang sedia ada **ialah** "connector" yang berfungsi: probe read-only
+   bernombor, jangkaan dikira dalam PGlite, jawapan verbatim. Ia sudah
+   menangkap DP-7, DP-10, DP-13.3 dan DP-14.2 — bukti bahawa corak itu
+   berkesan tanpa alat baharu.
+3. **Satu-satunya keupayaan yang berbaloi ditambah pada sisi ChatGPT** ialah
+   **pelaksanaan kod** (code interpreter), supaya ia boleh mengira SHA-256
+   daripada SQL yang terbenam dalam prompt dan menutup jurang cap jari DP-11.
+   **Tiada** connector daripada senarai ini memberi kesan itu.
+
+### 16.4 Syarat penilaian semula
+
+Senarai ini akan dinilai semula **hanya** jika bukti baharu muncul:
+
+* Sandbox Arena memperoleh capaian rangkaian ke Supabase → MCP baca-sahaja
+  dinilai semula serta-merta (keutamaan tertinggi; menyelesaikan punca DP-14.2/DP-6).
+* MIMOS Academy benar-benar menggunakan Dynamics 365 / Dataverse / SharePoint
+  untuk data pelajar → connector berkaitan dinilai semula **bersama** fail
+  bukti (bukan anggaran).
+* Fasa 8B (penyimpanan fail sumber) memutuskan storan luar Supabase Storage →
+  connector storan dinilai semula.
+* Skala pengguna naik melebihi satu akademi (multi-tenant sebenar) → pola
+  Multi-Tenant dinilai semula.
+
+Sehingga salah satu bukti itu wujud, **tiada MCP akan ditambah**.
+
+### 16.5 Pengajaran direkodkan
+
+35. **Senarai alat yang panjang bukan pelan.** 25+ cadangan dinilai, dan bukti
+    repo menunjukkan **sifar** jejak bagi hampir semua teknologi yang disebut.
+    Menilai cadangan bermakna mengiranya dalam repo, bukan menimbangnya secara
+    abstrak.
+36. **Ukur persekitaran sebelum mencadangkan integrasi.** Satu `curl` ke
+    `example.com` (gagal, exit 35) membatalkan keseluruhan kelas cadangan.
+    Tanpa ukuran itu, panel akan membuang masa merekabentuk sesuatu yang tidak
+    boleh bersambung.
+37. **Jangan tambah lapisan tadbir urus kedua apabila lapisan pertama sudah
+    diuji.** "Control Plane" mencadangkan Skill Registry + Policy Engine +
+    Audit; sistem ini sudah ada Git+blob SHA, RLS+governance lock, dan
+    `audit_logs` yang tidak boleh diubah. Lapisan kedua menambah permukaan
+    kegagalan, bukan keyakinan.
+38. **Selesaikan punca, bukan gejala, dengan alat termurah yang berfungsi.**
+    DP-14.1 berpunca daripada buta versi. Penyelesaiannya bukan MCP data
+    fabric — ia **satu query `SELECT version()`**.
