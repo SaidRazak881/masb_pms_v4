@@ -91,6 +91,10 @@ https://raw.githubusercontent.com/SaidRazak881/masb_pms_v4/arena/01a06274-masb-p
 > Jika `raw.githubusercontent.com` gagal, guna bentuk HTML dan klik **Raw**:
 > `https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/<laluan>`
 >
+> ⚠️ **Perangkap: repo guna UNDERSCORE, branch guna HYPHEN.**
+> `SaidRazak881/masb_pms_v4` tetapi `arena/01a06274-masb-pms-v4` — kedua-duanya
+> muncul dalam URL yang sama. Jangan seragamkan salah satu.
+>
 > **Perhatikan UNDERSCORE dalam `masb_pms_v4`.** Jika anda mendapat `404`,
 > periksa nama repo dahulu sebelum menyimpulkan fail itu tiada — dan
 > **laporkan**, jangan reka kandungan.

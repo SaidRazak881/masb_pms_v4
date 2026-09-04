@@ -1057,6 +1057,26 @@ Arena melakukan kesilapan yang sama terhadap pengecam yang **lebih besar**.
 | Kemunculan | **14** (8 dalam PROMPT-8A3-INSTALL, 5 dalam PROMPT-8A-CLIENT-MASTER, 1 dalam PROMPT-8A-J1-READONLY) |
 | Dokumen lama yang betul | `ACTION-4C`, `DEPLOY-VERCEL`, `GPT-ASSISTANT-PROMPTS`, `PROMPT-2/4/4F/4H/5/6/6B…` — semuanya underscore |
 
+**Perangkap yang menjelaskan mengapa typo ini mudah berlaku:**
+
+```text
+nama repo  : SaidRazak881/masb_pms_v4            <- UNDERSCORE
+nama branch: arena/01a06274-masb-pms-v4          <- HYPHEN
+```
+
+Kedua-dua pengecam muncul **bersebelahan dalam URL yang sama**:
+
+```text
+https://github.com/SaidRazak881/masb_pms_v4/blob/arena/01a06274-masb-pms-v4/docs/...
+                             ^^^^^^^^^^^ underscore   ^^^^^^^^^^^ hyphen
+```
+
+Mata (dan model) cenderung **menyeragamkan** kedua-duanya kepada satu bentuk.
+Arena menyeragamkan kepada hyphen kerana branch — yang lebih kerap dilihat dalam
+sesi kerja — menggunakan hyphen. Inilah sebabnya penjaga automatik
+(`scripts/test-doc-references.mjs`) membandingkan nama repo terhadap
+`git remote get-url origin` dan **bukan** terhadap sebarang nilai yang diingati.
+
 **Kesan yang diukur daripada laporan ChatGPT (8A-3, J0):**
 
 ChatGPT mematuhi larangan #8 (jangan reka bukti) dan **berhenti sebelum
