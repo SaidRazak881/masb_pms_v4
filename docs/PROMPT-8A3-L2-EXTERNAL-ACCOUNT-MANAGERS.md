@@ -3,7 +3,7 @@
 > **Untuk:** ChatGPT (mempunyai akses penuh Supabase + Vercel + GitHub)
 > **Daripada:** Arena (menulis kod/SQL/ujian; **tidak** melaksanakan kerja produksi)
 > **Tarikh:** 2026-09-04
-> **Repo:** `SaidRazak881/masb_pms_v4` · **Branch:** `arena/01a06274-masb-pms-v4` · **Commit:** `27268f0`
+> **Repo:** `SaidRazak881/masb_pms_v4` · **Branch:** `arena/01a06274-masb-pms-v4`
 > **Projek Supabase:** `lmenmfsbjgxfhnykkgow` (20 aksara)
 > **Jenis:** 🔴 **HARD GATE — pemasangan live. Sudah DILULUSKAN pengguna.**
 > **Dijana oleh:** `node scripts/generate-8a3-install-prompts.mjs` — **jangan

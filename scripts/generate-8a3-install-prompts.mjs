@@ -42,8 +42,13 @@ const SENARAI_SQL = 'lib/supabase';
 const PROMPT_INDUK = 'docs/PROMPT-8A3-INSTALL.md';
 const BRANCH = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'],
   { encoding: 'utf8' }).trim();
-const COMMIT = execFileSync('git', ['rev-parse', '--short', 'HEAD'],
-  { encoding: 'utf8' }).trim();
+// NOTA: cop commit SENGAJA tidak dipakai.
+// Penjana mengecop `git rev-parse HEAD`, tetapi fail yang dijana di-commit dalam
+// commit BERIKUTNYA — jadi cop itu sentiasa lapuk satu langkah dan penjanaan
+// semula sentiasa menghasilkan diff (masalah ayam-dan-telur). Kandungan sudah
+// dipin dengan lebih kuat oleh **blob SHA Git**, yang content-addressed dan tidak
+// bergantung pada sejarah. Membuang cop ini menjadikan penjana DETERMINISTIK
+// sepenuhnya: jana semula -> sifar diff.
 const remoteUrl = execFileSync('git', ['remote', 'get-url', 'origin'],
   { encoding: 'utf8' }).trim();
 const REPO = remoteUrl.match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/)[1];
@@ -287,7 +292,9 @@ const LANGKAH = [
 // -----------------------------------------------------------------------------
 // Jana setiap prompt
 // -----------------------------------------------------------------------------
+const MOD_CHECK = process.argv.includes('--check');
 let jumlahBait = 0;
+const drift = [];
 for (const L of LANGKAH) {
   const rel = path.join(SENARAI_SQL, L.fail);
   const cj = capJari(rel);
@@ -299,7 +306,7 @@ for (const L of LANGKAH) {
 > **Untuk:** ChatGPT (mempunyai akses penuh Supabase + Vercel + GitHub)
 > **Daripada:** Arena (menulis kod/SQL/ujian; **tidak** melaksanakan kerja produksi)
 > **Tarikh:** 2026-09-04
-> **Repo:** \`${REPO}\` · **Branch:** \`${BRANCH}\` · **Commit:** \`${COMMIT}\`
+> **Repo:** \`${REPO}\` · **Branch:** \`${BRANCH}\`
 > **Projek Supabase:** \`lmenmfsbjgxfhnykkgow\` (20 aksara)
 > **Jenis:** 🔴 **HARD GATE — pemasangan live. Sudah DILULUSKAN pengguna.**
 > **Dijana oleh:** \`node scripts/generate-8a3-install-prompts.mjs\` — **jangan
@@ -435,7 +442,14 @@ ${FORMAT}
 menyemak laporan ini.
 `;
 
-  fs.writeFileSync(L.out, dokumen);
+  if (MOD_CHECK) {
+    // Jangan tulis. Bandingkan dengan cakera supaya drift boleh dikesan oleh
+    // scripts/test-doc-references.mjs tanpa mengubah fail semasa ujian.
+    const sedia = fs.existsSync(L.out) ? fs.readFileSync(L.out, 'utf8') : null;
+    if (sedia !== dokumen) drift.push(L.out);
+  } else {
+    fs.writeFileSync(L.out, dokumen);
+  }
   const bait = Buffer.byteLength(dokumen);
   jumlahBait += bait;
   console.log(`✅ ${L.out}`);
@@ -444,5 +458,15 @@ menyemak laporan ini.
               `${obj.lajur.length} lajur, ${obj.jadual.length} jadual, ` +
               `${obj.fungsi.length} fungsi, ${obj.polisi.length} polisi, ` +
               `${obj.indeks.length} indeks`);
+}
+if (MOD_CHECK) {
+  if (drift.length === 0) {
+    console.log('\n✅ --check: keempat-empat prompt sepadan output penjana (tiada drift).');
+    process.exit(0);
+  }
+  console.log('\n❌ --check: prompt berikut DRIFT daripada output penjana:');
+  for (const d of drift) console.log(`   - ${d}`);
+  console.log('   Jalankan: node scripts/generate-8a3-install-prompts.mjs');
+  process.exit(1);
 }
 console.log(`\nJUMLAH: ${jumlahBait} bait bagi 4 prompt`);

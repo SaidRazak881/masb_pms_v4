@@ -482,6 +482,52 @@ console.log('\n[7] DP-12 — SQL inline dalam prompt langkah byte-identik dengan
 }
 
 // -----------------------------------------------------------------------------
+// 8. DP-12 — prompt langkah mesti sepadan output penjana (tiada drift)
+// -----------------------------------------------------------------------------
+//
+// Seksyen [7] membuktikan SQL inline === bait fail. Tetapi seseorang masih boleh
+// menyunting prompt itu dengan TANGAN selepas penjanaan (mengubah arahan, jadual
+// cap jari, atau larangan) tanpa menjana semula. Mod `--check` penjana membina
+// dokumen dalam ingatan dan membandingkannya dengan cakera TANPA menulis, jadi
+// drift boleh dikesan semasa ujian tanpa mengubah fail.
+//
+// Sejarah: penjana pada asalnya mengecop `git rev-parse HEAD`, yang sentiasa
+// lapuk satu commit (fail dijana dalam commit N tetapi dicop sebagai N-1) dan
+// menjadikan penjanaan semula sentiasa menghasilkan diff. Cop itu dibuang;
+// kandungan sudah dipin lebih kuat oleh blob SHA yang content-addressed.
+console.log('\n[8] DP-12 — prompt langkah sepadan output penjana (tiada drift)');
+{
+  const PENJANA = 'scripts/generate-8a3-install-prompts.mjs';
+  if (!fs.existsSync(PENJANA)) {
+    bad(`${PENJANA} tiada`);
+  } else {
+    let kod = 0;
+    let output = '';
+    try {
+      output = execFileSync('node', [PENJANA, '--check'], { encoding: 'utf8' });
+    } catch (e) {
+      kod = e.status ?? 1;
+      output = `${e.stdout ?? ''}${e.stderr ?? ''}`;
+    }
+    eq(kod, 0, 'penjana --check: prompt langkah sepadan output penjana');
+    if (kod !== 0) {
+      for (const l of output.split('\n').filter((x) => x.trim())) {
+        console.log(`       ${l}`);
+      }
+    }
+    // Cop commit yang lapuk mesti TIDAK muncul semula — ia punca drift asal.
+    for (const pf of ['docs/PROMPT-8A3-L1-CLIENT-MASTER.md',
+                      'docs/PROMPT-8A3-L2-EXTERNAL-ACCOUNT-MANAGERS.md',
+                      'docs/PROMPT-8A3-L3-ACCOUNT-MANAGER-RESOLUTION.md',
+                      'docs/PROMPT-8A3-L4-SEED-ALIASES.md']) {
+      if (!fs.existsSync(pf)) continue;
+      eq(fs.readFileSync(pf, 'utf8').includes('**Commit:**'), false,
+         `${path.basename(pf)}: tiada cop commit (punca bukan-deterministik)`);
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
 console.log(`\nKEPUTUSAN: ${lulus} lulus, ${gagal} gagal`);
 if (gagal > 0) {
   console.log('\nKegagalan:');
