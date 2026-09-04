@@ -414,6 +414,178 @@ END $$;
 
 ---
 
+## 3B. Pra-pemasangan — probe S2-F (read-only, WAJIB dalam pusingan yang sama)
+
+> 🟢 **Jalankan seksyen ini DAHULU, kemudian Seksyen 4 (seed).** Kedua-duanya
+> dilaporkan dalam SATU laporan. Probe ini read-only sepenuhnya — tiada DDL,
+> tiada DML, tiada kelulusan diperlukan, dan ia tidak mengubah apa-apa.
+
+**Mengapa ia di sini (DP-19.4):** laporan L3-R menandakan S2 🔴 kerana
+`anon = true` bagi 7/7 fungsi Langkah 3 sedangkan fixture menjangkakan `false`.
+DP-18 memutuskan perkara itu TIDAK boleh dibatalkan berdasarkan PGlite sahaja.
+Probe di bawah ialah ukuran live yang diperlukan untuk menutupnya.
+
+> 🔴 **Probe ini TIDAK mengawal seed L4.** L4 dilaksanakan sebagai pemilik
+> pangkalan data, jadi postur `anon` tidak mengubah hasilnya. Laporkan dan
+> TERUSKAN kepada seed — kecuali dalam satu keadaan di bawah.
+
+> ⛔ **SATU-SATUNYA keadaan berhenti:** jika mana-mana probe menunjukkan `anon`
+> memegang grant **TULISAN** (`INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`,
+> `REFERENCES` atau `TRIGGER`) ke atas objek `public`, BERHENTI SEBELUM seed
+> dan laporkan. Itu pendedahan sebenar — berbeza daripada sisihan
+> *least-privilege* yang sudah diasingkan dalam DP-18.4.
+
+### 1. PROBE
+
+#### F1 — Adakah projek ini mempunyai *default privileges* untuk fungsi?
+
+Ini **bukti langsung**. `pg_default_acl` dengan `defaclobjtype = 'f'` menyimpan
+privilej yang **automatik** diberi kepada fungsi yang dicipta kemudian.
+
+```sql
+SELECT 'F1' AS check_name,
+       d.defaclrole::regrole::text      AS ditetapkan_oleh,
+       coalesce(d.defaclnamespace::regnamespace::text, '(semua skema)') AS skema,
+       d.defaclacl::text                AS acl
+  FROM pg_default_acl d
+ WHERE d.defaclobjtype = 'f'
+ ORDER BY 2, 3;
+```
+
+**Cara membaca `acl`:** setiap entri berbentuk `ROLE=HAK/PEMBERI`.
+`X` bermaksud **EXECUTE**. Jadi `anon=X/postgres` bermaksud *"fungsi baharu
+dalam skema ini automatik memberi EXECUTE kepada `anon`"*.
+
+* Jika anda melihat **`anon=X/…`** → **hipotesis DISAHKAN**: `anon = true`
+  datang daripada platform, bukan daripada pemasangan L3.
+* Jika **tiada baris**, atau tiada `anon=X` → **hipotesis DITOLAK**; punca lain
+  dan S2 🔴 ialah penemuan sebenar yang memerlukan tindakan.
+
+#### F2 — Sistemik, atau khusus kepada Langkah 3?
+
+Ini **pembeza paling kuat**. `user-management.sql` (Fasa 6, dipasang lebih awal)
+mempunyai **19 fungsi**, dan **17** daripadanya menggunakan corak
+`REVOKE ALL ON FUNCTION … FROM PUBLIC` + `GRANT EXECUTE … TO authenticated`
+yang **sama persis** dengan Langkah 3.
+
+```sql
+SELECT 'F2' AS check_name,
+       CASE WHEN p.proname IN (
+              'am_backfill_account_manager','am_backfill_preview','am_confirm_alias',
+              'am_list_staff','am_revoke_alias','am_unresolved_values',
+              'can_resolve_account_managers')
+            THEN 'L3 (baharu)' ELSE 'pra-L3 (sedia ada)' END AS kumpulan,
+       count(*)::int                                                            AS bilangan_fungsi,
+       count(*) FILTER (WHERE has_function_privilege('anon', p.oid, 'EXECUTE'))::int          AS anon_boleh,
+       count(*) FILTER (WHERE has_function_privilege('authenticated', p.oid, 'EXECUTE'))::int AS auth_boleh
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+ WHERE n.nspname = 'public'
+ GROUP BY 1
+ ORDER BY 1;
+```
+
+* Jika **`pra-L3` juga `anon_boleh ≈ bilangan_fungsi`** → **sistemik**. Ia
+  bukan kesan pemasangan L3; ia keadaan seluruh projek. S2 tidak boleh
+  digunakan sebagai bukti ketidaksetiaan L3.
+* Jika **`pra-L3` `anon_boleh = 0` tetapi `L3 = 7`** → **khusus kepada L3**,
+  dan itu **🔴 penemuan sebenar** tentang cara L3 dipasang. Berhenti dan
+  laporkan.
+
+#### F3 — Penjelasan alternatif: adakah `anon` ahli `authenticated`?
+
+Satu lagi cara `anon` boleh mewarisi EXECUTE ialah **keahlian peranan**. Ini
+menutup penjelasan itu supaya ia tidak kekal sebagai kemungkinan terbuka.
+
+```sql
+SELECT 'F3' AS check_name,
+       m.rolname AS ahli,
+       r.rolname AS ahli_kepada
+  FROM pg_auth_members am
+  JOIN pg_roles r ON r.oid = am.roleid
+  JOIN pg_roles m ON m.oid = am.member
+ WHERE r.rolname IN ('anon','authenticated','service_role')
+    OR m.rolname IN ('anon','authenticated','service_role')
+ ORDER BY 1, 2;
+```
+
+* Jika `anon` **ahli kepada** `authenticated` → grant kepada `authenticated`
+  juga memberi kuasa kepada `anon`, dan itu penjelasan **berbeza** daripada
+  F1. Laporkan kedua-duanya.
+* Jika tiada baris melibatkan `anon` sebagai ahli → keahlian **bukan** punca.
+
+#### F4 — 🟠 PILIHAN: apa yang `anon` **sebenarnya** dapat lihat?
+
+S4 sudah menunjukkan bahawa tanpa identiti ketiga-tiga fungsi baca memulangkan
+**0 baris**, dan S5 menunjukkan fungsi tulis **menolak dengan 42501**. Oleh
+kerana `anon` tidak mempunyai JWT, `auth.uid()` juga NULL bagi `anon` — jadi S4
+sudah **memodelkan** pandangan `anon`. Probe ini mengesahkannya secara langsung.
+
+```sql
+SET ROLE anon;
+SELECT 'F4' AS check_name,
+       auth.uid()::text                            AS uid,
+       (SELECT count(*) FROM public.am_list_staff())          AS staf_dilihat,
+       (SELECT count(*) FROM public.am_unresolved_values())   AS nilai_dilihat;
+RESET ROLE;
+```
+
+* Jangkaan: `uid = NULL`, `staf_dilihat = 0`, `nilai_dilihat = 0`.
+* 🟠 Jika alat anda **tidak menyokong** `SET ROLE` atau kenyataan berbilang,
+  laporkan `⏳ tidak dapat dijalankan` dengan mesej verbatim. **Jangan**
+  simpulkan apa-apa daripadanya — probe ini **sokongan**, bukan penentu.
+* 🔴 Jika `staf_dilihat > 0` sebagai `anon` → itu **kebocoran sebenar**.
+  **BERHENTI** dan laporkan serta-merta.
+
+---
+
+### Cara melaporkan bahagian S2-F ini
+
+Letakkan jawapan probe di bawah tajuk **`## S2-F`** dalam laporan anda,
+**SEBELUM** bahagian L4. Gunakan format laporan asal prompt S2-F:
+
+### 2. FORMAT LAPORAN
+
+**Seksyen 1 — Status:** project ref, pengesahan bahawa 4 probe ini read-only
+(tiada DDL/DML/`GRANT`/`REVOKE`/`ALTER DEFAULT PRIVILEGES`/`service_role`), dan
+pengesahan bahawa **tiada apa-apa diubah** di live.
+
+**Seksyen 2 — Keputusan F1–F4:** tampal output **verbatim** bagi setiap probe.
+Jangan ringkaskan `acl` dalam F1 — rentetan itu ialah bukti utama.
+
+**Seksyen 3 — Penilaian punca.** Jawab tiga soalan ini secara eksplisit:
+
+1. Adakah `pg_default_acl` mengandungi `anon=X/…`? (ya / tidak)
+2. Adakah fungsi **pra-L3** juga `anon = true`? (ya / tidak / berapa)
+3. Adakah `anon` ahli kepada `authenticated`? (ya / tidak)
+
+Kemudian nyatakan **satu** kesimpulan:
+
+* **A — artifak platform:** F1 ada `anon=X` **atau** F2 menunjukkan pra-L3 juga
+  `true`. Maka `anon = true` **bukan** kesan pemasangan L3, dan **S2 dijangka
+  gagal pada mana-mana projek Supabase** dengan SQL yang diluluskan ini.
+* **B — penemuan sebenar khusus L3:** F2 menunjukkan pra-L3 `anon = false`
+  tetapi L3 `anon = true`. Maka cara L3 dipasang **berbeza** daripada fail yang
+  diluluskan, dan ini **🔴**.
+* **C — tidak dapat ditentukan:** nyatakan apa yang menghalang.
+
+**Seksyen 4 — Kesan keselamatan semasa.** Berdasarkan S4/S5 yang **sudah**
+lulus dan F4 (jika dijalankan), nyatakan sama ada `anon` boleh **mendapat data**
+atau **menulis** melalui mana-mana daripada 7 fungsi itu. Bezakan dengan jelas
+antara *"anon boleh MEMANGGIL"* dan *"anon boleh MENDAPATKAN sesuatu"*.
+
+**Seksyen 5 — Apa yang anda TIDAK ubah.** Senaraikan.
+
+**Berhenti selepas laporan.** Jangan mula Langkah 4. Jangan `REVOKE`.
+
+---
+
+> 🟠 **Pra-daftar DP-18.3 — jangan tafsir sendiri.** Laporkan ANGKA sahaja.
+> Arena akan memadankannya dengan kesimpulan A / B / C yang sudah direkodkan
+> SEBELUM data live dilihat (DP-18.3). Sebarang tafsiran di hujung anda akan
+> mencemarkan pra-daftar itu dan menjadikan bukti itu tidak berguna.
+
+---
 ## 4. Cara melaksanakan
 
 1. Sahkan integriti (Seksyen 2).

@@ -2498,7 +2498,7 @@ Mengisytiharkan "artifak, teruskan" berdasarkan PGlite sahaja ialah **tepat
 kesilapan yang panel ini wujud untuk elak** — dan ia akan menjadi kali keempat
 Arena membuat kesimpulan tentang live tanpa mengukurnya.
 
-**Kata putus 18.2:** keluarkan **`docs/PROMPT-8A3-S2F-ANON-PRIVILEGE-DIAGNOSTIK.md`**
+**Kata putus 18.2:** keluarkan **`docs/PROMPT-8A3-S2F-ANON-PRIVILEGE-DIAGNOSTIK.md`** *(kemas kini DP-19.4: prompt itu kini **dibundel** ke dalam L4 Seksyen 3B dan L4 **tidak lagi disekat**; probe tetap dijalankan, hanya caranya yang berubah)*
 (4 query read-only). **Langkah 4 KEKAL DISEKAT** sehingga ia kembali. Kos:
 satu pusingan; nilai: menukar "hipotesis kuat" kepada "fakta diukur".
 
@@ -2605,3 +2605,184 @@ Fakta untuk (2), diukur:
     kita mahu?".** ChatGPT membuat pemisahan ini sendiri dan dengan tepat.
     Menjawab yang pertama "ya" **tidak** menjawab yang kedua, dan menjawap yang
     kedua "tidak memuaskan" **tidak** bermakna yang pertama gagal.
+
+---
+
+## DP-19 — Permintaan pengguna "dah nak guna": apa yang dihantar sekarang, bagaimana L4 dinyahsekat tanpa melangkau S2-F, dan di mana invarian `raw_text` sebenarnya berada (2026-09-05)
+
+**Pencetus.** Pengguna menulis: *"Please lengkapkan proses pembinaan system. Dah nak guna ni."*
+Ini bukan gangguan kepada proses — ia **keperluan**. Panel mesti memutuskan apa
+yang dihantar dalam pusingan ini, kerana sehingga sekarang 8A mempunyai SQL yang
+lengkap (L1–L3 dipasang, L3-R 5/6 🟢) tetapi **tiada permukaan manusia**: satu-
+satunya cara merekodkan keputusan alias ialah menulis SQL. Staf kewangan tidak
+boleh menggunakan sistem yang memerlukan mereka menulis `SELECT`.
+
+### 19.1 Fakta yang ditetapkan SEBELUM sebarang keputusan
+
+| Fakta | Sumber |
+|---|---|
+| 14 halaman + 5 modul Server Action sudah wujud | inventori `app/`, `lib/actions/` |
+| `lib/mock-data.ts` ialah **fallback** sahaja, ditandakan `isDemo` — bukan sumber utama | `dashboard-data`, `master-records`, `participants-data` |
+| 7 fungsi L3 + 3 fungsi L2 sudah dipasang di live | laporan L3-R S1, `external-account-managers.sql` |
+| L3-R = 5/6 🟢; S2 🔴 (`anon = true` 7/7) | laporan GPT 2026-09-05 |
+| S4/S5/S6: 0 baris bocor, `42501` pada baris 11 SEBELUM INSERT, 0/0/44 | laporan L3-R |
+| L4 (seed) belum dijalankan; prompt sudah dijana | `PROMPT-8A3-L4-SEED-ALIASES.md` |
+
+**Bacaan panel:** sistem ini **sudah boleh digunakan** untuk kebanyakan aliran.
+Yang menghalang "boleh guna" bagi 8A bukanlah kekurangan SQL — ia kekurangan UI.
+
+### 19.2 Keputusan A — hantar permukaan 8A-2 sekarang
+
+Dibina dalam pusingan ini:
+
+| Fail | Peranan |
+|---|---|
+| `lib/account-manager.ts` | helper **tulen** (kategori, DP-8/DP-9, validator, ringkasan) — tiada I/O |
+| `lib/actions/account-manager-actions.ts` | 9 Server Action → 8 RPC; DB menguatkuasakan kuasa |
+| `app/(dashboard)/account-managers/page.tsx` | gate peranan — **menanya DB**, bukan meneka |
+| `components/account-managers/alias-confirmation.tsx` | UI: kad ringkasan, tab, jadual, 3 dialog |
+| `components/layout/sidebar-nav.tsx` | pautan "Pengurus Akaun" (4 peranan) |
+| `scripts/test-account-manager-ui.mjs` | **ujian kontrak** TS↔SQL, 160 penegasan |
+
+Reka bentuk yang tidak boleh dirunding (semuanya sudah ada dalam kod):
+
+1. **Sistem tidak pernah mengesahkan sendiri.** Manusia memilih; sistem mengingati.
+2. **Veto Kewangan §2.4** menghalang *sistem* daripada memilih seorang daripada
+   sel berbilang orang — ia **tidak** menghalang *manusia*. DP-8 ialah keputusan
+   manusia, jadi UI **mewajibkan nota** (≥12 aksara) untuk nilai berbilang orang:
+   nota itulah jejak audit yang membezakan "manusia memutuskan" daripada
+   "sistem meneka".
+3. **Setiap keputusan boleh dibatalkan** (syarat QA dalam DP-8) — dialog batal
+   untuk alias dan untuk orang luar.
+4. **Pendedahan minimum §2.8** — pemilih staf hanya `id` + `full_name`, sepadan
+   dengan `am_list_staff()` yang disahkan live oleh probe S1.
+5. **Mod demo: baca dibenarkan, tulisan DITOLAK.** Data palsu tidak boleh
+   disalah anggap sebagai keputusan manusia yang direkodkan.
+
+### 19.3 Keputusan B — mengapa ujian kontrak, bukan ujian unit
+
+`tsc` dan `next build` **lulus** walaupun nama RPC salah eja, kerana
+`.rpc("nama")` menerima sebarang rentetan. Ralat itu hanya muncul apabila
+pengguna menekan butang — tepat pada saat sistem mula digunakan. Maka
+`test-account-manager-ui.mjs` membandingkan kod TS **terus kepada fail SQL**:
+
+- setiap nama `.rpc()` mesti ditakrifkan dalam `lib/supabase/*.sql`
+- setiap kunci argumen mesti parameter yang diisytihar
+- setiap parameter **tanpa `DEFAULT`** mesti dibekalkan
+
+Ujian ini serta-merta membuktikan 8/8 nama dan semua nama parameter sepadan —
+termasuk tiga fungsi yang tinggal di fail berbeza (`am_confirm_external`,
+`am_revoke_external`, `is_external_account_manager` dalam
+`external-account-managers.sql`, bukan `account-manager-resolution.sql`).
+Tanpa ujian ini, perbezaan fail itu kelihatan seperti nama fungsi yang hilang.
+
+Bahagian C ujian mengunci satu lagi invarian yang mahal jika tersilap:
+**set peranan nav tolak `super_admin` mesti SAMA TEPAT dengan set `has_role()`
+dalam `can_resolve_account_managers()`.** Jika keduanya berbeza, pengguna melihat
+pautan yang kemudian menolak mereka — ralat yang memalukan dan sukar dikesan.
+
+### 19.4 Keputusan C — L4 dinyahsekat dengan MEMBUNDEL S2-F, bukan melangkauinya
+
+DP-18.2 mengeluarkan probe F1–F4 sebagai prompt berasingan dan L4 ditandakan
+BLOCKED. Pengguna kini mahu sistem digunakan. Panel memilih **bundel**:
+
+> Probe S2-F (read-only) disuntik ke dalam prompt L4 sebagai **Seksyen 3B**,
+> dijalankan DAHULU, dilaporkan dalam laporan yang SAMA, kemudian seed L4.
+
+**Mengapa bundel ini sah, dan bila ia tidak sah.** Bundel hanya sah kerana
+kedua-dua kerja **tidak bersandaran**: L4 dilaksanakan sebagai pemilik pangkalan
+data melalui SQL Editor, jadi postur `anon` tidak mengubah hasilnya. S4/S5/S6
+sudah menunjukkan tiada pendedahan. Jika suatu langkah kelak bergantung kepada
+*JAWAPAN* probe, ia mesti dipisah semula — bundel bukan alasan untuk melangkau
+keputusan.
+
+**Apa yang TIDAK dikorbankan:**
+
+- S2-F **tetap dijalankan**, jadi pra-daftar DP-18.3 (A/B/C) tetap boleh dijawab.
+- Kandungan probe **dipotong** daripada `PROMPT-8A3-S2F-…md`, bukan disalin —
+  satu sumber kebenaran; `--check` mengesan drift.
+- Prompt L1/L2/L3 yang **sudah dilaksanakan tidak disentuh langsung** (disahkan
+  `git diff`: hanya L4 berubah, +172 baris), supaya laporan lepas kekal boleh
+  dipadan.
+- Rantai integriti DP-12 utuh: blob SHA seed tidak berubah (`22fc847e4708…`),
+  dan probe sengaja kekal berpagar 3-backtick supaya pengekstrak 4-backtick
+  dalam `test-doc-references.mjs` seksyen [7] tidak boleh terkeliru. Penjana
+  malah **membaling ralat** jika probe mula mengandungi pagar 4-backtick.
+- Prompt mengandungi **satu** syarat berhenti: jika `anon` memegang grant
+  TULISAN (`INSERT`/`UPDATE`/`DELETE`/`TRUNCATE`/`REFERENCES`/`TRIGGER`) ke
+  atas objek `public`, GPT mesti berhenti sebelum seed. Itu pendedahan sebenar —
+  berbeza daripada sisihan *least-privilege* yang sudah diasingkan dalam DP-18.4.
+
+**Bantahan Keselamatan (direkodkan):** membundel bermakna seed berjalan sebelum
+Arena melihat jawapan F1–F4. **Diterima sebagai risiko terkawal** kerana seed
+tidak menyentuh grant, dijalankan sebagai pemilik, dan boleh dibatalkan
+(`am_revoke_alias`); syarat berhenti di atas menutup satu-satunya senario yang
+dapat menjadikan bundel itu berbahaya.
+
+**Bantahan QA (direkodkan):** dua perkara dalam satu laporan meningkatkan risiko
+GPT meringkaskan separuh daripadanya. **Diterima** dengan mitigasi: format
+laporan S2-F dipotong sekali dan diletakkan di dalam prompt, dengan arahan
+eksplisit supaya jawapan probe muncul di bawah tajuk `## S2-F` **sebelum**
+bahagian L4, dan angka dilaporkan **mentah** tanpa tafsiran (melindungi
+pra-daftar DP-18.3).
+
+### 19.5 Keputusan D — di mana invarian `raw_text` sebenarnya berada
+
+Ujian menangkap satu `raw_text.trim()` dalam UI. Dua bacaan yang boleh
+dipertahankan:
+
+- **QA/integriti:** `Fuzy / Sholihin ` (ruang hujung) ialah kunci sebenar dalam
+  DB. Sebarang pemangkasan menjadikan pengesahan tidak sepadan → data rosak
+  senyap. Larang `trim()` sepenuhnya.
+- **UX:** `trim()` itu berada pada **nama paparan pra-isi** untuk orang luar —
+  medan baharu yang dicipta manusia, bukan kunci. Memaksa pengguna memadam ruang
+  hujung ialah geseran tanpa faedah.
+
+**Kata putus 19.5:** invarian yang betul ialah **LALUAN HANTAR**, bukan kehadiran
+token. Ditetapkan:
+
+1. Keempat-empat laluan hantar (`confirmAlias`, `confirmExternal`, `revokeAlias`,
+   `revokeExternal`) mesti menghantar `raw_text` **tanpa pemangkasan** — diuji
+   dengan mengekstrak argumen pertama setiap panggilan.
+2. **Tepat satu** `.trim()` pada `raw_text` dibenarkan, dan ia dinamakan dalam
+   komen di tempatnya (nama paparan pra-isi). Bilangan itu dikunci oleh ujian,
+   jadi `trim()` kedua akan gagal.
+3. UI mengekalkan ruang putih secara visual (`whitespace-pre-wrap`) supaya
+   pengguna **nampak** ruang hujung itu wujud.
+
+**Susunan yang penting:** laluan hantar disemak **DAHULU**, dan hanya selepas
+ia terbukti bait-identik barulah assertion yang terlalu ketat itu dilonggarkan.
+Melonggarkan ujian sebelum membuktikan laluan sebenar selamat adalah cara
+pepijat disembunyikan.
+
+### 19.6 Keputusan E — apa yang TIDAK dihantar, dinyatakan tanpa berselindung
+
+8A-2 menutup 8A. Yang berikut **belum** dibina dan tidak boleh dituntut sebagai
+siap: **8B** quotation, **8C** pengetatan privilej (termasuk `anon`),
+**8D** pembaikan invois, **8E** pipeline, **8F** P&L/komisen, **8G** penugasan,
+**8H** penamaan semula + pembersihan. Empat fail sumber yang belum dipetakan
+masih digunakan aktif (keputusan pengguna 2026-09-04), jadi 8B–8E masih
+mempunyai kerja pemetaan data, bukan sekadar kerja UI.
+
+### 19.7 Pengajaran direkodkan
+
+51. **"Dah nak guna" ialah keperluan, bukan gangguan.** Permukaan yang boleh
+    digunakan oleh manusia bukan-pembangun adalah sebahagian daripada definisi
+    *siap*. SQL yang lengkap tanpa UI ialah kerja separuh siap yang kelihatan
+    lengkap dalam laporan.
+52. **Sempadan antara bahasa tidak disemak oleh compiler.** `.rpc("nama")` ialah
+    rentetan; TypeScript tidak dapat membantu. Setiap sempadan TS↔SQL
+    memerlukan ujian kontraknya sendiri yang membaca **fail SQL**, bukan
+    salinan jangkaan.
+53. **Nyatakan invarian pada sempadan yang betul.** "Tiada `trim()` di
+    mana-mana" gagal pada kod yang betul; "nilai yang dihantar mesti
+    bait-identik" menangkap kod yang salah. Ujian yang terlalu ketat pada
+    tempat yang salah menghasilkan tekanan untuk melonggarkannya secara
+    membuta tuli.
+54. **Bundel hanya sah bila tiada kebergantungan keputusan.** Menjimatkan satu
+    pusingan GPT tidak boleh membayar harga satu keputusan yang dibuat dengan
+    maklumat yang belum ada. Di sini bundel sah kerana L4 dijalankan sebagai
+    pemilik pangkalan data — fakta, bukan harapan.
+55. **Jangan sentuh prompt yang sudah dilaksanakan.** Menambah satu baris kosong
+    kepada L1/L2/L3 akan memutuskan padanan dengan laporan lepas. Suntikan
+    bersyarat mesti menghasilkan **sifar bait** perbezaan apabila tidak aktif.

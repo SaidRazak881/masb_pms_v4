@@ -9,6 +9,7 @@ import {
   Shield,
   Upload,
   UserCog,
+  UserRoundCheck,
   Users,
 } from "lucide-react";
 
@@ -53,6 +54,18 @@ const NAV_ITEMS: NavItem[] = [
     title: "Keselamatan",
     href: "/security",
     icon: Shield,
+  },
+  {
+    // Fasa 8A-2: permukaan manusia bagi pengesahan pengurus akaun.
+    // Peranan ini MESTI sepadan dengan `can_resolve_account_managers()` dalam
+    // `account-manager-resolution.sql` — super_admin lulus kerana `has_role()`
+    // mengembalikan true untuk super_admin tanpa mengira peranan yang diminta.
+    // Jika senarai ini dan fungsi SQL itu berbeza, pengguna akan melihat pautan
+    // yang kemudian menolak mereka — jadi keduanya mesti diubah bersama.
+    title: "Pengurus Akaun",
+    href: "/account-managers",
+    icon: UserRoundCheck,
+    roles: ["super_admin", "admin", "head_governance", "finance"],
   },
   {
     title: "Admin Pengguna",

@@ -265,6 +265,90 @@ const BLOK_VERSI = [
   '> kriteria lulus/gagal; ia fakta platform yang Arena perlukan untuk mentafsir',
   '> sebarang perbezaan katalog pada langkah seterusnya.',
 ].join('\n');
+
+// -----------------------------------------------------------------------------
+// DP-19.4 — Probe S2-F DIBUNDELKAN ke dalam pusingan L4.
+//
+// S2 dalam laporan L3-R menandakan 🔴 kerana `anon = true` bagi 7/7 fungsi
+// Langkah 3, sedangkan fixture menjangkakan `false`. DP-18 memutuskan perkara
+// itu TIDAK boleh dibatalkan berdasarkan PGlite sahaja — ia memerlukan ukuran
+// live — dan probe F1–F4 dikeluarkan sebagai prompt berasingan. Pengguna
+// kemudian meminta sistem disiapkan untuk kegunaan sebenar, jadi panel
+// memutuskan probe itu dibundelkan ke dalam pusingan yang sama dengan seed L4:
+// SATU perjalanan pergi balik, tiada langkah dilangkau.
+//
+// Bundel ini SAH hanya kerana kedua-dua kerja tidak bersandaran antara satu
+// sama lain: L4 dilaksanakan sebagai pemilik pangkalan data (SQL Editor), jadi
+// postur `anon` tidak mengubah hasilnya. Jika suatu langkah kelak bergantung
+// kepada JAWAPAN probe, ia mesti dipisah semula — bundel bukan alasan untuk
+// melangkau keputusan.
+//
+// Kandungan probe DIPOTONG daripada prompt S2-F yang sedia ada, bukan disalin.
+// Satu sumber kebenaran: jika probe disunting, kedua-dua prompt berubah bersama
+// dan mod `--check` akan mengesan drift.
+const PROMPT_S2F = 'docs/PROMPT-8A3-S2F-ANON-PRIVILEGE-DIAGNOSTIK.md';
+const s2f = fs.readFileSync(PROMPT_S2F, 'utf8');
+const potongDari = (teks, mula, tamat, label) => {
+  const i = teks.indexOf(mula);
+  const j = i < 0 ? -1 : teks.indexOf(tamat, i + 1);
+  if (i < 0 || j < 0) {
+    throw new Error(`S2-F: sempadan '${label}' tidak ditemui dalam ${PROMPT_S2F}`);
+  }
+  return teks.slice(i, j).trim();
+};
+// Tajuk dalam potongan itu bernombor untuk prompt S2-F yang BERDIRI SENDIRI
+// (`## 1. PROBE`, `## 2. FORMAT LAPORAN`). Disuntik begitu sahaja ke dalam L4,
+// ia akan berlanggar dengan `## 1.` dan `## 2.` milik L4 sendiri dan mengelirukan
+// pembaca. Maka setiap tajuk diturunkan SATU aras - kandungan tidak disentuh,
+// hanya kedalamannya.
+const turunTajuk = (teks) => teks.split('\n')
+  .map((l) => (/^#{2,5} /.test(l) ? '#' + l : l))
+  .join('\n');
+const S2F_PROBE = turunTajuk(potongDari(s2f, '## 1. PROBE', '## 2. FORMAT LAPORAN', 'PROBE'));
+const S2F_FORMAT = turunTajuk(potongDari(s2f, '## 2. FORMAT LAPORAN', '## 3. Apa yang Arena', 'FORMAT'));
+// Probe ini menggunakan pagar 3-backtick. Rantai integriti DP-12 (seksyen [7]
+// test-doc-references) mengekstrak SQL daripada pagar 4-BACKTICK pertama, jadi
+// blok ini sengaja tidak menaik taraf pagarnya — ia tidak boleh mengelirukan
+// pengekstrak itu.
+if (S2F_PROBE.includes('`'.repeat(4))) {
+  throw new Error('S2-F: probe mengandungi pagar 4-backtick - akan memecahkan pengekstrak DP-12');
+}
+const BLOK_S2F = [
+  '## 3B. Pra-pemasangan — probe S2-F (read-only, WAJIB dalam pusingan yang sama)',
+  '',
+  '> 🟢 **Jalankan seksyen ini DAHULU, kemudian Seksyen 4 (seed).** Kedua-duanya',
+  '> dilaporkan dalam SATU laporan. Probe ini read-only sepenuhnya — tiada DDL,',
+  '> tiada DML, tiada kelulusan diperlukan, dan ia tidak mengubah apa-apa.',
+  '',
+  '**Mengapa ia di sini (DP-19.4):** laporan L3-R menandakan S2 🔴 kerana',
+  '`anon = true` bagi 7/7 fungsi Langkah 3 sedangkan fixture menjangkakan `false`.',
+  'DP-18 memutuskan perkara itu TIDAK boleh dibatalkan berdasarkan PGlite sahaja.',
+  'Probe di bawah ialah ukuran live yang diperlukan untuk menutupnya.',
+  '',
+  '> 🔴 **Probe ini TIDAK mengawal seed L4.** L4 dilaksanakan sebagai pemilik',
+  '> pangkalan data, jadi postur `anon` tidak mengubah hasilnya. Laporkan dan',
+  '> TERUSKAN kepada seed — kecuali dalam satu keadaan di bawah.',
+  '',
+  '> ⛔ **SATU-SATUNYA keadaan berhenti:** jika mana-mana probe menunjukkan `anon`',
+  '> memegang grant **TULISAN** (`INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`,',
+  '> `REFERENCES` atau `TRIGGER`) ke atas objek `public`, BERHENTI SEBELUM seed',
+  '> dan laporkan. Itu pendedahan sebenar — berbeza daripada sisihan',
+  '> *least-privilege* yang sudah diasingkan dalam DP-18.4.',
+  '',
+  S2F_PROBE,
+  '',
+  '### Cara melaporkan bahagian S2-F ini',
+  '',
+  'Letakkan jawapan probe di bawah tajuk **`## S2-F`** dalam laporan anda,',
+  '**SEBELUM** bahagian L4. Gunakan format laporan asal prompt S2-F:',
+  '',
+  S2F_FORMAT,
+  '',
+  '> 🟠 **Pra-daftar DP-18.3 — jangan tafsir sendiri.** Laporkan ANGKA sahaja.',
+  '> Arena akan memadankannya dengan kesimpulan A / B / C yang sudah direkodkan',
+  '> SEBELUM data live dilihat (DP-18.3). Sebarang tafsiran di hujung anda akan',
+  '> mencemarkan pra-daftar itu dan menjadikan bukti itu tidak berguna.',
+].join('\n');
 const AYAT_K6_PENUH = 'Untuk **K6**, tampal **kesemua 12 baris** — jangan ringkaskan.';
 const AYAT_K6_L1 = [
   'Untuk **K6**, laporkan `⏳ tidak dijalankan pada Langkah 1` — query K6',
@@ -385,6 +469,9 @@ const LANGKAH = [
     // boleh ditambah di sini. L1/L2 sudah selesai - jangan ubah prompt
     // yang telah dilaksanakan, supaya laporan lepas kekal boleh dipadan.
     versiProbe: true,
+    // DP-19.4: probe S2-F dibundelkan ke dalam pusingan L4 (read-only, tidak
+    // mengawal seed). L1/L2/L3 sudah dilaksanakan - jangan ubah prompt lepas.
+    s2fProbe: true,
     out: 'docs/PROMPT-8A3-L4-SEED-ALIASES.md',
     tajuk: 'Langkah 4 — `seed-account-manager-aliases.sql` (keputusan DP-8 + DP-9)',
     ringkas: 'Merekodkan keputusan manusia sebagai **data**: 3 alias DP-8 ' +
@@ -542,7 +629,7 @@ ${PAGAR}sql
 ${cj.teks}${PAGAR}
 
 ---
-
+${L.s2fProbe ? '\n' + BLOK_S2F + '\n\n---' : ''}
 ## 4. Cara melaksanakan
 
 1. Sahkan integriti (Seksyen 2).

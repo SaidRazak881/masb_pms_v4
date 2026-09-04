@@ -1,7 +1,7 @@
 # CODEBASE MAP — TPMS MIMOS Academy
 
 > Dijana: 2026-09-04 · Arahan kemaskini: `node scripts/codebase-map.mjs`
-> Git: c48266e DP-12 susulan: penjana deterministik + penjaga drift (test-doc-references 115 -> 120) · arena/01a06274-masb-pms-v4
+> Git: 2ae019a DP-18: L3-R 5/6 LULUS; S2 🔴 anon=true - bukti mekanikal ia artifak fixture, tetapi TIDAK diputuskan tanpa ukuran live · arena/01a06274-masb-pms-v4
 
 > **Nota penggunaan:** Dokumen ini ialah KONTEKS RINGKAS untuk pembantu AI. Ia bukan spec penuh — rujuk fail sebenar apabila perlu butiran.
 
@@ -19,6 +19,7 @@
 - /login  `(app/(auth)/login/page.tsx)`
 - /pending-approval  `(app/(auth)/pending-approval/page.tsx)`
 - /register  `(app/(auth)/register/page.tsx)`
+- /account-managers  `(app/(dashboard)/account-managers/page.tsx)`
 - /admin/users  `(app/(dashboard)/admin/users/page.tsx)`
 - /dashboard  `(app/(dashboard)/dashboard/page.tsx)`
 - /import  `(app/(dashboard)/import/page.tsx)`
@@ -32,6 +33,7 @@
 
 ## 3. Komponen Utama (components/)
 
+- `components/account-managers/alias-confirmation.tsx`
 - `components/admin/user-management.tsx`
 - `components/dashboard/dashboard-overview.tsx`
 - `components/governance/change-request-dialog.tsx`
@@ -77,6 +79,8 @@
 
 ## 4. Modul Logik (lib/)
 
+- `lib/account-manager.ts`
+- `lib/actions/account-manager-actions.ts`
 - `lib/actions/financial-actions.ts`
 - `lib/actions/import-actions.ts`
 - `lib/actions/participant-actions.ts`
@@ -184,6 +188,7 @@
 
 ## 6. Fail dengan Rujukan Mock / Demo (perlu perhatian bila 'live')
 
+- `lib/actions/account-manager-actions.ts`
 - `lib/actions/import-actions.ts`
 - `lib/actions/programme-actions.ts`
 - `lib/actions/user-management-actions.ts`
@@ -195,6 +200,7 @@
 - `lib/mock-data.ts`
 - `lib/participants-data.ts`
 - `lib/supabase/middleware.ts`
+- `components/account-managers/alias-confirmation.tsx`
 - `components/admin/user-management.tsx`
 - `components/dashboard/dashboard-overview.tsx`
 - `components/import/import-history.tsx`
@@ -251,7 +257,9 @@
 - `PROMPT-8A3-L1-REKONSILIASI.md`
 - `PROMPT-8A3-L2-EXTERNAL-ACCOUNT-MANAGERS.md`
 - `PROMPT-8A3-L3-ACCOUNT-MANAGER-RESOLUTION.md`
+- `PROMPT-8A3-L3-REKONSILIASI.md`
 - `PROMPT-8A3-L4-SEED-ALIASES.md`
+- `PROMPT-8A3-S2F-ANON-PRIVILEGE-DIAGNOSTIK.md`
 - `PROMPT-8A3-SAMBUNGAN.md`
 - `PROMPT-TEMPLATE-FASA.md`
 - `SETUP-SUPABASE.md`

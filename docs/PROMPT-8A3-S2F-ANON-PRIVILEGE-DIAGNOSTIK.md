@@ -9,6 +9,14 @@
 > **Sifat:** **READ-ONLY sepenuhnya.** 4 query katalog. Tiada DDL, tiada DML,
 > tiada `GRANT`/`REVOKE`, tiada `service_role`, tiada kelulusan pengguna diperlukan.
 
+> 🔴 **STATUS 2026-09-05 (DP-19.4): fail ini sudah DIBUNDEL ke dalam
+> `docs/PROMPT-8A3-L4-SEED-ALIASES.md` Seksyen 3B. JANGAN kongsi fail ini
+> berasingan** — kongsi prompt L4 sahaja. Bahagian PROBE dan FORMAT LAPORAN di
+> bawah **dipotong** (bukan disalin) ke dalam L4 oleh
+> `scripts/generate-8a3-install-prompts.mjs`, jadi fail ini kekal satu-satunya
+> sumber kebenaran bagi probe F1–F4. Jika anda menyuntingnya, jalankan semula
+> penjana itu dan kedua-dua prompt akan berubah bersama.
+
 ---
 
 ## 0. Apa yang anda lakukan dengan betul — dan mengapa prompt ini wujud
