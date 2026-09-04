@@ -6,6 +6,17 @@
 > **Keadaan:** Langkah 1 ✅ dipasang + direkonsiliasi (DP-14) · Langkah 2 ✅ dipasang (DP-15) · **Langkah 3 ✅ dipasang, rekonsiliasi INI** · Langkah 4 ⏳ belum
 > **Sifat:** **READ-ONLY sepenuhnya.** Tiada DDL, tiada DML, tiada `service_role`, tiada kelulusan pengguna diperlukan.
 
+> 🟢 **STATUS 2026-09-05 (DP-20) — SUDAH DILAKSANAKAN, JANGAN ULANG.** Laporan
+> anda (5/6 🟢, S2 🔴) sudah diterima. **Jangkaan S2 dalam fail ini dibetulkan
+> SELEPAS laporan itu tiba**: dahulu `anon = false`, kini `anon = true`. Sebabnya
+> diukur di live oleh probe S2-F (F1 `pg_default_acl` mengandungi `anon=X/postgres`;
+> F2 fungsi pra-L3 **46/46** juga `anon = true`; F3 `anon` bukan ahli
+> `authenticated`) — jadi `anon = true` ialah **sifat platform Supabase**, bukan
+> bukti Langkah 3 dipasang berbeza. Mengikut pra-daftar DP-18.3 itu **kesimpulan A**:
+> **S2 🔴 → 🟠, L3-R DIPUASKAN, L4 DIBUKA.** Laporan asal anda **kekal sah**;
+> tiada apa yang perlu dijalankan semula. Fail ini dijana semula hanya supaya
+> fixture, penjana dan dokumen tidak boleh drift antara satu sama lain.
+
 ---
 
 ## 0. Mengapa prompt ini wujud
@@ -131,14 +142,34 @@ SELECT p.proname AS fungsi,
 
 ---
 
-### S2 — Postur GRANT — `authenticated` boleh, `anon` tidak 🔴 MESTI SEPADAN
+### S2 — Postur GRANT — `authenticated` boleh; `anon` JUGA boleh (default privileges platform, DP-20) 🔴 MESTI SEPADAN
 
-Ketujuh-tujuh fungsi mesti `authenticated = true` dan **`anon = false`**.
-Ini mengesahkan pasangan `REVOKE ALL ... FROM PUBLIC` + `GRANT EXECUTE ... TO
-authenticated` benar-benar terpakai, bukan sekadar hadir dalam teks SQL.
+Ketujuh-tujuh fungsi mesti `authenticated = true` dan **`anon = true`**.
 
-Jika mana-mana satu memberi `anon = true`, fungsi itu boleh dipanggil oleh
-pelawat tanpa log masuk → 🔴 BERHENTI dan laporkan.
+🟠 **Mengapa `anon = true` kini jangkaan yang BETUL (DP-20.2).** Jangkaan
+asal probe ini ialah `anon = false`. Laporan L3-R anda menandakan 🔴 kerana
+live memberi `true`. Probe S2-F kemudian mengukur puncanya di live:
+
+* **F1** — `pg_default_acl` bagi skema `public` (ditetapkan `postgres`)
+  mengandungi `anon=X/postgres`, iaitu Supabase memberi EXECUTE kepada `anon`
+  atas **setiap fungsi baharu** secara lalai.
+* **F2** — bukan khusus Langkah 3: fungsi **pra-L3 46/46** juga `anon = true`.
+* **F3** — `anon` **bukan** ahli `authenticated`, jadi itu bukan penjelasannya.
+* **F4** — simulasi `anon`: `uid=NULL`, staf dilihat **0**, nilai dilihat **0**.
+
+`REVOKE ALL ... FROM PUBLIC` dalam SQL yang diluluskan **tidak** membuang
+grant itu kerana `PUBLIC` ialah pseudo-role, bukan penerima grant. Maka
+`anon = true` berlaku walaupun fail dipasang **byte-for-byte** — ia sifat
+platform, dan pra-daftar DP-18.3 menamakannya **kesimpulan A**.
+
+Yang masih diuji oleh probe ini: `authenticated = true` (pasangan GRANT
+benar-benar terpakai, bukan sekadar hadir dalam teks SQL) dan **keseragaman**
+— jika mana-mana fungsi L7 **berbeza** daripada 46 fungsi pra-L3, itu
+petanda Langkah 3 dipasang dengan cara yang berbeza.
+
+🔴 **Soalan *least-privilege* TIDAK ditutup oleh probe ini.** Ia diasingkan
+ke gate 8C (DP-18.4) sebagai migration aditif: `REVOKE ... FROM anon` +
+audit pengawal dalaman bagi semua fungsi `public`. **Jangan** `REVOKE` di sini.
 
 ```sql
 SELECT p.proname AS fungsi,
@@ -157,13 +188,13 @@ SELECT p.proname AS fungsi,
 
 | fungsi | authenticated | anon |
 |---|---|---|
-| am_backfill_account_manager | true | false |
-| am_backfill_preview | true | false |
-| am_confirm_alias | true | false |
-| am_list_staff | true | false |
-| am_revoke_alias | true | false |
-| am_unresolved_values | true | false |
-| can_resolve_account_managers | true | false |
+| am_backfill_account_manager | true | true |
+| am_backfill_preview | true | true |
+| am_confirm_alias | true | true |
+| am_list_staff | true | true |
+| am_revoke_alias | true | true |
+| am_unresolved_values | true | true |
+| can_resolve_account_managers | true | true |
 
 ---
 
@@ -354,7 +385,7 @@ diteruskan**.
 * Fixture: `scripts/lib/fixture-live.mjs` — **dikongsi** dengan penjana L1-R
   supaya dua fixture tidak boleh drift antara satu sama lain.
 * Pengawal penjana: S1 mesti 7 fungsi dengan `am_list_staff` =
-  `TABLE(id uuid, full_name text)`; S2 mesti `authenticated=true`/`anon=false`;
+  `TABLE(id uuid, full_name text)`; S2 mesti `authenticated=true`/`anon=true` (DP-20.4);
   S4 mesti 3 baris semuanya 0; **S5 mesti gagal dengan 42501** — jika ia tidak
   gagal, penjanaan berhenti kerana pengawal kuasa telah hilang daripada SQL.
 * **Fail SQL TIDAK diubah** oleh penjana ini.

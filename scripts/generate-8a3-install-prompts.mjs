@@ -267,87 +267,80 @@ const BLOK_VERSI = [
 ].join('\n');
 
 // -----------------------------------------------------------------------------
-// DP-19.4 — Probe S2-F DIBUNDELKAN ke dalam pusingan L4.
+// DP-20.5 — S2-F SUDAH DIJAWAB. Blok ini kini REKOD keputusan, bukan arahan.
 //
-// S2 dalam laporan L3-R menandakan 🔴 kerana `anon = true` bagi 7/7 fungsi
-// Langkah 3, sedangkan fixture menjangkakan `false`. DP-18 memutuskan perkara
-// itu TIDAK boleh dibatalkan berdasarkan PGlite sahaja — ia memerlukan ukuran
-// live — dan probe F1–F4 dikeluarkan sebagai prompt berasingan. Pengguna
-// kemudian meminta sistem disiapkan untuk kegunaan sebenar, jadi panel
-// memutuskan probe itu dibundelkan ke dalam pusingan yang sama dengan seed L4:
-// SATU perjalanan pergi balik, tiada langkah dilangkau.
+// Sejarah yang tidak boleh diulang: DP-19.4 membundelkan probe S2-F ke dalam
+// prompt L4 dengan MEMOTONG bahagian PROBE **dan FORMAT LAPORAN** daripada
+// prompt S2-F yang berdiri sendiri. Format laporan itu berakhir dengan baris
+// "Berhenti selepas laporan. Jangan mula Langkah 4." — arahan yang betul bagi
+// prompt standalone, tetapi bercanggah terus dengan "TERUSKAN kepada seed" di
+// dalam dokumen yang sama. ChatGPT mematuhi arahan yang lebih khusus itu,
+// berhenti sebelum seed, dan kehilangan satu pusingan.
 //
-// Bundel ini SAH hanya kerana kedua-dua kerja tidak bersandaran antara satu
-// sama lain: L4 dilaksanakan sebagai pemilik pangkalan data (SQL Editor), jadi
-// postur `anon` tidak mengubah hasilnya. Jika suatu langkah kelak bergantung
-// kepada JAWAPAN probe, ia mesti dipisah semula — bundel bukan alasan untuk
-// melangkau keputusan.
+// ChatGPT BETUL: ia tidak mereka data dan tidak melangkau gate. Kecacatan itu
+// milik Arena. Pengajarannya dijadikan pengawal boleh uji (lihat
+// scripts/test-prompt-8a3-install.mjs seksyen "arahan bercanggah"):
 //
-// Kandungan probe DIPOTONG daripada prompt S2-F yang sedia ada, bukan disalin.
-// Satu sumber kebenaran: jika probe disunting, kedua-dua prompt berubah bersama
-// dan mod `--check` akan mengesan drift.
-const PROMPT_S2F = 'docs/PROMPT-8A3-S2F-ANON-PRIVILEGE-DIAGNOSTIK.md';
-const s2f = fs.readFileSync(PROMPT_S2F, 'utf8');
-const potongDari = (teks, mula, tamat, label) => {
-  const i = teks.indexOf(mula);
-  const j = i < 0 ? -1 : teks.indexOf(tamat, i + 1);
-  if (i < 0 || j < 0) {
-    throw new Error(`S2-F: sempadan '${label}' tidak ditemui dalam ${PROMPT_S2F}`);
-  }
-  return teks.slice(i, j).trim();
-};
-// Tajuk dalam potongan itu bernombor untuk prompt S2-F yang BERDIRI SENDIRI
-// (`## 1. PROBE`, `## 2. FORMAT LAPORAN`). Disuntik begitu sahaja ke dalam L4,
-// ia akan berlanggar dengan `## 1.` dan `## 2.` milik L4 sendiri dan mengelirukan
-// pembaca. Maka setiap tajuk diturunkan SATU aras - kandungan tidak disentuh,
-// hanya kedalamannya.
-const turunTajuk = (teks) => teks.split('\n')
-  .map((l) => (/^#{2,5} /.test(l) ? '#' + l : l))
-  .join('\n');
-const S2F_PROBE = turunTajuk(potongDari(s2f, '## 1. PROBE', '## 2. FORMAT LAPORAN', 'PROBE'));
-const S2F_FORMAT = turunTajuk(potongDari(s2f, '## 2. FORMAT LAPORAN', '## 3. Apa yang Arena', 'FORMAT'));
-// Probe ini menggunakan pagar 3-backtick. Rantai integriti DP-12 (seksyen [7]
-// test-doc-references) mengekstrak SQL daripada pagar 4-BACKTICK pertama, jadi
-// blok ini sengaja tidak menaik taraf pagarnya — ia tidak boleh mengelirukan
-// pengekstrak itu.
-if (S2F_PROBE.includes('`'.repeat(4))) {
-  throw new Error('S2-F: probe mengandungi pagar 4-backtick - akan memecahkan pengekstrak DP-12');
-}
-const BLOK_S2F = [
-  '## 3B. Pra-pemasangan — probe S2-F (read-only, WAJIB dalam pusingan yang sama)',
+//   Apabila membundel kandungan daripada prompt lain, JANGAN bawa sekali
+//   arahan penutupnya. Potong bahagian KANDUNGAN sahaja; arahan aliran
+//   (mula/berhenti/teruskan) mesti milik dokumen yang menerima.
+//
+// Probe itu sendiri tidak perlu dijalankan semula — ia read-only dan sudah
+// dijawab dengan angka live. Yang dibundel sekarang ialah KEPUTUSANNYA, supaya
+// GPT mempunyai konteks tanpa perlu meneka, dan supaya seed tidak disekat lagi.
+const BLOK_S2F_SELESAI = [
+  '## 3B. S2-F SUDAH DIJAWAB (DP-20) — jangan ulang probe, TERUSKAN kepada Seksyen 4',
   '',
-  '> 🟢 **Jalankan seksyen ini DAHULU, kemudian Seksyen 4 (seed).** Kedua-duanya',
-  '> dilaporkan dalam SATU laporan. Probe ini read-only sepenuhnya — tiada DDL,',
-  '> tiada DML, tiada kelulusan diperlukan, dan ia tidak mengubah apa-apa.',
+  '> 🟢 **Probe F1–F4 sudah dijalankan pada 2026-09-05 dan sudah dilaporkan.**',
+  '> Ia read-only dan **tidak** mengawal seed ini. **Jangan jalankannya semula.**',
+  '> Bahagian ini wujud supaya fakta itu ada dalam konteks anda dan anda tidak',
+  '> perlu meneka atau menunggu semakan Arena.',
   '',
-  '**Mengapa ia di sini (DP-19.4):** laporan L3-R menandakan S2 🔴 kerana',
-  '`anon = true` bagi 7/7 fungsi Langkah 3 sedangkan fixture menjangkakan `false`.',
-  'DP-18 memutuskan perkara itu TIDAK boleh dibatalkan berdasarkan PGlite sahaja.',
-  'Probe di bawah ialah ukuran live yang diperlukan untuk menutupnya.',
+  '**Keputusan live (daripada laporan anda sendiri):**',
   '',
-  '> 🔴 **Probe ini TIDAK mengawal seed L4.** L4 dilaksanakan sebagai pemilik',
-  '> pangkalan data, jadi postur `anon` tidak mengubah hasilnya. Laporkan dan',
-  '> TERUSKAN kepada seed — kecuali dalam satu keadaan di bawah.',
+  '| Probe | Keputusan |',
+  '|---|---|',
+  '| F1 — `pg_default_acl` (`public`, ditetapkan `postgres`) | `{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}` |',
+  '| F2 — fungsi Langkah 3 | 7 fungsi · `anon_boleh` = **7** · `auth_boleh` = 7 |',
+  '| F2 — fungsi pra-Langkah 3 | 46 fungsi · `anon_boleh` = **46** · `auth_boleh` = 46 |',
+  '| F3 — keahlian peranan | `anon` **bukan** ahli `authenticated` |',
+  '| F4 — simulasi `anon` | `uid = NULL` · staf dilihat = **0** · nilai dilihat = **0** |',
   '',
-  '> ⛔ **SATU-SATUNYA keadaan berhenti:** jika mana-mana probe menunjukkan `anon`',
-  '> memegang grant **TULISAN** (`INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`,',
-  '> `REFERENCES` atau `TRIGGER`) ke atas objek `public`, BERHENTI SEBELUM seed',
-  '> dan laporkan. Itu pendedahan sebenar — berbeza daripada sisihan',
-  '> *least-privilege* yang sudah diasingkan dalam DP-18.4.',
+  '**Kesimpulan (DP-20.2) mengikut pra-daftar DP-18.3 → A (artifak platform).**',
+  '`anon = true` berpunca daripada `ALTER DEFAULT PRIVILEGES` yang ditetapkan',
+  'Supabase di luar mana-mana fail repo, dan ia **sistemik** (46/46 fungsi pra-L3',
+  'sama), jadi S2 dalam laporan L3-R **bukan** bukti Langkah 3 dipasang berbeza',
+  'daripada fail yang diluluskan. Maka: **S2 🔴 → 🟠 · L3-R DIPUASKAN · L4 DIBUKA.**',
   '',
-  S2F_PROBE,
+  '`anon` boleh **MEMANGGIL** fungsi, tetapi F4 menunjukkan ia tidak',
+  '**MENDAPATKAN** data (0 baris, `uid = NULL`). Soalan *least-privilege*',
+  '(`REVOKE … FROM anon`) **tidak** ditutup di sini — ia gate **8C** (DP-18.4),',
+  'satu migration aditif yang juga membawa DP-14.2 dan DP-17.4(a)(b).',
+  '**Jangan `REVOKE`, `GRANT` atau `ALTER DEFAULT PRIVILEGES` semasa L4.**',
   '',
-  '### Cara melaporkan bahagian S2-F ini',
+  '> 🔴 **ARAHAN ALIRAN — TERUSKAN.** Selepas membaca bahagian ini, **LAKSANAKAN',
+  '> Seksyen 4** (hantar `seed-account-manager-aliases.sql` kepada',
+  '> `Supabase.apply_migration`), kemudian jalankan Seksyen 5 dan laporkan',
+  '> Seksyen 6–8 seperti biasa, dalam **satu** laporan. **JANGAN berhenti di sini',
+  '> dan JANGAN tunggu semakan Arena sebelum seed.** Arahan "Berhenti selepas',
+  '> laporan" di hujung fail ini bermaksud *selepas seed dijalankan*, bukan',
+  '> sebelumnya.',
   '',
-  'Letakkan jawapan probe di bawah tajuk **`## S2-F`** dalam laporan anda,',
-  '**SEBELUM** bahagian L4. Gunakan format laporan asal prompt S2-F:',
+  '> ⛔ **Satu-satunya keadaan yang membenarkan anda tidak meneruskan seed:** jika',
+  '> seed itu sendiri gagal (contoh `42501`, `P0002` kerana tiada Super Admin,',
+  '> atau kekangan FK). Dalam kes itu laporkan teks ralat **penuh** dan jangan',
+  '> longgarkan RLS, jangan tukar `SECURITY DEFINER`, jangan guna `service_role`.',
   '',
-  S2F_FORMAT,
-  '',
-  '> 🟠 **Pra-daftar DP-18.3 — jangan tafsir sendiri.** Laporkan ANGKA sahaja.',
-  '> Arena akan memadankannya dengan kesimpulan A / B / C yang sudah direkodkan',
-  '> SEBELUM data live dilihat (DP-18.3). Sebarang tafsiran di hujung anda akan',
-  '> mencemarkan pra-daftar itu dan menjadikan bukti itu tidak berguna.',
+  '> 🟠 **Nota sejarah (DP-20.5) — supaya anda tidak menyalahkan diri sendiri.',
+  '> Versi prompt ini yang terdahulu membundelkan probe S2-F bersama format',
+  '> laporannya, dan format itu membawa sekali arahan penutupnya sendiri yang',
+  '> menyuruh pembaca berhenti selepas melapor dan tidak memulakan Langkah 4.',
+  '> Arahan penutup itu bercanggah dengan niat Seksyen 3B dalam dokumen yang',
+  '> sama. Anda mengikutinya — **betul mengikut teks, salah mengikut niat Arena.**',
+  '> Kecacatan itu milik Arena, bukan anda. Ayat imperatif itu sengaja TIDAK',
+  '> dipetik di sini: model yang membacanya boleh mematuhinya semula walaupun ia',
+  '> berada dalam tanda petik. Percanggahan itu kini dibuang dan dikunci oleh',
+  '> pengawal boleh uji dalam `scripts/test-prompt-8a3-install.mjs`.',
 ].join('\n');
 const AYAT_K6_PENUH = 'Untuk **K6**, tampal **kesemua 12 baris** — jangan ringkaskan.';
 const AYAT_K6_L1 = [
@@ -469,9 +462,9 @@ const LANGKAH = [
     // boleh ditambah di sini. L1/L2 sudah selesai - jangan ubah prompt
     // yang telah dilaksanakan, supaya laporan lepas kekal boleh dipadan.
     versiProbe: true,
-    // DP-19.4: probe S2-F dibundelkan ke dalam pusingan L4 (read-only, tidak
-    // mengawal seed). L1/L2/L3 sudah dilaksanakan - jangan ubah prompt lepas.
-    s2fProbe: true,
+    // DP-20.5: S2-F sudah dijawab; blok 3B kini REKOD keputusan + arahan
+    // TERUSKAN kepada seed. L1/L2/L3 sudah dilaksanakan - jangan ubah prompt lepas.
+    s2fSelesai: true,
     out: 'docs/PROMPT-8A3-L4-SEED-ALIASES.md',
     tajuk: 'Langkah 4 — `seed-account-manager-aliases.sql` (keputusan DP-8 + DP-9)',
     ringkas: 'Merekodkan keputusan manusia sebagai **data**: 3 alias DP-8 ' +
@@ -629,7 +622,7 @@ ${PAGAR}sql
 ${cj.teks}${PAGAR}
 
 ---
-${L.s2fProbe ? '\n' + BLOK_S2F + '\n\n---' : ''}
+${L.s2fSelesai ? '\n' + BLOK_S2F_SELESAI + '\n\n---' : ''}
 ## 4. Cara melaksanakan
 
 1. Sahkan integriti (Seksyen 2).

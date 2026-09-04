@@ -2786,3 +2786,165 @@ mempunyai kerja pemetaan data, bukan sekadar kerja UI.
 55. **Jangan sentuh prompt yang sudah dilaksanakan.** Menambah satu baris kosong
     kepada L1/L2/L3 akan memutuskan padanan dengan laporan lepas. Suntikan
     bersyarat mesti menghasilkan **sifar bait** perbezaan apabila tidak aktif.
+
+---
+
+## DP-20 — S2-F dijawab di live: pra-daftar DP-18.3 → **A**; fixture kelas-5 dibaiki; dan kecacatan Arena yang menghilangkan satu pusingan (2026-09-05)
+
+**Pencetus.** ChatGPT menjalankan probe S2-F secara read-only dan melaporkan
+keputusannya, kemudian **berhenti sebelum seed L4**, menyatakan ia mengikut
+"arahan eksplisit prompt". Panel terpaksa memutuskan tiga perkara berasingan:
+apa maksud angka itu, apa yang perlu dibaiki, dan siapa yang sebenarnya salah.
+
+### 20.1 Angka live (verbatim daripada laporan, tidak ditafsir di hujung GPT)
+
+| Probe | Keputusan live |
+|---|---|
+| **F1** `pg_default_acl` (`public`, ditetapkan `postgres`) | `{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}` |
+| **F1** (`public`, ditetapkan `supabase_admin`) | `{postgres=X/supabase_admin,anon=X/supabase_admin,authenticated=X/supabase_admin,service_role=X/supabase_admin}` |
+| **F2** fungsi Langkah 3 | 7 fungsi · `anon_boleh` = **7** · `auth_boleh` = 7 |
+| **F2** fungsi pra-Langkah 3 | **46** fungsi · `anon_boleh` = **46** · `auth_boleh` = 46 |
+| **F3** keahlian peranan | `authenticator`, `postgres`, `supabase_realtime_admin` → ahli `anon`/`authenticated`/`service_role`. **Tiada baris `anon` → `authenticated`.** |
+| **F4** simulasi `anon` | `uid = NULL` · staf dilihat = **0** · nilai dilihat = **0** |
+
+Cap jari `seed-account-manager-aliases.sql` yang GPT kutip disahkan semula oleh
+Arena terhadap fail sebenar: bait **12284** ✅ · aksara **12229** ✅ · SHA-256
+`0bcc03a8…` ✅ · blob SHA `22fc847e4708…` ✅ · `CREATE` 0/0/0/0 ✅.
+(Baris: prompt menyebut **283** kerana penjana mengira *newline*; `split('\n')`
+memberi 284 elemen bagi fail yang berakhir dengan newline. Konvensyen berbeza,
+fail sama — **bukan** percanggahan.) GPT menandakan ⏳ bagi nilai yang tidak
+dapat dikiranya sendiri dalam runtime dan **tidak mereka** angka. Itu betul.
+
+### 20.2 Pemadanan dengan pra-daftar DP-18.3 → **kesimpulan A**
+
+DP-18.3 mengikat tiga tafsiran **sebelum** data live dilihat:
+
+> **A** artifak platform → S2 jadi 🟠, fixture ditambah *default privileges*,
+> **L3-R DIPUASKAN, L4 DIBUKA** · **B** khusus-L3 → L4 kekal disekat ·
+> **C** tidak ditentukan → kekal disekat.
+
+Ukuran memenuhi **A** melalui **dua** cabang yang berasingan, dan cabang itu
+saling mengesahkan:
+
+1. **F1** menunjukkan mekanismenya wujud di live: `anon=X/postgres` dalam
+   `pg_default_acl` bagi skema `public`. Ini tepat mekanisme yang Arena buktikan
+   *mencukupi* dalam PGlite (DP-18.1) — kini terbukti **hadir**, bukan sekadar
+   mungkin.
+2. **F2** adalah pembeza yang DP-18.2 namakan paling kuat: **46/46 fungsi
+   pra-L3** juga `anon = true`. Maka keadaan ini **sistemik**, bukan kesan cara
+   Langkah 3 dipasang.
+3. **F3** menutup penjelasan alternatif: `anon` **bukan** ahli `authenticated`,
+   jadi `anon = true` bukan warisan keahlian peranan.
+
+**Kata putus 20.2:** **S2 🔴 → 🟠 (artifak platform). L3-R DIPUASKAN. L4
+DIBUKA.** Laporan asal GPT **kekal sah** — ia tidak perlu dijalankan semula, dan
+jangkaannya yang lama (`anon = false`) adalah salah **fixture**, bukan salah
+pemasangan. Ini menutup kelas jurang fixture↔live **kelima** dengan ukuran,
+bukan dengan hujah.
+
+**Yang TIDAK ditutup oleh A (DP-18.4 kekal berkuat kuasa):** soalan
+*least-privilege*. F4 menunjukkan `anon` boleh **MEMANGGIL** tetapi tidak
+**MENDAPATKAN** data (0 baris, `uid = NULL`), dan tiada percubaan tulisan dibuat.
+Jadi tiada kebocoran ditunjukkan — tetapi F2 menjadikan risikonya **berangka**:
+**53 fungsi `public`** (46 pra-L3 + 7 L3) boleh dipanggil tanpa log masuk, dan
+setiap satu mesti menjaga dirinya sendiri. Itulah skop sebenar gate **8C**,
+bersama DP-14.2 dan DP-17.4(a)(b).
+
+### 20.3 Fixture dibaiki — dan pengawal yang dahulunya punca merah palsu
+
+`scripts/lib/fixture-live.mjs` kini memodelkan *default privileges* platform:
+
+```sql
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated;
+```
+
+Kesan yang diukur, bukan diandaikan:
+
+* **L1-R TIDAK terjejas** — `--check`: tiada drift selepas baris ditambah.
+  `resolve_account_manager()` tidak membaca privilej, jadi jangkaan rekonsiliasi
+  L1 kekal bait-identik.
+* **L3-R berubah di satu tempat sahaja** — pengawal penjana yang dahulunya
+  menuntut `anon = false` kini menuntut `anon = true`. Pengawal itu **punca
+  langsung** merah palsu S2; ia kini diterbalikkan dan, jika baris fixture itu
+  hilang kelak, penjana **gagal dengan sengaja** supaya jurang kelas-5 tidak
+  boleh kembali secara senyap.
+* **Prompt L3-R dijana semula** dengan banner **SUDAH DILAKSANAKAN, JANGAN
+  ULANG** yang menerangkan bahawa jangkaan S2 dibetulkan *selepas* laporan tiba.
+  Prompt L1/L2/L3 pemasangan **tidak berubah walau satu bait** (disahkan
+  `git diff`).
+
+**Kata putus 20.3:** menjana semula prompt yang **sudah dilaksanakan** biasanya
+dilarang (DP-19.4: laporan lepas mesti kekal boleh dipadan). Ia dibenarkan di
+sini **hanya** kerana (i) perubahan itu terhad kepada satu jangkaan yang kini
+diketahui salah, (ii) banner menyatakan dengan jelas bahawa laporan asal kekal
+sah dan tiada apa perlu diulang, dan (iii) teks jangkaan lama direkodkan di sini
+sebagai rekod audit: *"Ketujuh-tujuh fungsi mesti `authenticated = true` dan
+`anon = false`. Jika mana-mana satu memberi `anon = true` … 🔴 BERHENTI."*
+Tanpa ketiga-tiga syarat itu, penjanaan semula akan menjadi pemalsuan sejarah.
+
+### 20.4 🔴 Kecacatan Arena: membundel **arahan penutup** prompt lain
+
+Prompt L4 versi DP-19.4 memotong bahagian `## 1. PROBE` **dan** `## 2. FORMAT
+LAPORAN` daripada prompt S2-F yang berdiri sendiri. Format laporan itu berakhir
+dengan arahan penutupnya sendiri — menyuruh pembaca berhenti selepas melapor dan
+tidak memulakan Langkah 4. Di dalam dokumen L4, baris itu **bercanggah terus**
+dengan Seksyen 3B yang menyuruh teruskan kepada seed.
+
+ChatGPT mematuhi arahan yang lebih khusus dan lebih akhir, berhenti sebelum seed,
+dan melaporkannya dengan jujur. **Ia betul.** Tiada data direka, tiada gate
+dilangkau, tiada perubahan live (14 perkara disenaraikan sebagai tidak dilakukan).
+Yang hilang ialah **satu pusingan**, dan puncanya milik Arena.
+
+**Kata putus 20.4:** apabila membundel kandungan daripada prompt lain, potong
+bahagian **KANDUNGAN** sahaja. Arahan aliran — mula, berhenti, teruskan, jangan
+ulang — mesti **milik dokumen yang menerima**, kerana hanya dokumen itu tahu
+apa yang berlaku seterusnya. Prompt S2-F tidak tahu ia akan disuntik ke dalam
+dokumen yang mempunyai Langkah 4 selepasnya.
+
+**Penemuan kedua yang lebih halus.** Pembetulan pertama Arena *memetik* ayat
+imperatif itu di dalam nota sejarah ("Berhenti selepas laporan. Jangan mula
+Langkah 4."), dan pengawal baharu serta-merta gagal — dua kali kemunculan frasa itu.
+Ini bukan sekadar artifak ujian: **model yang membaca ayat imperatif boleh
+mematuhinya semula walaupun ia berada dalam tanda petik.** Maka ayat itu
+**diolah secara deskriptif** (menerangkan bahawa arahan penutup itu wujud dan
+bercanggah) tanpa memetik bentuk imperatifnya. Peraturan am: dalam prompt yang
+ditujukan kepada model, jangan petik arahan yang anda tidak mahu dipatuhi —
+terangkan ia.
+
+**Pengawal boleh uji ditambah** (`scripts/test-prompt-8a3-install.mjs`, seksyen
+DP-20.5, 26 penegasan; 140 → 166): tiada frasa berhenti sebelum Seksyen 4;
+tiada blok ` ```sql ` dalam 3B (probe tidak boleh dijalankan semula secara tidak
+sengaja); arahan TERUSKAN hadir; keputusan F1–F4 + kesimpulan A + pengasingan 8C
+direkodkan; dan **setiap** prompt langkah mempunyai **tepat satu** arahan
+"Berhenti selepas laporan".
+
+### 20.5 Bentuk baharu Seksyen 3B
+
+3B kini **rekod**, bukan arahan: jadual keputusan F1–F4, kesimpulan A mengikut
+pra-daftar, pemisahan eksplisit antara *boleh memanggil* dan *boleh mendapatkan
+data*, pengasingan *least-privilege* ke 8C, dan satu arahan aliran yang tidak
+boleh disalah tafsir — laksanakan Seksyen 4 dalam pusingan yang sama. Satu
+satunya keadaan yang membenarkan tidak meneruskan seed ialah **seed itu sendiri
+gagal** (`42501`, `P0002` tiada Super Admin, kekangan FK), dan dalam kes itu
+teks ralat penuh mesti dilaporkan tanpa melonggarkan RLS, `SECURITY DEFINER`
+atau menggunakan `service_role`.
+
+### 20.6 Pengajaran direkodkan
+
+56. **Jangan bundel arahan penutup.** Potong kandungan; tulis semula arahan
+    aliran. Dokumen sumber tidak tahu apa yang datang selepasnya dalam dokumen
+    penerima.
+57. **Jangan petik imperatif yang anda tidak mahu dipatuhi.** Tanda petik tidak
+    meneutralkan arahan bagi model yang membacanya. Terangkan, jangan petik.
+58. **Pengawal yang terlalu khusus ialah punca merah palsu yang paling mahal.**
+    Pengawal S2 (`anon = false`) kelihatan seperti pengesahan kesetiaan, tetapi
+    ia sebenarnya mengesahkan **andaian fixture**. Pengawal mesti menyatakan
+    *fakta platform yang diukur*, bukan *jangkaan yang belum diuji*.
+59. **Pra-daftar membayar balik.** DP-18.3 mengikat A/B/C sebelum data tiba,
+    jadi apabila F1/F2/F3 sampai, pemadanan mengambil satu perenggan — tiada
+    ruang untuk memilih tafsiran yang membolehkan kerja diteruskan.
+60. **Laporan yang berhenti boleh lebih bernilai daripada laporan yang selesai.**
+    ChatGPT kehilangan satu pusingan tetapi mendedahkan percanggahan arahan yang
+    akan terus menjejaskan setiap prompt bundel kelak. Berhenti dengan sebab
+    yang dinyatakan ialah kelakuan yang betul, dan ia harus direkodkan sebagai
+    kejayaan proses, bukan kegagalan jadual.

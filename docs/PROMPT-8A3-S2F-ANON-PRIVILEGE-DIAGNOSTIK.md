@@ -9,13 +9,19 @@
 > **Sifat:** **READ-ONLY sepenuhnya.** 4 query katalog. Tiada DDL, tiada DML,
 > tiada `GRANT`/`REVOKE`, tiada `service_role`, tiada kelulusan pengguna diperlukan.
 
-> 🔴 **STATUS 2026-09-05 (DP-19.4): fail ini sudah DIBUNDEL ke dalam
-> `docs/PROMPT-8A3-L4-SEED-ALIASES.md` Seksyen 3B. JANGAN kongsi fail ini
-> berasingan** — kongsi prompt L4 sahaja. Bahagian PROBE dan FORMAT LAPORAN di
-> bawah **dipotong** (bukan disalin) ke dalam L4 oleh
-> `scripts/generate-8a3-install-prompts.mjs`, jadi fail ini kekal satu-satunya
-> sumber kebenaran bagi probe F1–F4. Jika anda menyuntingnya, jalankan semula
-> penjana itu dan kedua-dua prompt akan berubah bersama.
+> 🟢 **STATUS 2026-09-05 (DP-20.2): prompt ini SUDAH DILAKSANAKAN dan SUDAH
+> DIJAWAB. JANGAN kongsi atau jalankan semula.** Keputusan F1–F4 direkodkan
+> sebagai jadual dalam `docs/PROMPT-8A3-L4-SEED-ALIASES.md` Seksyen 3B, dan
+> kesimpulannya dipadankan dengan pra-daftar DP-18.3 → **A (artifak platform)**.
+> Fail ini dikekalkan sebagai **rekod sejarah** probe itu sahaja.
+>
+> Pengajarannya (DP-20.5): versi L4 yang terdahulu MEMOTONG bahagian FORMAT
+> LAPORAN di bawah ke dalam dirinya, dan baris penutup "Berhenti selepas
+> laporan. Jangan mula Langkah 4." bercanggah dengan arahan teruskan di dokumen
+> yang sama — menyebabkan satu pusingan hilang. **Apabila membundel kandungan
+> daripada prompt lain, potong bahagian KANDUNGAN sahaja; jangan bawa arahan
+> penutupnya.** Kini dikunci oleh pengawal boleh uji dalam
+> `scripts/test-prompt-8a3-install.mjs`.
 
 ---
 

@@ -128,6 +128,39 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon')
     THEN CREATE ROLE anon NOLOGIN; END IF;
 END $$;
+-- ---------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
+-- DP-20.4 -- JURANG FIXTURE-live KELAS 5 DITUTUP: default privileges platform.
+--
+-- Supabase menetapkan, di luar mana-mana fail repo:
+--   ALTER DEFAULT PRIVILEGES IN SCHEMA public
+--     GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
+-- jadi SETIAP fungsi baharu dalam skema public boleh dieksekusi oleh anon.
+-- REVOKE ALL ... FROM PUBLIC dalam SQL yang diluluskan TIDAK membuangnya,
+-- kerana PUBLIC ialah pseudo-role dan bukan penerima grant itu.
+--
+-- Diukur LIVE oleh probe S2-F (2026-09-05), bukan dihujarkan:
+--   F1 pg_default_acl(public, oleh postgres) =
+--      {postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,
+--       service_role=X/postgres}
+--   F2 fungsi L3 7/7 anon EXECUTE; fungsi pra-L3 46/46 anon EXECUTE
+--      -> SISTEMIK, bukan kesan Langkah 3.
+--   F3 anon BUKAN ahli authenticated (penjelasan alternatif ditolak).
+--   F4 simulasi anon: uid=NULL, staf dilihat=0, nilai dilihat=0
+--      -> boleh MEMANGGIL, tetapi tidak MENDAPATKAN data.
+--
+-- Tanpa baris di bawah, fixture menghasilkan anon = false dan setiap probe
+-- privilej menandakan MERAH PALSU terhadap live. Itulah yang berlaku pada S2
+-- dalam laporan L3-R. Pra-daftar DP-18.3 (kesimpulan A) mewajibkan pembetulan
+-- ini SELEPAS ia diukur - dan kini ia sudah diukur.
+--
+-- Yang TIDAK berubah: resolve_account_manager() tidak membaca privilej, jadi
+-- penjana rekonsiliasi L1 disahkan TIDAK terjejas (--check: tiada drift
+-- selepas baris ini ditambah). Hanya jangkaan S2 dalam penjana L3 yang berubah.
+--
+-- NOTA BINAAN: komen ini berada DI DALAM template literal JS, jadi ia tidak
+-- boleh mengandungi backtick atau urutan dollar-brace. Gunakan teks biasa.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated;
 INSERT INTO auth.users (id, email) VALUES ('${uid}'::uuid, 'staff@mimos.my')
   ON CONFLICT DO NOTHING;
 `;

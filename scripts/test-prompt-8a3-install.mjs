@@ -504,6 +504,91 @@ console.log('\n[11] DP-15 — 12 nilai K6 MESTI tersenarai di setiap langkah yan
   }
 }
 
+
+// -----------------------------------------------------------------------------
+// DP-20.5 — PENGAWAL ARAHAN BERCANGGAH
+// -----------------------------------------------------------------------------
+//
+// Kecacatan sebenar yang sudah berlaku (bukan hipotesis): DP-19.4 membundelkan
+// probe S2-F ke dalam prompt L4 dengan memotong bahagian PROBE **dan FORMAT
+// LAPORAN** daripada prompt S2-F yang berdiri sendiri. Format laporan itu
+// berakhir dengan "Berhenti selepas laporan. Jangan mula Langkah 4." — betul
+// bagi prompt standalone, tetapi bercanggah terus dengan "TERUSKAN kepada seed"
+// dalam dokumen yang sama. ChatGPT mematuhi arahan yang lebih khusus itu,
+// berhenti sebelum seed, dan satu pusingan hilang.
+//
+// ChatGPT betul (tidak mereka data, tidak melangkau gate). Kecacatan itu milik
+// Arena, dan pengawal di bawah menjadikannya tidak boleh kembali: sebarang
+// arahan "berhenti sebelum seed" yang muncul SEBELUM Seksyen 4 akan
+// menggagalkan ujian ini.
+console.log('\n[DP-20.5] Tiada arahan aliran yang bercanggah dalam prompt L4');
+{
+  const L4 = 'docs/PROMPT-8A3-L4-SEED-ALIASES.md';
+  const d = fs.readFileSync(L4, 'utf8');
+  const idxS4 = d.indexOf('## 4. Cara melaksanakan');
+  eq(idxS4 > 0, true, 'L4: Seksyen 4 (cara melaksanakan seed) wujud');
+  const sebelum = d.slice(0, idxS4);
+  const selepas = d.slice(idxS4);
+
+  // (a) Tiada arahan berhenti sebelum seed
+  eq(sebelum.includes('Jangan mula Langkah 4'), false,
+     'L4: tiada "Jangan mula Langkah 4" sebelum Seksyen 4 (punca pusingan hilang)');
+  eq(sebelum.includes('Berhenti selepas laporan'), false,
+     'L4: tiada "Berhenti selepas laporan" sebelum Seksyen 4');
+  eq(/BERHENTI SEBELUM seed/i.test(sebelum), false,
+     'L4: tiada "BERHENTI SEBELUM seed" (syarat berhenti DP-19.4 sudah tidak terpakai - probe dijawab)');
+
+  // (b) Arahan teruskan hadir dan eksplisit
+  const idx3B = sebelum.indexOf('## 3B.');
+  eq(idx3B > 0, true, 'L4: Seksyen 3B wujud sebelum Seksyen 4');
+  const blok3B = sebelum.slice(idx3B);
+  eq(/TERUSKAN/.test(blok3B), true, 'L4/3B: arahan TERUSKAN hadir');
+  eq(/LAKSANAKAN\s*\n?>?\s*Seksyen 4|LAKSANAKAN/.test(blok3B), true,
+     'L4/3B: mengarah GPT melaksanakan Seksyen 4 dalam pusingan yang sama');
+  eq(/JANGAN berhenti di sini/i.test(blok3B), true,
+     'L4/3B: larangan berhenti dinyatakan secara eksplisit');
+
+  // (c) 3B ialah REKOD, bukan arahan untuk menjalankan probe semula
+  eq(blok3B.includes('```sql'), false,
+     'L4/3B: tiada blok SQL - probe tidak boleh dijalankan semula secara tidak sengaja');
+  eq(/Jangan jalankannya semula|jangan ulang/i.test(blok3B), true,
+     'L4/3B: menyatakan probe sudah dijawab dan tidak perlu diulang');
+
+  // (d) Keputusan live direkodkan, dan pra-daftar DP-18.3 dipadankan
+  for (const fakta of ['46', 'pg_default_acl', 'uid = NULL', 'DP-18.3', 'DP-20']) {
+    eq(blok3B.includes(fakta), true, `L4/3B: merekodkan "${fakta}"`);
+  }
+  eq(/A \(artifak platform\)|artifak platform/i.test(blok3B), true,
+     'L4/3B: kesimpulan A (artifak platform) dinyatakan');
+  eq(/L4 DIBUKA|L3-R DIPUASKAN/.test(blok3B), true,
+     'L4/3B: akibatnya dinyatakan (L3-R dipuaskan, L4 dibuka)');
+
+  // (e) Soalan least-privilege tetap diasingkan ke 8C, bukan diselesaikan di L4
+  eq(/8C/.test(blok3B), true, 'L4/3B: least-privilege diasingkan ke gate 8C (DP-18.4)');
+  eq(/Jangan `REVOKE`|Jangan REVOKE/i.test(blok3B.replace('**', '')), true,
+     'L4/3B: larangan REVOKE semasa L4 kekal');
+
+  // (f) "Berhenti selepas laporan" yang SAH hanya di hujung, selepas seed
+  eq(selepas.includes('Berhenti selepas laporan'), true,
+     'L4: arahan berhenti yang sah kekal di hujung (selepas seed + laporan)');
+
+  // (g) Setiap prompt langkah ada tepat satu arahan berhenti (tiada duplikasi)
+  for (const f of ['docs/PROMPT-8A3-L1-CLIENT-MASTER.md',
+                   'docs/PROMPT-8A3-L2-EXTERNAL-ACCOUNT-MANAGERS.md',
+                   'docs/PROMPT-8A3-L3-ACCOUNT-MANAGER-RESOLUTION.md', L4]) {
+    const n = (fs.readFileSync(f, 'utf8').match(/Berhenti selepas laporan/g) || []).length;
+    eq(n, 1, `${f.split('/').pop()}: tepat SATU arahan "Berhenti selepas laporan" (dapat ${n})`);
+  }
+
+  // (h) Prompt S2-F standalone: masih ada arahan berhenti sendiri (betul di sana)
+  //     dan banner mengatakan ia sudah dijawab.
+  const s2f = fs.readFileSync('docs/PROMPT-8A3-S2F-ANON-PRIVILEGE-DIAGNOSTIK.md', 'utf8');
+  eq(s2f.includes('Berhenti selepas laporan'), true,
+     'S2-F standalone: arahan berhenti kekal (betul dalam konteksnya sendiri)');
+  eq(/SUDAH DILAKSANAKAN dan SUDAH\s*\n?>?\s*DIJAWAB|SUDAH DILAKSANAKAN/.test(s2f), true,
+     'S2-F standalone: banner menyatakan ia sudah dijawab - jangan kongsi semula');
+}
+
 console.log(`\n${'='.repeat(62)}`);
 console.log(`KEPUTUSAN: ${pass} lulus, ${fail} gagal`);
 console.log(`${'='.repeat(62)}\n`);
