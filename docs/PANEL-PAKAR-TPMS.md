@@ -3496,3 +3496,175 @@ daripada takrifan `RETURNS TABLE` fungsi yang kebetulan senama.
 `test-konvensyen-privilej.mjs` diuji-mutasi dengan fail scratch yang sengaja
 melanggar sebelum diterima; tanpa itu, 14/14 lulus tidak membezakan pengawal
 yang berfungsi daripada pengawal yang sentiasa lulus.
+
+---
+
+## DP-24 — 8C DITERIMA DI LIVE; `unlock_programme` ialah RPC tulis YATIM yang tiada dalam repo (2026-09-05)
+
+### 24.1 Keputusan live yang dilaporkan ChatGPT
+
+| Kriteria | Live | Penilaian Arena |
+|---|---|---|
+| J0a (sebelum) | 53 / 53 / 53 | lubang DP-18.4 disahkan |
+| K1 (selepas) | `jumlah=56`, `anon=0`, `auth=56`, `nama_masih_anon=(tiada)` | **🟢 53 → 0** capaian anon; 56 = 53 + 3 fungsi 8C |
+| K2 | `postgres` tiada `anon=`; `supabase_admin` **kekal** `anon=X` | **🟢 seperti diramal** — `ALTER DEFAULT PRIVILEGES` tanpa `FOR ROLE` hanya sentuh `postgres` |
+| K3 | blocked → `viewer` / `false` / `0` | **🟢 DP-17.4(a) tertutup di live** |
+| K4 | super_admin → `super_admin`/`true`/`true`/`19` | **🟢 tiada lockout** |
+| K5 | `42501: gate 8C: backfill memerlukan token kebenaran…` | **🟢 verbatim** |
+| K6 | `42501` bukan-Super · `22023` sebab pendek · token kedua `42501` | **🟢 DP-17.4(b) tertutup** |
+| K8 | `backfill_authorizations` · `fungsi_8c=3` · `p_token uuid` · `rls=true` | **🟢** |
+| K9 | `anon_mewarisi=true`, `authenticated_ok=true` | **🟠 DP-23.1 DISAHKAN DI LIVE** — PGlite dan production bersetuju |
+| K11 | 21 jadual / 21 ber-RLS | **🟢** = 18 rasmi + 3 warisan (DP-23.6) |
+| K12 | ⏳ connector tidak memulangkan NOTICE/WARNING | **diterima** — ChatGPT **tidak mereka-reka** (larangan 7 dipatuhi) |
+| K10 | 12 RPC UI: `auth=true`, `anon=false`; UI visual belum disahkan | **🟡** — memerlukan sesi pelayar pengguna |
+
+Data baseline kekal: `import_staging=1124`, `invoices=6`, `organizers=12`,
+`programmes=14`, `user_profiles=20`, `backfill_authorizations=0` (rollback K6
+berkesan). **DP-23.1 kini bukti production, bukan inferens PGlite** — Lapisan 2
+(pengawal CI) ialah penutupan yang sebenarnya bagi fungsi baharu.
+
+### 24.2 Drift yang dilaporkan: `unlock_programme`
+
+Katalog live selepas pemasangan mengandungi **satu** fungsi di luar inventori 8C:
+`unlock_programme`. Tiada nama inventori yang hilang. Ini menyelesaikan misteri
+"53 vs 52" daripada laporan J0: **53 = 52 nama inventori + `unlock_programme`**.
+
+**Siasatan Arena (fakta, bukan tekaan):**
+
+1. `grep -rn "unlock_programme"` merentas `*.sql`, `*.ts`, `*.tsx`, `*.mjs`
+   → **SIFAR** definisi, **SIFAR** pemanggil.
+2. `find . -name "*.sql"` di luar `lib/supabase/*.sql` → **tiada**. Jadi pengawal
+   `test-konvensyen-privilej.mjs` **bukan buta**; ia memang mengimbas semua SQL repo.
+3. `unlock_programme` dirujuk dalam **8 dokumen prompt** (`PROMPT-4B`, `4C`, `4D`,
+   `4E`, `4F`, `8A`, `8A3-INSTALL`, `8A3-L1`) sebagai **RPC tulis perniagaan yang
+   dilarang dipanggil** — iaitu Arena sudah lama *menganggap* ia wujud di live.
+4. Semua adik-beradiknya **ada** dalam `governance-lock.sql`:
+   `request_programme_unlock` (:146), `review_programme_unlock` (:238),
+   `lock_programme` (:337), `cancel_programme_unlock` (:385).
+
+**Kesimpulan:** `unlock_programme` ialah **RPC tulis yatim** — wujud di production,
+tiada dalam repo, tiada pemanggil dalam aplikasi. Sama ada ia dipasang oleh fasa
+awal (kemungkinan `PROMPT-2B-INSTALL-RPC` / `PROMPT-4E-FIX-DB-LOCK-NAMES`) dan
+SQL-nya tidak pernah di-commit, atau ia pendahulu kepada `review_programme_unlock`
+yang tidak pernah di-DROP.
+
+**Implikasi keselamatan yang tepat (tidak dibesar-besarkan):**
+SEBELUM 8C fungsi ini memegang EXECUTE untuk `anon` (seperti 52 yang lain) — jadi
+8C **menutup** pendedahan tanpa-log-masuknya. Selepas 8C ia hanya boleh dipanggil
+oleh `authenticated`. Yang **belum** diselesaikan: badannya tidak pernah disemak,
+dan ia kekal sebagai RPC tulis yang tidak didokumentasikan bagi 19 pengguna aktif.
+
+### 24.3 Kata putus — **Posisi C: probe dahulu, rekod, kemudian putuskan**
+
+| | Pilihan | Penilaian |
+|---|---|---|
+| A | `DROP FUNCTION unlock_programme` sekarang | Menyelesaikan drift, tetapi **DROP di live** ialah keputusan yang pengguna sudah tangguhkan ("legacy pre-repo DROP cleanup = KEKAL DITANGGUH"), dan kita belum tahu sama ada ada pergantungan |
+| B | Biarkan | Drift repo↔live kekal — **kelas kesilapan DP-14.2**: ramalan Arena berdasarkan repo akan terus salah selagi live berbeza |
+| **C** | **Probe read-only** → rekod definisi penuh → **commit ke repo** sebagai kebenaran → putuskan DROP pada fasa cleanup | Fakta dahulu; tiada tindakan tidak boleh balik; menutup jurang repo↔live yang menyebabkan DP-14.2 |
+
+**Dipilih C.** Probe: `docs/PROMPT-8C-DRIFT-UNLOCK-PROGRAMME.md` (4 query
+read-only, tiada DDL/DML). Selepas definisi diperoleh, ia dimasukkan ke repo
+(kemungkinan sebagai `lib/supabase/legacy-unlock-programme.sql` dengan anotasi
+"dirakam daripada live, bukan direka") supaya inventori, pengawal konvensyen, dan
+ramalan Arena semuanya setara live.
+
+### 24.4 Pengesahan sampingan terhadap reka bentuk 8C
+
+Drift ini **mengesahkan** kata putus DP-23.3 (sapuan dinamik, bukan senarai nama).
+Sekiranya 8C dibina seperti **reka bentuk asal** — revoke mengikut senarai 52 nama
+— `unlock_programme` akan **terlepas sepenuhnya** dan kekal boleh dipanggil oleh
+`anon` di production hari ini. Ia ditutup hanya kerana sapuan membaca `pg_proc`,
+dan ia **kelihatan** hanya kerana laporan DRIFT diwajibkan. Dua keputusan reka
+bentuk itu kini terbukti bernilai oleh satu objek yang tiada siapa tahu wujud.
+
+**Pengajaran 80.** **Inventori repo bukan inventori live.** Sebarang senarai nama
+yang diterbitkan daripada repo akan sentiasa kekurangan objek yang dipasang di
+live tanpa di-commit. Mekanisme yang bergantung pada senarai sedemikian mesti
+mempunyai laluan sapuan dinamik **dan** laporan drift; jika tidak, ia gagal
+secara senyap tepat pada objek yang paling kurang difahami.
+
+**Pengajaran 81.** **Apabila saluran laporan tidak memaparkan output (NOTICE),
+sediakan laluan pengesahan alternatif dalam prompt itu sendiri.** K12 tidak boleh
+diisi kerana connector tidak memulangkan NOTICE/WARNING; ChatGPT betul kerana
+tidak mereka-reka, tetapi Arena sepatutnya menjangkakan ini — maklumat drift kini
+boleh diperoleh daripada perbandingan katalog (K1 `nama_masih_anon`, dan probe
+P3), yang tidak bergantung pada NOTICE.
+
+**Pengajaran 82.** **Dokumen prompt ialah bukti jangkaan, bukan bukti kewujudan.**
+Lapan prompt merujuk `unlock_programme` sebagai RPC yang perlu dielakkan. Rujukan
+berulang itu menjadikan kewujudannya terasa "disahkan", sedangkan tiada satu pun
+fail repo mentakrifkannya. Larangan yang menyebut sesuatu objek **tidak**
+menjadikan objek itu terkawal — hanya definisi yang di-commit dan ujian yang
+menjadikannya terkawal.
+
+---
+
+## DP-25 — Definisi `unlock_programme` diperoleh: skema `private` yang tidak dikenali repo, dan satu laluan tulis tanpa audit (2026-09-05)
+
+**Fakta (probe P1/P2/P3 live, verbatim):** definisi penuh dirakam di
+`lib/supabase/legacy/unlock-programme-RECORDED-FROM-LIVE.sql`.
+
+* `public.unlock_programme(p_programme_id uuid, p_reason text DEFAULT NULL)`
+  `RETURNS programmes`, `LANGUAGE plpgsql`, `VOLATILE`.
+* **`SECURITY INVOKER`** (`security_definer=false`); `SET search_path TO
+  'public','pg_temp'` (dipin); pemilik `postgres`.
+* Privilej: `{postgres=X, authenticated=X, service_role=X}` — **`anon` tiada
+  EXECUTE**. Sapuan 8C menutup pendedahan tanpa-log-masuknya.
+* Pengawal kuasanya: **`private.has_role('head_governance')`**.
+* Kesan tulis: `UPDATE public.programmes SET governance_lock_status='unlocked',
+  locked_at=NULL, locked_by=NULL, lock_reason=p_reason, updated_at=now()`.
+* **Tiada `log_audit()`** dan **tiada baris `programme_unlock_requests`**.
+* P3: 56 nama fungsi live = 55 nama unik repo **+ `unlock_programme`**. Maka
+  **tepat satu** objek yatim; tiada yang lain. Semua 56: `anon=false`,
+  `authenticated=true`.
+
+**Isu 1 — skema `private` tidak wujud dalam repo.** `private.has_role` bukan
+`public.has_role` (yang ditakrifkan dalam `fix-rls-recursion.sql` dan dikeraskan
+oleh 8C melalui `current_user_role()`). Kerana fungsi ini SECURITY INVOKER, ia
+tidak mewarisi rantaian `public` yang sudah ditapis `is_active`/`account_status`.
+**Akibat yang belum ditutup:** jika `private.has_role` tidak menapis akaun
+blocked/pending, maka DP-17.4(a) **tidak** tertutup untuk laluan ini — seorang
+`head_governance` yang disekat masih boleh membuka kunci program. Ini hipotesis
+yang mesti diukur (probe P6), **bukan** kesimpulan.
+
+**Isu 2 — laluan tulis tanpa jejak audit.** Aliran governance repo ialah
+`request_programme_unlock` → `review_programme_unlock` → `cancel_programme_unlock`
+(semua dalam `governance-lock.sql`). `unlock_programme` menulis
+`governance_lock_status='unlocked'` **secara terus**, tanpa audit dan tanpa
+permintaan unlock — iaitu pintasan kepada kawalan yang direka, tersedia kepada
+mana-mana `head_governance`.
+
+**Isu 3 — P4/P5 tidak menjalankan query yang diluluskan.** P5 gagal dengan
+`"array_agg" is an aggregate function` sedangkan **P5 tiada `array_agg`**; P4
+gagal dengan `column d.refid does not exist` sedangkan `pg_depend.refid` ialah
+kolum katalog yang sah. Maka SQL yang sampai ke enjin **bukan** SQL dalam prompt
+— kejadian **ke-5** bukan byte-for-byte (selepas DP-13.2, DP-17.2, DP-21.4, dan
+typo `defaclnobjtype`). ChatGPT melaporkan ralat dengan jujur dan tidak mereka
+bukti; sebab itu percanggahan ini boleh dikesan. **Kata putus:** SQL yang betul
+tidak akan "dibaiki"; probe seterusnya mewajibkan ChatGPT **mengekorkan semula
+teks query yang dihantar** sebelum keputusan, supaya penggantian boleh dikesan
+secara langsung dan bukan melalui inferens.
+
+**Kata putus DP-25:**
+1. Definisi dirakam sebagai **evidens** dalam `lib/supabase/legacy/` — tidak
+   dipasang, tidak diimbas pengawal konvensyen, tidak menambah inventori.
+2. **Probe P6–P8** (read-only): inventori penuh skema `private` + definisi
+   `private.has_role` + sama ada ia menapis `is_active`/`account_status`;
+   P4/P5 diulang dengan kawalan ekoran.
+3. **Tiada DROP, tiada ALTER** — penangguhan cleanup legacy pengguna dihormati.
+4. Jika P6 mengesahkan `private.has_role` tidak menapis akaun blocked → ini
+   menjadi **lubang DP-17.4(a) yang masih terbuka** dan mesti dibawa sebagai
+   migration aditif (bukan suntingan fail terpasang).
+
+**Pengajaran 83.** **Fungsi yang "dikawal" oleh satu pengawal kuasa bukan
+bermakna ia dikawal oleh pengawal kuasa yang anda keraskan.** 8C menutup
+`public.current_user_role()`; `unlock_programme` tidak lalu situ langsung kerana
+ia SECURITY INVOKER yang memanggil `private.has_role`. Mengukuhkan satu laluan
+tanpa menginventori laluan lain menghasilkan keyakinan palsu — dan hanya
+definisi sebenar (bukan senarai nama) yang mendedahkannya.
+
+**Pengajaran 84.** **Skema yang tidak pernah disebut dalam repo masih boleh
+menjadi beban keselamatan.** `private` tidak wujud dalam mana-mana fail, tetapi
+ia memegang pengawal kuasa bagi satu RPC tulis production. Inventori repo mesti
+dianggap **tidak lengkap selagi ia belum dibandingkan dengan katalog live** —
+sebab itu P3 (katalog penuh) kini sebahagian standard setiap probe.
