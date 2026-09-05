@@ -505,6 +505,10 @@ console.log('\n[8] DP-12 — prompt langkah sepadan output penjana (tiada drift)
     ['scripts/generate-8a3-install-prompts.mjs', '4 prompt langkah 8A-3'],
     ['scripts/generate-8a3-l1-reconciliation.mjs', 'prompt rekonsiliasi L1'],
     ['scripts/generate-8a3-l3-reconciliation.mjs', 'prompt rekonsiliasi L3'],
+    // 8C: prompt ini membawa bait SQL privilege-hardening + cap jari + query J0/K.
+    // Drift di sini bermaksud ChatGPT memasang SQL yang BERBEZA daripada yang
+    // Arena uji dalam PGlite, atau membandingkan output live dengan jangkaan lapuk.
+    ['scripts/generate-8c-prompt.mjs', 'prompt 8C privilege hardening'],
   ];
   for (const [PEN, label] of PENJANA) {
     if (!fs.existsSync(PEN)) { bad(`${PEN} tiada`); continue; }

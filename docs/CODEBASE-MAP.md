@@ -152,6 +152,11 @@
 
 ### `lib/supabase/migrations/v4-raw-data-inserts.sql`
 
+### `lib/supabase/privilege-hardening.sql`
+- **Jadual:** backfill_authorizations
+- **Fungsi/RPC:** current_user_role, current_role_name, am_calon_layak, am_backfill_authorize, am_backfill_account_manager, am_backfill_pengecualian
+- **Polisi RLS:** backfill_auth_super_read · backfill_auth_super_insert
+
 ### `lib/supabase/schema-import-staging.sql`
 - **Jadual:** import_staging, import_batches
 - **Enum:** import_entity_kind, import_record_action, import_duplicate_confidence
@@ -263,6 +268,7 @@
 - `PROMPT-8A3-L4-SEED-ALIASES.md`
 - `PROMPT-8A3-S2F-ANON-PRIVILEGE-DIAGNOSTIK.md`
 - `PROMPT-8A3-SAMBUNGAN.md`
+- `PROMPT-8C-PRIVILEGE-HARDENING.md`
 - `PROMPT-TEMPLATE-FASA.md`
 - `SETUP-SUPABASE.md`
 - `SKILLS.md`

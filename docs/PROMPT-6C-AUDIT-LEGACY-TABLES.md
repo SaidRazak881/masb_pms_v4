@@ -147,11 +147,17 @@ SELECT 'W1_public_tables' AS check_name,
        -- ⚠️ KEMASKINI FASA 8A-2 (2026-09-04, Panel DP-9): `external_account_managers`
        --    ditambah oleh `lib/supabase/external-account-managers.sql`.
        --    Bilangan rasmi 16 -> 17.
+       -- ⚠️ KEMASKINI FASA 8C (2026-09-05, Panel DP-23): `backfill_authorizations`
+       --    ditambah oleh `lib/supabase/privilege-hardening.sql` — jadual token
+       --    sekali-guna yang menggate `am_backfill_account_manager()`
+       --    (DP-17.4(b)). Ia JADUAL RASMI repo, ber-RLS, dengan polisi
+       --    SELECT/INSERT terhad kepada Super Admin. Bilangan rasmi 17 -> 18.
        --    NOTA: PROMPT-6C SUDAH dijalankan sebelum ini, jadi laporan lama
-       --    mengira 15. Jika W1 dijalankan SEMULA selepas Fasa 7A dipasang di
-       --    live, jangkaan = 16 rasmi + 3 warisan = 19 jadual public ber-RLS.
+       --    mengira 15. Jika W1 dijalankan SEMULA selepas Fasa 8C dipasang di
+       --    live, jangkaan = 18 rasmi + 3 warisan = 21 jadual public ber-RLS.
        CASE WHEN c.relname IN (
               'account_manager_aliases','app_settings','audit_logs',
+              'backfill_authorizations',
               'change_requests','cost_items','external_account_managers',
               'financial_docs','import_batches','import_staging','invoices',
               'organizers','participants','programme_costs',

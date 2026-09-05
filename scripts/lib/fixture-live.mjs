@@ -118,8 +118,22 @@ CREATE TABLE IF NOT EXISTS auth.identities (
   last_sign_in_at timestamptz,
   created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(),
   UNIQUE (provider_id, provider));
+-- 🔴 JURANG FIXTURE-live KELAS 5 DITUTUP (DP-23, 2026-09-05): stub asal
+-- memulangkan UUID literal sahaja, jadi ia TIDAK dapat melaksanakan query yang
+-- bergantung pada \`request.jwt.claims\` — iaitu tepat mekanisme yang dipakai di
+-- live oleh Supabase SQL Editor (tiada JWT dalam editor, jadi seed L4 dan prompt
+-- 8C menetapkan claims secara eksplisit). Akibatnya query J0/K dalam prompt 8C
+-- tidak boleh disahkan dalam PGlite langsung, dan "tidak boleh diuji" mudah
+-- bertukar menjadi "tidak diuji".
+--
+-- Versi ini membaca \`sub\` daripada \`request.jwt.claims\` jika ditetapkan, dan
+-- jatuh balik kepada UUID literal. Kelakuan sedia ada KEKAL untuk semua ujian
+-- yang menggunakan \`sebagaiPengguna()\` kerana helper itu mentakrifkan semula
+-- fungsi ini sebagai literal — jadi tiada regresi.
 CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE
-  AS $$ SELECT '${uid}'::uuid $$;
+  AS $$ SELECT coalesce(
+          nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub',
+          '${uid}')::uuid $$;
 CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE
   AS $$ SELECT '{}'::jsonb $$;
 DO $$ BEGIN
@@ -332,6 +346,28 @@ export async function pasangLangkah(db, fail) {
 export async function sebagaiPengguna(db, uuid) {
   await db.exec(`CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE
     AS $$ SELECT ${uuid === null ? 'NULL' : `'${uuid}'`}::uuid $$;`);
+}
+
+/**
+ * Pulihkan stub `auth.uid()` kepada versi SEDAR-CLAIMS (membaca `sub` daripada
+ * `request.jwt.claims`, jatuh balik kepada UUID literal).
+ *
+ * MENGAPA DIPERLUKAN: `sebagaiPengguna()` di atas mentakrifkan semula `auth.uid()`
+ * sebagai literal — ia **memadam** kesedaran claims. Ujian yang memakai
+ * `sebagaiPengguna()` (cth. untuk menyemai L4 sebagai Super Admin) dan kemudian
+ * mahu melaksanakan query gaya-live yang menetapkan `request.jwt.claims` (seed L4
+ * dan prompt 8C di Supabase SQL Editor) MESTI memanggil helper ini selepas itu.
+ * Tanpa ia, `set_config('request.jwt.claims', ...)` kelihatan "tidak berkesan"
+ * dan ujian akan menyalahkan SQL yang sebenarnya betul.
+ *
+ * @param {PGlite} db
+ * @param {string} [uuid] UUID jatuh balik; lalai kepada UID modul
+ */
+export async function pulihkanAuthUid(db, uuid = UID) {
+  await db.exec(`CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE
+    AS $$ SELECT coalesce(
+            nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub',
+            '${uuid}')::uuid $$;`);
 }
 
 /**

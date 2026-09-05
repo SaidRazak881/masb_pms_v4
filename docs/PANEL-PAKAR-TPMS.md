@@ -3355,3 +3355,144 @@ rapatkan jarak antara pengesahan dan push.** Semua pengesahan (ujian, `tsc`,
 `build`, `curl`) dijalankan dahulu, kemudian `git log` + `add` + `commit` +
 `push` dalam **satu** blok arahan. Jendela di mana reset boleh memisahkan
 commit daripada push adalah beberapa saat, bukan beberapa minit.
+
+---
+
+## DP-23 — Fasa 8C: `ALTER DEFAULT PRIVILEGES` **tidak boleh** menutup pewarisan `anon`, dan tiga lapisan yang menggantikannya (2026-09-05)
+
+**Isu:** DP-18.4 (52 fungsi TPMS boleh dipanggil oleh `anon`) dan DP-17.4(a)(b)
+ditangguh ke Fasa 8C. Semasa membina 8C, satu andaian teras didapati **salah
+separuh** melalui pengukuran, bukan melalui pembacaan kod.
+
+### 23.1 Fakta yang diukur (PGlite, fixture setara-live 20 profil)
+
+| # | Pengukuran | Keputusan |
+|---|---|---|
+| F-a | `pg_default_acl` public/fungsi SEBELUM 8C | `{authenticated=X/postgres, anon=X/postgres}` — mengesahkan punca F1 ChatGPT |
+| F-b | `pg_default_acl` SELEPAS `REVOKE ... FROM anon` + `FROM PUBLIC` | `{authenticated=X/postgres}` — **`anon` berjaya dibuang** |
+| F-c | Fungsi dicipta SELEPAS itu: `has_function_privilege('anon', ...)` | **TRUE — MASIH BOCOR** |
+| F-d | `proacl` fungsi baharu itu | `{=X/postgres, postgres=X/postgres, authenticated=X/postgres}` |
+| F-e | Fungsi baharu + `REVOKE ALL ... FROM PUBLIC` eksplisit | `anon = FALSE`, `authenticated = TRUE` |
+| F-f | Fungsi pra-8C (38 dalam fixture) selepas sapuan | `anon = 0`, `authenticated = 38/38` |
+| F-g | Fail repo pra-8C yang mengandungi `REVOKE ... FROM anon` | **0 daripada 17 fail** |
+
+**Penjelasan F-c/F-d:** PostgreSQL membina ACL awal fungsi baharu daripada
+`acldefault()`, yang memberi EXECUTE kepada pseudo-peranan **PUBLIC**, kemudian
+*menambah* entri `pg_default_acl` di atasnya. `pg_default_acl` menyimpan ACL
+**hasil**, bukan operasi delta — jadi tiada cara menyimpan "buang PUBLIC" di
+dalamnya. Selagi PUBLIC memegang EXECUTE, `anon` memegangnya juga (tiada
+mekanisme "revoke daripada anon tetapi kekalkan PUBLIC").
+
+**Akibat:** `ALTER DEFAULT PRIVILEGES` — satu-satunya mekanisme yang pada
+mulanya dirancang untuk DP-18.4(b) — **tidak dapat** menutup fungsi baharu.
+
+### 23.2 Pilihan yang dipertimbangkan
+
+| | Pilihan | Kelebihan | Kelemahan |
+|---|---|---|---|
+| A | `ALTER DEFAULT PRIVILEGES` sahaja (rancangan asal) | Satu baris; tiada penyelenggaraan | **Diukur tidak berkesan** (F-c). Menutup hanya entri `anon` eksplisit |
+| B | Sapuan dinamik semua fungsi `public` (idempoten, dijalankan semula tiap fasa) | Menutup apa sahaja yang wujud semasa ia dijalankan; penapis `pg_depend deptype='e'` melindungi objek extension | Tidak menutup fungsi pada saat dicipta — ada jendela antara cipta dan sapuan semula |
+| C | `EVENT TRIGGER` pada `ddl_command_end` yang auto-revoke | Menutup serta-merta pada saat penciptaan; tiada jendela | Mekanisme DDL baharu di production; berinteraksi dengan trigger platform (`pgrst_ddl_watch`); sukar dirawat oleh fasa lain; tidak boleh disahkan dalam PGlite |
+| D | Pengawal CI: setiap fungsi baharu dalam `lib/supabase/*.sql` wajib membawa 3 baris konvensyen | Menutup **semasa dicipta**; boleh diuji; sifar risiko runtime | Hanya melindungi fungsi yang datang daripada repo, bukan objek yang dicipta terus di live |
+
+### 23.3 Kata putus — **B + D, dengan A dikekalkan sebagai niat katalog**
+
+Posisi yang dipilih ialah **berlapis**, kerana tiada satu lapisan yang mencukupi
+bersendirian:
+
+1. **Lapisan 1 (B) — sapuan dinamik** dalam Seksyen 2 `privilege-hardening.sql`:
+   setiap fungsi dalam skema `public` yang **bukan** ahli extension dirawat
+   dengan `REVOKE FROM PUBLIC` + `REVOKE FROM anon` + `GRANT authenticated`.
+   Migration idempoten → dijalankan semula pada penghujung tiap fasa.
+   Penapis `pg_depend.deptype='e'` adalah pengawal keselamatan: sekiranya
+   PostGIS/pgjwt dipasang dalam `public` di live, fungsinya tidak dirampas.
+2. **Lapisan 2 (D) — `scripts/test-konvensyen-privilej.mjs`**: fungsi baharu
+   wajib membawa 3 baris konvensyen dalam failnya sendiri. 61 pelanggaran
+   pra-8C dibekukan sebagai `BASELINE` (fail terpasang tidak boleh disunting);
+   pelanggaran **baharu** menggagalkan suite. Pengawal ini diuji-mutasi
+   (fail scratch sengaja melanggar → 2 kegagalan + panduan pembetulan →
+   dibuang → lulus semula), kerana **pengawal yang tidak pernah gagal bukan
+   pengawal**.
+3. **A dikekalkan** dengan komen yang jujur: ia membuang entri `anon` eksplisit
+   daripada `pg_default_acl` (F-b) dan memberi `authenticated` secara lalai,
+   tetapi fail itu kini menyatakan dengan terang bahawa ia **bukan** penutupan
+   pewarisan.
+4. **C ditolak.** Event trigger ialah mekanisme DDL produksi yang tidak boleh
+   disahkan dalam PGlite dan berisiko berinteraksi dengan trigger platform.
+   Jendela yang ditinggalkan oleh B ditutup oleh D bagi semua fungsi repo —
+   dan fungsi repo ialah satu-satunya sumber fungsi baharu yang diluluskan.
+
+### 23.4 Kata putus kedua — tukar tanda tangan `am_backfill_account_manager()`
+
+DP-17.4(b) memerlukan gate yang **dikuatkuasakan**, bukan larangan prosa dalam
+prompt. Dua cara: (i) kekalkan fungsi tanpa argumen dan tambah pembungkus
+berpagar; (ii) `DROP` dan cipta semula dengan `(p_token uuid)`.
+
+**Dipilih (ii), kerana fakta ini diukur:** inventori `.rpc()` dalam `app/`,
+`lib/`, `components/` = **26 nama fungsi berbeza**, dan
+`am_backfill_account_manager` **bukan** salah satunya (ia RPC migration
+sekali-guna yang dijalankan oleh ChatGPT, bukan oleh aplikasi). Maka menukar
+tanda tangan tidak memutus apa-apa. Pilihan (i) akan meninggalkan fungsi tanpa
+gate yang masih boleh dipanggil — iaitu lubang yang sepatutnya ditutup.
+
+Reka bentuk gate: `backfill_authorizations` (ber-RLS, polisi SELECT/INSERT
+Super Admin sahaja) + `am_backfill_authorize(p_reason)` (Super Admin sahaja,
+sebab ≥ 12 aksara, diaudit) → token **sekali-guna** →
+`am_backfill_account_manager(p_token)`.
+
+### 23.5 Kata putus ketiga — penangguhan bendera UI (DP-14.2 Posisi C)
+
+`am_unresolved_values()` tidak diubah jenis pulangan dalam 8C. Calon yang
+ditolak (blocked/super_admin) **dilaporkan** oleh fungsi baharu
+`am_backfill_pengecualian()` (read-only, beritem, sebab dinyatakan). Bendera UI
+pada panel DP-22 ditangguh ke 8B/8D apabila data wujud — diukur hari ini:
+**sifar** nilai mentah `Account Manager` di live (J1, 10.3), dan gate backfill
+sudah menutup risiko pengikatan. Menukar `RETURNS TABLE` fungsi terpasang
+adalah lebih berisiko daripada faedahnya sekarang.
+
+### 23.6 Regresi yang ditangkap oleh pengawal sedia ada (bukan oleh 8C)
+
+Menambah jadual `backfill_authorizations` menjadikan inventori repo **18**
+jadual, tetapi allowlist `W1_public_tables` dalam
+`docs/PROMPT-6C-AUDIT-LEGACY-TABLES.md` masih 17 → `test-preflight-b-sql.mjs`
+§8 **GAGAL dengan tepat**. Ini pengulangan DP-4 (8A, `account_manager_aliases`)
+dan pengajaran DP-4 terpakai semula: allowlist dikemas kini kepada 18 dengan
+anotasi Fasa 8C; jangkaan W1 semula = **18 rasmi + 3 warisan = 21**.
+
+### 23.7 Pembetulan fakta — kedua-dua lajur ialah `NOT NULL`
+
+Draf awal `privilege-hardening.sql` mendakwa `is_active` "boleh NULL". Ujian
+PGlite menangkapnya: `UPDATE ... SET is_active = NULL` → **23502**. Fakta
+sebenar: `is_active BOOLEAN NOT NULL DEFAULT true` (`schema-master.sql:311`) dan
+`account_status ... NOT NULL DEFAULT 'active'` (`user-management.sql:139-140`).
+Dakwaan salah itu berasal daripada lajur `is_active BOOLEAN` dalam
+`RETURNS TABLE` fungsi `admin_list_users()` (`user-management.sql:364`) —
+takrifan baris hasil fungsi, **bukan** lajur jadual. Bentuk toleran NULL
+(`IS NOT FALSE`, `coalesce`) dikekalkan sebagai **pertahanan berlapis** dan
+komen dibetulkan; ujian kini mengunci kekangan kedua-dua lajur supaya komen
+tidak boleh drift daripada skema tanpa dikesan.
+
+**Pengajaran 75.** **Uji kesan yang dituntut, bukan mekanisme yang diubah.**
+`pg_default_acl` memang berubah seperti diramal (F-b) — dan tuntutan itu tetap
+salah, kerana yang penting ialah `has_function_privilege()` pada objek **baharu**
+(F-c). Mengubah katalog bukan bukti perubahan kebenaran.
+
+**Pengajaran 76.** **PUBLIC ialah pemberi kuasa yang tersembunyi.** Selagi
+pseudo-peranan PUBLIC memegang EXECUTE, revoke daripada peranan bernama
+(`anon`) tidak berkesan. Sebarang reka bentuk privilej mesti menamakan PUBLIC
+secara eksplisit.
+
+**Pengajaran 77.** **Apabila pengawal sedia ada gagal selepas perubahan kita,
+baca dahulu apa yang pengawal itu kawal.** Kegagalan W1 bukan gangguan untuk
+di`skip` — ia menangkap positif palsu yang akan muncul dalam laporan live
+ChatGPT (jadual rasmi dilaporkan sebagai "WARISAN").
+
+**Pengajaran 78.** **Komen yang menyatakan sebab ialah tuntutan yang boleh
+diuji.** "is_active boleh NULL" terselamat daripada semakan sehingga satu ujian
+cuba menulis NULL. Ambil kekangan lajur daripada `information_schema`, bukan
+daripada takrifan `RETURNS TABLE` fungsi yang kebetulan senama.
+
+**Pengajaran 79.** **Pengawal yang belum pernah gagal belum terbukti.**
+`test-konvensyen-privilej.mjs` diuji-mutasi dengan fail scratch yang sengaja
+melanggar sebelum diterima; tanpa itu, 14/14 lulus tidak membezakan pengawal
+yang berfungsi daripada pengawal yang sentiasa lulus.
